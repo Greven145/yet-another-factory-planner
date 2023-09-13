@@ -1,6 +1,11 @@
 # Community
 
-Very sorry I haven't been actively responding to issues and PRs. Life is hard! I've got a lot going on IRL. I hope to be making big improvements to this project in the coming month or so, though. It's not abandoned, just temporarily inactive!
+The original author is dealing with life issues, and in an attempt to have a version of the tool that I like and to have it available, I have forked this repo and modified the backend to work on an Azure Function consumption plan with a consumption based Cosmos DB data store, serving the UI file from a CDN resource.
+
+# To Come
+
+* Infrastructure automation code for provisioning the appropriate resources to host the tool
+* Github workflows to build, test, scan, etc etc the code
 
 # Info
 
