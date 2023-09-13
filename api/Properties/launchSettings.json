@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "api": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 8000"
+    },
+    "Docker": {
+      "commandName": "Docker",
+      "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
+      "httpPort": 30426,
+      "useSSL": false
+    }
+  }
+}

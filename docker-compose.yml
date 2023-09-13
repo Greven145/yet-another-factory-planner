@@ -1,0 +1,62 @@
+networks:
+  default:
+    external: false
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.16.238.0/24"
+
+services:
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    ports:
+      - '80:80'
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - '8080:80'
+    environment:
+      - EndPointUri=https://172.16.238.246:8081
+      - CosmosKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
+      - CONTAINER_NAME=enableCors
+      - CORS_ALLOWED_ORIGINS=["http://localhost"]
+    entrypoint: ["/bin/bash","-c"]
+    command:
+       - |
+        curl -fk -o ~/cosmosemulatorcert.crt https://172.16.238.246:8081/_explorer/emulator.pem
+        cp ~/cosmosemulatorcert.crt /usr/local/share/ca-certificates/
+        update-ca-certificates
+        /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost
+    depends_on:
+      cosmosdb:
+        condition: service_healthy
+  cosmosdb:
+    image: "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest"
+    tty: true
+    restart: always
+    mem_limit: 3G
+    cpu_count: 4
+    ports:
+      - '8081:8081'
+      - '10250-10255:10250-10255'
+    networks:
+      default:
+        ipv4_address: 172.16.238.246
+    environment:
+      - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
+      - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8081/_explorer/emulator.pem"]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    entrypoint: ["/bin/bash","-c"]
+    command:
+       - |
+          apt-get update -y && apt-get install -y curl
+          /usr/local/bin/cosmos/start.sh
