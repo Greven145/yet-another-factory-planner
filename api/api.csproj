@@ -52,6 +52,11 @@
 			<AutoGen>True</AutoGen>
 			<DependentUpon>U6.resx</DependentUpon>
 		</Compile>
+		<Compile Update="Resources\U8.Designer.cs">
+		  <DependentUpon>U8.resx</DependentUpon>
+		  <DesignTime>True</DesignTime>
+		  <AutoGen>True</AutoGen>
+		</Compile>
 		<Compile Update="Resources\U7.Designer.cs">
 			<DesignTime>True</DesignTime>
 			<AutoGen>True</AutoGen>
@@ -66,6 +71,10 @@
 		<EmbeddedResource Update="Resources\U6.resx">
 			<Generator>ResXFileCodeGenerator</Generator>
 			<LastGenOutput>U6.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+		<EmbeddedResource Update="Resources\U8.resx">
+		  <LastGenOutput>U8.Designer.cs</LastGenOutput>
+		  <Generator>ResXFileCodeGenerator</Generator>
 		</EmbeddedResource>
 		<EmbeddedResource Update="Resources\U7.resx">
 			<Generator>ResXFileCodeGenerator</Generator>
