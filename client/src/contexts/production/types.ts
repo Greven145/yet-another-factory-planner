@@ -42,3 +42,13 @@ export type FactoryOptions = {
   allowedRecipes: RecipeSelectionMap,
   nodesPositions: NodeInfo[],
 };
+
+export type NodeInformation = {
+  x: number,
+  y: number,
+  key: string,
+}
+
+export type FactoryGraphChanges = {
+  nodes: NodeInformation[],
+}
