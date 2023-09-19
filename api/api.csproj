@@ -16,10 +16,10 @@
 		<PublishReadyToRun>true</PublishReadyToRun>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Azure.Identity" Version="1.10.0" />
+		<PackageReference Include="Azure.Identity" Version="1.10.1" />
 		<PackageReference Include="FluentValidation" Version="11.7.1" />
 		<PackageReference Include="Microsoft.ApplicationInsights.WorkerService" Version="2.21.0" />
-		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.35.3" />
+		<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.35.4" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.19.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" Version="1.0.0" />
 		<PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.1.0" />
