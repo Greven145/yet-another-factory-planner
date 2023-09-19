@@ -41,6 +41,7 @@ export function usePostSharedFactory() {
           buildings: Number(req.factoryConfig.weightingOptions.buildings),
         },
         allowedRecipes: Object.keys(req.factoryConfig.allowedRecipes).filter((key) => req.factoryConfig.allowedRecipes[key]),
+        nodesPositions: req.factoryConfig.nodesPositions,
       }
     }
     const res = await post('/share-factory', body);

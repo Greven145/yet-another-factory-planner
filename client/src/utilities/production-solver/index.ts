@@ -141,7 +141,7 @@ export class ProductionSolver {
         this.allowedItems[p.itemClass] = true;
       });
     });
-    
+
     this.globalWeights = {
       resources: Number(options.weightingOptions.resources),
       power: Number(options.weightingOptions.power),
@@ -314,7 +314,7 @@ export class ProductionSolver {
     }
   }
 
-  private validateNumber(num: Number) {
+  private validateNumber(num: number) {
     if (Number.isNaN(num)) {
       throw new GraphError('INVALID VALUE: NOT A NUMBER', 'Double check your factory settings.');
     } else if (num < 0) {
@@ -413,7 +413,7 @@ export class ProductionSolver {
         }
       }
 
-      
+
       model.objective.vars.push({
         name: recipeKey,
         coef: powerScore + resourceScore + buildingsScore,
@@ -446,7 +446,7 @@ export class ProductionSolver {
       }
     }
 
-  
+
     if (doPoints) {
       let intrinsicPoints = 0;
       for (const [itemKey, inputInfo] of Object.entries(remainingInputs)) {
@@ -484,7 +484,7 @@ export class ProductionSolver {
     for (const [itemKey, itemInfo] of Object.entries(this.gameData.items)) {
       if (!this.allowedItems[itemKey]) continue;
       const vars: Var[] = [];
-      
+
       const binKey = `${itemKey}_BIN`;
       const binVars: Var[] = [];
 
@@ -649,7 +649,7 @@ export class ProductionSolver {
       while (i < usedBy.length) {
         const usageInfo = usedBy[i];
         const usageNode = graph.nodes[usageInfo.recipeKey];
-        
+
         while (j < producedBy.length) {
           const productionInfo = producedBy[j];
           const productionNode = graph.nodes[productionInfo.recipeKey];
@@ -680,7 +680,7 @@ export class ProductionSolver {
               to: itemNode.id,
               productionRate: recipeAmount,
             });
-          } 
+          }
 
           if (productionInfo.amount < EPSILON) {
             j++
@@ -706,7 +706,7 @@ export class ProductionSolver {
             usageInfo.amount -= productionInfo.amount;
             productionInfo.amount = 0;
           }
-          
+
           if (usageInfo.amount < EPSILON) {
             i++;
             continue nextDemand;

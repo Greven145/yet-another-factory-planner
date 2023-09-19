@@ -14,6 +14,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         RuleFor(x => x.WeightingOptions).NotNull().SetValidator(new WeightingOptionsValidator());
         RuleFor(x => x.AllowedRecipes).NotEmpty();
         RuleForEach(x => x.AllowedRecipes).NotEmpty();
+        RuleForEach(x => x.NodesPositions).SetValidator(new NodePositionValidator());
     }
 
     private sealed class ProductionItemsValidator : AbstractValidator<ProductionItems> {
@@ -39,6 +40,15 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
             RuleFor(x => x.Power).NotNull();
             RuleFor(x => x.Complexity).NotNull();
             RuleFor(x => x.Buildings).NotNull();
+        }
+    }
+    private sealed class NodePositionValidator : AbstractValidator<NodePosition>
+    {
+        public NodePositionValidator()
+        {
+            RuleFor(x => x.Key).NotEmpty();
+            RuleFor(x => x.X).NotNull();
+            RuleFor(x => x.Y).NotNull();
         }
     }
 }

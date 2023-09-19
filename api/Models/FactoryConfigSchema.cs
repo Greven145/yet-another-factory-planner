@@ -9,4 +9,5 @@ public record FactoryConfigSchema {
     public Input[] InputResources { get; init; } = Array.Empty<Input>();
     public ProductionItems[] ProductionItems { get; init; } = Array.Empty<ProductionItems>();
     public WeightingOptions WeightingOptions { get; init; } = new(1000, 1, 0, 0);
+    public NodePosition[] NodesPositions { get; init; } = Array.Empty<NodePosition>();
 }
