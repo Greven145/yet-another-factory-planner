@@ -56,7 +56,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   const getInitialize = useGetInitialize();
 
   const pageTitle = useMemo(() => {
-    const base = 'Yet Another Factory Planner';
+    const base = 'Another... Yet Another Factory Planner';
     let versionPart = '';
     if (gameVersion) {
       versionPart = `[${gameVersion}] `;

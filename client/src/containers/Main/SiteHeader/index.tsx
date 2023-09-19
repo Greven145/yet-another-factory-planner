@@ -14,7 +14,7 @@ const SiteHeader = () => {
   return (
     <HeaderContainer fluid>
       <img src={logo} height={42} alt='Satisfactory logo' />
-      <MainTitle>[Yet Another Factory Planner]</MainTitle>
+      <MainTitle>[Another... Yet Another Factory Planner]</MainTitle>
       <RightAlign>
         <Select
           aria-label="Game version"
