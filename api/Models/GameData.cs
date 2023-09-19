@@ -12,4 +12,7 @@ public sealed record GameData(string Buildings, string Recipes, string Resources
 
     public static readonly GameData U7Data = new(U7.buildings, U7.recipes, U7.resources, U7.items,
         U7.handGatheredItems);
+
+    public static readonly GameData U8Data = new(U8.buildings, U8.recipes, U8.resources, U8.items,
+        U8.handGatheredItems);
 }

@@ -23,7 +23,7 @@ GET http://{{hostname}}:{{port}}/initialize?factoryKey=8j6-5VpBGFlbEdWddtiAw
 
 ### Initialize Incorrect
 
-GET http://{{hostname}}:{{port}}/initialize?gameVersion=U8
+GET http://{{hostname}}:{{port}}/initialize?gameVersion=U9
 
 ### Initialize undefined
 

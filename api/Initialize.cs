@@ -20,7 +20,7 @@ public class Initialize {
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "initialize")]
         HttpRequestData req, CancellationToken cancellationToken) {
-        var request = req.Query["gameVersion"] ?? "U7";
+        var request = req.Query["gameVersion"] ?? "U8";
         var factoryKey = req.Query["factoryKey"];
 
         if (factoryKey is not null) {
@@ -43,6 +43,7 @@ public class Initialize {
             "U5" => new ResponseData(HttpStatusCode.OK, "application/json", GetGameData(GameData.U5Data, _factoryData)),
             "U6" => new ResponseData(HttpStatusCode.OK, "application/json", GetGameData(GameData.U6Data, _factoryData)),
             "U7" => new ResponseData(HttpStatusCode.OK, "application/json", GetGameData(GameData.U7Data, _factoryData)),
+            "U8" => new ResponseData(HttpStatusCode.OK, "application/json", GetGameData(GameData.U8Data, _factoryData)),
             _ => new ResponseData(HttpStatusCode.BadRequest, "text/plain", "Invalid game version")
         };
 
