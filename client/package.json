@@ -1,18 +1,19 @@
 {
     "name": "yet-another-factory-planner-client",
-    "version": "6.0.0",
+    "version": "6.1.0",
     "private": true,
     "repository": {
         "type": "git",
-        "directory": "git+https://github.com/lydianlights/yet-another-factory-planner.git"
+        "directory": "git+https://github.com/Greven145/yet-another-factory-planner.git"
     },
-    "homepage": "https://www.satisfactory-planner.net",
+    "homepage": "https://yafp.game.gottselig.ca/",
     "scripts": {
         "start": "craco start",
         "build": "craco build",
+        "analyze": "source-map-explorer 'build/static/js/*.js'",
         "staging": "env-cmd -f .env.staging npm start",
-        "predeploy": "npm run build && echo www.satisfactory-planner.net > ./build/CNAME",
-        "deploy": "gh-pages -d build"
+        "predeploy": "npm run build && echo yafp.game.gottselig.ca > ./build/CNAME",
+        "deploy": "az storage blob upload-batch --account-name yafp -s ./build -d '$web' --auth-mode login --overwrite"
     },
     "eslintConfig": {
         "extends": [
