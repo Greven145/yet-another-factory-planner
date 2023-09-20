@@ -97,7 +97,8 @@ export type Report = {
   totalRawResources: {
     [key: string]: number,
   },
-  totalItemsRecap: ProducedItemInformation[]
+  totalItemsRecap: ProducedItemInformation[],
+  loopWarning: boolean,
 }
 
 export type ProductionGraph = {
@@ -805,7 +806,8 @@ export class ProductionSolver {
       buildingsUsed: {},
       totalMaterialCost: {},
       totalRawResources: {},
-      totalItemsRecap: []
+      totalItemsRecap: [],
+      loopWarning: false
     };
 
     report.totalItemsRecap = this.generateItemsPerStep(productionGraph);
@@ -889,6 +891,8 @@ export class ProductionSolver {
 
     report.estimatedFoundations = Math.ceil(2 * (report.totalBuildArea / 64));
 
+    report.loopWarning = this.hasLoop(productionGraph);
+
     return report;
   }
 
@@ -943,9 +947,14 @@ export class ProductionSolver {
         }
       }
 
-      usedKeys = [...usedKeys, ...loopKeys];
-      keys = keys.filter(unusedKeyFilter);
-      step++;
+      if ( usedKeys.length < loopKeys.length ||
+           !usedKeys.slice(-loopKeys.length).every((key, index) => key === loopKeys[index] )) {
+        usedKeys = [...usedKeys, ...loopKeys];
+        keys = keys.filter(unusedKeyFilter);
+        step++;
+      } else {
+        keys = [];
+      }
     }
 
     return itemsList;
@@ -972,4 +981,38 @@ export class ProductionSolver {
       item.step = step;
     }
   }
+
+  private hasLoop(productionGraph: ProductionGraph): boolean {
+    const visited = new Set<string>();
+    const stack = new Set<string>();
+
+    function dfs(node: string): boolean {
+      visited.add(node);
+      stack.add(node);
+
+      for (const edge of productionGraph.edges.filter(e => e.from === node).map((e) => e.to)) {
+        if ( stack.has(edge) ) {
+          return true;
+        } else if (!visited.has(edge)) {
+          if ( dfs(edge) ) {
+            return true;
+          }
+        }
+      }
+
+      stack.delete(node);
+      return false;
+    }
+
+    for (const node of Object.keys(productionGraph.nodes).map((k) => productionGraph.nodes[k])) {
+      if (!visited.has(node.id)) {
+        if (dfs(node.id)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
 }
+

@@ -47,6 +47,7 @@ const ReportTab = () => {
         <SDivider />
 
         <Title order={2} style={{ marginTop: '30px' }}>Summary of produced items</Title>
+          {renderLoopWarning()}
         <SDivider />
         <List listStyleType='none'>
           {renderSteps()}
@@ -101,6 +102,13 @@ const ReportTab = () => {
         <ItemLabel>{itemInfo.name}</ItemLabel>  <Count>x{formatFloat(itemInfo.amount)}/min</Count>
       </List.Item>
     ));
+  }
+
+  function renderLoopWarning(){
+    if (report!.loopWarning ) {
+      return <SmallerTitle order={3} >⚠️Warning⚠️: A loop was detected, these values may not be reliable</SmallerTitle>
+    }
+    return null;
   }
 
   function renderBuildingsUsed() {
