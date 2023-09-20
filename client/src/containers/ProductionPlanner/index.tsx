@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader, Divider, Text, Title } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';

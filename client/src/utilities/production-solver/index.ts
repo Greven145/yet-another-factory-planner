@@ -1,9 +1,8 @@
 import loadGLPK, { GLPK, LP, Var } from 'glpk.js';
 import { nanoid } from 'nanoid';
 import { FactoryOptions, RecipeSelectionMap } from '../../contexts/production/types';
-import { GameData } from '../../contexts/gameData/types';
+import { GameData, ItemRate } from '../../contexts/gameData/types';
 import { GraphError } from '../error/GraphError';
-import { forEach } from 'lodash';
 
 const EPSILON = 1e-8;
 const MIN_RESOURCE_WEIGHT = 0.0001;
@@ -816,8 +815,6 @@ export class ProductionSolver {
       {
         report.totalRawResources[this.gameData.items[node.key].name] = node.multiplier;
       }
-    }
-    for (const [key, node] of Object.entries(productionGraph.nodes)) {
       if (node.type === NODE_TYPE.RECIPE) {
         const recipeInfo = this.gameData.recipes[key];
         const buildingKey = recipeInfo.producedIn;
@@ -925,11 +922,14 @@ export class ProductionSolver {
     //to another recipe that should have been in the next step
     let loopKeys = [] as string[];
 
+    let ingredientKeyFilter = (ingredient:ItemRate) => usedKeys.includes(ingredient.itemClass);
+    let unusedKeyFilter = (key:string) => !usedKeys.includes(key);
+
     while (keys.length > 0){
-      for (var key of keys){
+      for (key of keys){
         const recipe = this.gameData.recipes[key];
-        const applicableIngredientsAmount = recipe.ingredients.filter((ingredient) => usedKeys.includes(ingredient.itemClass)).length;
-        if (applicableIngredientsAmount == recipe.ingredients.length){
+        const applicableIngredientsAmount = recipe.ingredients.filter(ingredientKeyFilter).length;
+        if (applicableIngredientsAmount === recipe.ingredients.length){
           for (var product of recipe.products){
             if (!this.gameData.resources[product.itemClass])
             {
@@ -944,7 +944,7 @@ export class ProductionSolver {
       }
 
       usedKeys = [...usedKeys, ...loopKeys];
-      keys = keys.filter((key) => !usedKeys.includes(key));
+      keys = keys.filter(unusedKeyFilter);
       step++;
     }
 

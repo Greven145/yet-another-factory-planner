@@ -382,7 +382,6 @@ const ProductionGraphTab = () => {
   }
 
   function areNodesSame(node1: NodeInfo, node2: NodeInfo): boolean {
-    console.log(node1 == node2);
     console.log(node1 === node2);
     return false;
   }

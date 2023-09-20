@@ -159,7 +159,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       gameVersion,
       setGameVersion: handleSetGameVersion,
     }
-  }, [completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading]);
+  }, [completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading, loadingError]);
 
   return (
     <GameDataContext.Provider value={ctxValue}>
