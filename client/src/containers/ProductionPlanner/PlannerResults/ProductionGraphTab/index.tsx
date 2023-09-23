@@ -22,6 +22,21 @@ if (process.env.NODE_ENV !== 'development') {
   Cytoscape.warnings(false);
 }
 
+const layout = {
+  name: 'klay',
+  padding: 40,
+  transform: (node: any, pos: any) => { return pos; },
+  klay: {
+    direction: 'RIGHT',
+    edgeRouting: 'ORTHOGONAL',
+    nodePlacement: 'LINEAR_SEGMENTS',
+    edgeSpacingFactor: 0.2,
+    inLayerSpacingFactor: 0.7,
+    spacing: 90,
+    thoroughness: 10,
+  },
+};
+
 const stylesheet: Stylesheet[] = [
   {
     // ====== BASE ====== //
@@ -293,21 +308,6 @@ const ProductionGraphTab = () => {
   const nodesPositions = ctx.state.nodesPositions;
   let currentNodePosition: NodeInfo | undefined;
 
-  const layout = {
-    name: 'klay',
-    padding: 40,
-    transform: modifyNodePositions,
-    klay: {
-      direction: 'RIGHT',
-      edgeRouting: 'ORTHOGONAL',
-      nodePlacement: 'LINEAR_SEGMENTS',
-      edgeSpacingFactor: 0.2,
-      inLayerSpacingFactor: 0.7,
-      spacing: 90,
-      thoroughness: 10,
-    },
-  };
-
   function modifyNodePositions(node: any, pos: any){
     let savedNode = nodesPositions?.find(n => n.key === node.data('key'));
     if (savedNode){
@@ -315,6 +315,7 @@ const ProductionGraphTab = () => {
     }
     return pos;
   }
+  layout.transform = modifyNodePositions;
 
   function setGraphRef(instance: HTMLDivElement | null) {
     if (instance && !graphRef.current) {
