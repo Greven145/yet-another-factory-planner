@@ -5,7 +5,7 @@ import Cytoscape, { Stylesheet } from 'cytoscape';
 import klay from 'cytoscape-klay';
 import GraphVisualizer from 'react-cytoscapejs';
 import popper from 'cytoscape-popper';
-import { Text, Container, Center, Group, Loader } from '@mantine/core';
+import { Text, Container, Center, Group, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { GraphNode, GraphEdge, NODE_TYPE } from '../../../../utilities/production-solver';
 import { graphColors } from '../../../../theme';
@@ -229,6 +229,27 @@ const NODE_COLOR_CLASS = {
   [NODE_TYPE.RECIPE]: 'recipe',
 };
 
+const GraphButtonGroup = styled(Group)`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 100;
+`;
+
+//Extend the mantine/core button component to add a custom style
+const GraphButton = styled(Button)<ButtonProps<'button'>>`
+  opacity: 0.1;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  padding: 5px;
+  &:hover {
+    opacity: 0.8;
+  }
+  &:active {
+    opacity: 1;
+  }
+`;
+
 function getNodeLabel(node: GraphNode, gameData: GameData) {
   let label = '';
   let amountText = '';
@@ -308,10 +329,10 @@ const ProductionGraphTab = () => {
   const nodesPositions = ctx.state.nodesPositions;
   let currentNodePosition: NodeInfo | undefined;
 
-  function modifyNodePositions(node: any, pos: any){
+  function modifyNodePositions(node: any, pos: any) {
     let savedNode = nodesPositions?.find(n => n.key === node.data('key'));
-    if (savedNode){
-      return {x: savedNode.x, y:savedNode.y};
+    if (savedNode) {
+      return { x: savedNode.x, y: savedNode.y };
     }
     return pos;
   }
@@ -337,12 +358,14 @@ const ProductionGraphTab = () => {
       e.target.addClass('selected');
       e.target.outgoers('edge').addClass('selected').addClass('selected-outgoing');
       e.target.incomers('edge').addClass('selected').addClass('selected-incoming');
+      deactivatePopper(cy);
     });
 
     cy.on('unselect', 'node', function (e) {
       e.target.removeClass('selected');
       e.target.outgoers('edge').removeClass('selected').removeClass('selected-outgoing');
       e.target.incomers('edge').removeClass('selected').removeClass('selected-incoming');
+      deactivatePopper(cy);
     });
 
     cy.on('grab', 'node', function (e) {
@@ -350,13 +373,14 @@ const ProductionGraphTab = () => {
       e.target.outgoers('edge').addClass('grabbed').addClass('grabbed-outgoing');
       e.target.incomers('edge').addClass('grabbed').addClass('grabbed-incoming');
       registerNodePosition(e.target.data('key'), e.target.position('x'), e.target.position('y'));
+      deactivatePopper(cy);
     });
 
     cy.on('free', 'node', function (e) {
       e.target.removeClass('grabbed');
       e.target.outgoers('edge').removeClass('grabbed').removeClass('grabbed-outgoing');
       e.target.incomers('edge').removeClass('grabbed').removeClass('grabbed-incoming');
-      if (currentNodePosition && !areNodesSame(currentNodePosition, { key: e.target.data('key'), x: e.target.position('x'), y: e.target.position('y') })){
+      if (currentNodePosition && !areNodesSame(currentNodePosition, { key: e.target.data('key'), x: e.target.position('x'), y: e.target.position('y') })) {
         updateStateNodePosition(e.target.data('key'), e.target.position('x'), e.target.position('y'));
         ctx.dispatch({ type: 'UPDATE_NODES_POSTIONS', nodesPositions: nodesPositions });
         currentNodePosition = undefined;
@@ -378,24 +402,29 @@ const ProductionGraphTab = () => {
     });
   }
 
-  function registerNodePosition(key: string, x: number, y: number){
+  function registerNodePosition(key: string, x: number, y: number) {
     currentNodePosition = { key: key, x: x, y: y };
+  }
+
+  function resetNodePositions() {
+    nodesPositions.length = 0;
+    ctx.dispatch({ type: 'UPDATE_NODES_POSTIONS', nodesPositions: nodesPositions });
   }
 
   function areNodesSame(node1: NodeInfo, node2: NodeInfo): boolean {
     console.log(node1 === node2);
     return false;
   }
-  function updateStateNodePosition(key: string, x: number, y: number){
+  function updateStateNodePosition(key: string, x: number, y: number) {
     let existingNode = nodesPositions?.find(node => node.key === key);
-    if (existingNode){
-      if (existingNode.x !== x || existingNode.y !== y){
+    if (existingNode) {
+      if (existingNode.x !== x || existingNode.y !== y) {
         existingNode.x = x;
         existingNode.y = y;
       }
     }
-    else{
-      nodesPositions.push({key: key, x: x, y: y });
+    else {
+      nodesPositions.push({ key: key, x: x, y: y });
     }
   }
 
@@ -464,12 +493,16 @@ const ProductionGraphTab = () => {
     });
 
     return { key, elements };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultsGraph]);
 
   return (
     <>
       <GraphContainer fluid ref={setGraphRef}>
+        <GraphButtonGroup>
+          <GraphButton onClick={() => { cyRef.current?.fit(); }}>Fit Graph</GraphButton>
+          <GraphButton onClick={() => { resetNodePositions(); }}>Reset positions</GraphButton>
+        </GraphButtonGroup>
         {
           isLoading && (
             <Center style={{ position: 'absolute', height: '100%', width: '100%' }}>
@@ -480,7 +513,7 @@ const ProductionGraphTab = () => {
         {
           doFirstRender && !isLoading && (
             graphProps != null
-            ? (
+              ? (
                 <GraphVisualizer
                   key={graphProps.key}
                   elements={graphProps.elements}
@@ -493,27 +526,27 @@ const ProductionGraphTab = () => {
                   style={{ position: 'absolute', height: '100%', width: '100%', overflow: 'hidden' }}
                   cy={setCyRef}
                 />
-            )
-            : (
-              <Center style={{ position: 'absolute', height: '100%', width: '100%' }}>
-                <Group>
-                  <AlertCircle color="#eee" size={85} style={{ position: 'relative', top: '3px' }} />
-                  <Group direction='column' style={{ gap: '0px' }}>
-                    <Text style={{ fontSize: '28px' }}>
-                      Could not build graph
-                    </Text>
+              )
+              : (
+                <Center style={{ position: 'absolute', height: '100%', width: '100%' }}>
+                  <Group>
+                    <AlertCircle color="#eee" size={85} style={{ position: 'relative', top: '3px' }} />
+                    <Group direction='column' style={{ gap: '0px' }}>
+                      <Text style={{ fontSize: '28px' }}>
+                        Could not build graph
+                      </Text>
                       {graphError
-                      ? (
-                        <Text style={{ maxWidth: '600px', fontSize: '14px' }}>
+                        ? (
+                          <Text style={{ maxWidth: '600px', fontSize: '14px' }}>
                             {`ERROR: ${graphError.message}`}<br />
                             {graphError?.helpText || ''}
-                        </Text>
-                      )
-                      : null}
+                          </Text>
+                        )
+                        : null}
+                    </Group>
                   </Group>
-                </Group>
-              </Center>
-            )
+                </Center>
+              )
           )
         }
       </GraphContainer>
