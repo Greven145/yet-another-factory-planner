@@ -3,5 +3,5 @@
 public record ProductionItems(
     string ItemKey,
     string Mode,
-    int Value
+    decimal Value
 );

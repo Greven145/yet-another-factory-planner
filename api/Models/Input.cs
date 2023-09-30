@@ -1,3 +1,3 @@
 ﻿namespace api.Models;
 
-public record Input(string ItemKey, int Value, int Weight, bool Unlimited);
+public record Input(string ItemKey, decimal Value, int Weight, bool Unlimited);
