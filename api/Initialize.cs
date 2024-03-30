@@ -43,7 +43,7 @@ if (result.IsT1) {
             "U6" => GetGameData(GameData.U6Data, _factoryData),
             "U7" => GetGameData(GameData.U7Data, _factoryData),
             "U8" => GetGameData(GameData.U8Data, _factoryData),
-            _ => throw new NotImplementedException()
+            _ => null
         };
 
         return new ContentResult {
