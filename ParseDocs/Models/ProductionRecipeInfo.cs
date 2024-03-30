@@ -10,8 +10,8 @@ public class ProductionRecipeInfo
     public bool HandCraftable { get; set; }
     public bool WorkshopCraftable { get; set; }
     public bool MachineCraftable { get; set; }
-    public List<ItemQuantity> Ingredients { get; set; } = new();
-    public List<ItemQuantity> Products { get; set; } = new();
+    public List<ItemQuantity> Ingredients { get; set; } = [];
+    public List<ItemQuantity> Products { get; set; } = [];
     public string ProducedIn { get; set; } = string.Empty;
     public EventType Event { get; set; }
 }

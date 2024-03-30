@@ -1,48 +1,35 @@
-using api.Extensions;
 using api.Models;
-using api.Validation;
+using FluentValidation;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Configuration;
 using NanoidDotNet;
 
 namespace api;
 
-public class ShareFactory {
-    private readonly IConfiguration _configuration;
-
-    public ShareFactory(IConfiguration configuration) {
-        _configuration = configuration;
-    }
-
+public class ShareFactory(IValidator<FactoryConfigSchema> validator, FactoryClient factoryClient) {
     [Function(nameof(ShareFactory))]
-    public async Task<HttpResponseData> Run(
+    public async Task<IActionResult> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "share-factory")]
-        HttpRequestData req, CancellationToken cancellationToken) {
-        if (req.Body.Length == 0) {
-            return await req.CreateBadRequestResponseAsync(new { message = "Invalid request body" }, cancellationToken);
-        }
-
-        var factoryConfig = await req.ReadFromJsonAsync<ShareFactoryRequest>(cancellationToken);
+        HttpRequest req,
+        [Microsoft.Azure.Functions.Worker.Http.FromBody] ShareFactoryRequest factoryConfig,
+        CancellationToken cancellationToken) {
 
         if (factoryConfig is not { FactoryConfig: not null }) {
-            return await req.CreateBadRequestResponseAsync(new { message = "Invalid request body" }, cancellationToken);
+            return new BadRequestObjectResult(new { message = "Invalid request body" });
         }
 
-        var validator = new FactoryConfigSchemaValidator();
         var validationResult = await validator.ValidateAsync(factoryConfig.FactoryConfig, cancellationToken);
 
         if (!validationResult.IsValid) {
-            return await req.CreateBadRequestResponseAsync(
-                new { message = string.Join('.', validationResult.Errors.Select(x => x.ErrorMessage)) },
-                cancellationToken);
+            return new BadRequestObjectResult(
+                new { message = string.Join('.', validationResult.Errors.Select(x => x.ErrorMessage)) });
         }
 
         var factoryId = await Nanoid.GenerateAsync();
 
-        var factoryClient = new FactoryClient(_configuration);
         await factoryClient.SaveFactory(factoryConfig.FactoryConfig with { Id = factoryId }, cancellationToken);
 
-        return await req.CreateCreatedResponseAsync(new { data = new { key = factoryId } }, cancellationToken);
+        return new CreatedResult($"initialize?factoryKey={factoryId}", new { data = new { key = factoryId } });
     }
 }

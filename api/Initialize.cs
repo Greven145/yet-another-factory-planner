@@ -8,14 +8,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace api;
 
-public class Initialize {
-    private readonly IConfiguration _configuration;
+public class Initialize(IConfiguration configuration) {
     private string _factoryData = "";
     private static readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-
-    public Initialize(IConfiguration configuration) {
-        _configuration = configuration;
-    }
 
     [Function(nameof(Initialize))]
     public async Task<HttpResponseData> Run(
@@ -25,7 +20,7 @@ public class Initialize {
         var factoryKey = req.Query["factoryKey"];
 
         if (factoryKey is not null) {
-            var factoryClient = new FactoryClient(_configuration);
+            var factoryClient = new FactoryClient(configuration);
 
             var result = await factoryClient.GetFactory(factoryKey, request, cancellationToken);
             result.Switch(
