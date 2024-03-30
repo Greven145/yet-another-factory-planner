@@ -20,10 +20,10 @@ const Main = () => {
         </ErrorBoundary>
         <Footer>
           <FooterContent>
-            Made with ♥ by <ExternalLink href='https://github.com/lydianlights'>LydianLights</ExternalLink> -
-            Questions or bugs? File an <ExternalLink href='https://github.com/lydianlights/yet-another-factory-planner/issues'>issue on github</ExternalLink>
+            Originall made with ♥ by <ExternalLink href='https://github.com/lydianlights'>LydianLights</ExternalLink> -
+            Lovingly updated and maintained by <ExternalLink href='https://github.com/Greven145'>Greven145</ExternalLink> -
+            Questions or bugs? File an <ExternalLink href='https://github.com/Greven145/yet-another-factory-planner/issues'>issue on github</ExternalLink>
           </FooterContent>
-          <PaypalButton />
         </Footer>
       </MainContainer>
     </AppShell>

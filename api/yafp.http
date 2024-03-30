@@ -19,7 +19,7 @@ GET http://{{hostname}}:{{port}}/initialize?gameVersion=U7
 
 ### Initialize with shared factory key
 
-GET http://{{hostname}}:{{port}}/initialize?factoryKey=8j6-5VpBGFlbEdWddtiAw
+GET http://{{hostname}}:{{port}}/initialize?factoryKey=d7ACITo29Ms8wW8Sa4hgK
 
 ### Initialize Incorrect
 
