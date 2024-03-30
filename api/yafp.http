@@ -17,6 +17,10 @@ GET http://{{hostname}}:{{port}}/initialize?gameVersion=U6
 
 GET http://{{hostname}}:{{port}}/initialize?gameVersion=U7
 
+### Initialize U8
+
+GET http://{{hostname}}:{{port}}/initialize?gameVersion=U8
+
 ### Initialize with shared factory key
 
 GET http://{{hostname}}:{{port}}/initialize?factoryKey=il2tcCuCO0znk8eMEeWRN

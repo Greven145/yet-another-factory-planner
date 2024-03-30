@@ -1,13 +1,11 @@
-using api.Extensions;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
 
 namespace api;
 
 public class Ping {
     [Function(nameof(Ping))]
-    public async Task<HttpResponseData> Run(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ping")]
-        HttpRequestData req, CancellationToken cancellationToken) =>
-        await req.CreateResponseAsync(new { data = new { message = "pong" } }, cancellationToken);
+    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ping")] HttpRequest _) =>
+        new OkObjectResult(new { message = "Pong" });
 }
