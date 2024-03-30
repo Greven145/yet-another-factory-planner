@@ -8,12 +8,12 @@ using Parser = ParseDocs.Parser;
 
 var rootCommand = new RootCommand("Generated the YAFP data from parsed Satisfactory docs");
 var inputOption = new Option<DirectoryInfo>(
-    aliases: new[] {"--input","-i"},
+    aliases: ["--input","-i"],
 isDefault: true,
 parseArgument: result => new DirectoryInfo(result.Tokens.Single().Value),
     description: "The path to the parsed output of the Docs.json file.");
 var outputOption = new Option<DirectoryInfo>(
-    aliases: new[] { "--output", "-o" },
+    aliases: ["--output", "-o"],
     parseArgument: result => new DirectoryInfo(result.Tokens.Single().Value),
     description: "The path to save the YAFP object outputs.");
 

@@ -35,7 +35,7 @@ public static class Parser {
 
             var recipeData = buildableRecipes.Values.FirstOrDefault(br => br.Product == buildingKey);
             var buildCost = recipeData?.Ingredients ?? new List<ItemQuantity>();
-            if (!buildCost.Any())
+            if (buildCost.Count == 0)
             {
                 Console.WriteLine($"Building {buildingKey} HAS NOT BUILD COST");
             }

@@ -11,6 +11,7 @@ namespace api;
 public class Initialize {
     private readonly IConfiguration _configuration;
     private string _factoryData = "";
+    private static readonly JsonSerializerOptions _jsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public Initialize(IConfiguration configuration) {
         _configuration = configuration;
@@ -29,7 +30,7 @@ public class Initialize {
             var result = await factoryClient.GetFactory(factoryKey, request, cancellationToken);
             result.Switch(
                 factory => _factoryData = $"""
-                                           "factory_config" : {JsonSerializer.Serialize(factory, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })},
+                                           "factory_config" : {JsonSerializer.Serialize(factory, _jsonSerializerOptions)},
                                            """,
                 none => { }
             );
