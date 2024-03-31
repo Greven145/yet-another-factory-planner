@@ -6,6 +6,6 @@ namespace api;
 
 public class Ping {
     [Function(nameof(Ping))]
-    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ping")] HttpRequest _) =>
+    public IActionResult Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ping")] HttpRequest req) =>
         new OkObjectResult(new { message = "Pong" });
 }

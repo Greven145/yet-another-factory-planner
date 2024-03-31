@@ -11,7 +11,7 @@ public class ShareFactory(IValidator<FactoryConfigSchema> validator, FactoryClie
     [Function(nameof(ShareFactory))]
     public async Task<IActionResult> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "share-factory")]
-        HttpRequest _,
+        HttpRequest req,
         [Microsoft.Azure.Functions.Worker.Http.FromBody] ShareFactoryRequest factoryConfig,
         CancellationToken cancellationToken) {
 
