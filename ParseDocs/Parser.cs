@@ -34,8 +34,8 @@ public static class Parser {
             }
 
             var recipeData = buildableRecipes.Values.FirstOrDefault(br => br.Product == buildingKey);
-            var buildCost = recipeData?.Ingredients ?? new List<ItemQuantity>();
-            if (!buildCost.Any())
+            var buildCost = recipeData?.Ingredients ?? [];
+            if (buildCost.Count == 0)
             {
                 Console.WriteLine($"Building {buildingKey} HAS NOT BUILD COST");
             }
@@ -59,12 +59,12 @@ public static class Parser {
 
         recipesOutput.Add("Recipe_CUSTOM_NuclearPower_C",
             new Recipe("uranium_power_recipe", "Uranium Power", false,
-                new List<ItemPerMinute> { new("Desc_NuclearFuelRod_C", 0.2m), new("Desc_Water_C", 240) },
-                new List<ItemPerMinute> { new("Desc_NuclearWaste_C", 10) }, "Desc_GeneratorNuclear_C", false));
+                [new("Desc_NuclearFuelRod_C", 0.2m), new("Desc_Water_C", 240)],
+                [new("Desc_NuclearWaste_C", 10)], "Desc_GeneratorNuclear_C", false));
         recipesOutput.Add("Recipe_CUSTOM_PlutoniumPower_C",
             new Recipe("plutonium_power_recipe", "Plutonium Power", false,
-                new List<ItemPerMinute> { new("Desc_PlutoniumFuelRod_C", 0.1m), new("Desc_Water_C", 240) },
-                new List<ItemPerMinute> { new("Desc_PlutoniumWaste_C", 1) }, "Desc_GeneratorNuclear_C", false));
+                [new("Desc_PlutoniumFuelRod_C", 0.1m), new("Desc_Water_C", 240)],
+                [new("Desc_PlutoniumWaste_C", 1)], "Desc_GeneratorNuclear_C", false));
 
         var resourcesOutput = new Dictionary<string, Resource>();
         var maxExtraction = 0d;

@@ -5,7 +5,7 @@ public class BuildableInfo
     public string Slug { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
-    public List<string> Categories { get; set; } = new();
+    public List<string> Categories { get; set; } = [];
     public int? BuildMenuPriority { get; set; }
     public bool IsPowered { get; set; }
     public bool IsOverclockable { get; set; }

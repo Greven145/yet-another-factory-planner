@@ -2,7 +2,7 @@
 
 public class ResourceExtractorMeta
 {
-    public List<string> AllowedResourceForms { get; set; } = new();
-    public List<string> AllowedResources { get; set; } = new();
+    public List<string> AllowedResourceForms { get; set; } = [];
+    public List<string> AllowedResources { get; set; } = [];
     public double ResourceExtractSpeed { get; set; }
 }

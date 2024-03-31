@@ -7,7 +7,7 @@ using OneOf.Types;
 
 namespace api;
 
-internal sealed class FactoryClient {
+public sealed class FactoryClient(IConfiguration configuration) {
     private const string ContainerId = "factories";
     private const string DatabaseId = "shared-factory";
 
@@ -16,12 +16,6 @@ internal sealed class FactoryClient {
         SerializerOptions = new CosmosSerializationOptions
             { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }
     };
-
-    private readonly IConfiguration _configuration;
-
-    internal FactoryClient(IConfiguration configuration) {
-        _configuration = configuration;
-    }
 
     internal async Task SaveFactory(FactoryConfigSchema factoryConfig, CancellationToken cancellationToken = default) {
         var container = await GetContainer();
@@ -42,8 +36,8 @@ internal sealed class FactoryClient {
     }
 
     private async Task<Container> GetContainer() {
-        var client = new CosmosClient(_configuration["EndPointUri"],
-            _configuration["CosmosKey"],
+        var client = new CosmosClient(configuration["EndPointUri"],
+            configuration["CosmosKey"],
             ClientOptions);
         DatabaseResponse databaseResponse = await client.CreateDatabaseIfNotExistsAsync(DatabaseId);
         Database targetDatabase = databaseResponse.Database;
