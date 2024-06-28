@@ -16,9 +16,19 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Restore dependencies
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Restore NuGet dependencies
       run: dotnet restore
-    - name: Build
+    - name: Restore npm dependencies
+      run: npm install && npx update-browserslist-db@latest
+      working-directory: ./client
+    - name: Dotnet Build
       run: dotnet build --no-restore
-    - name: Test
+    - name: Dotnet Test
       run: dotnet test --no-build --verbosity normal
+    - name: NPM Build
+      run: npm run build
+      working-directory: ./client
