@@ -1,20 +1,20 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Anchor } from '@mantine/core';
+import { IconProp } from '@fortawesome/fontawesome-svg-core';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 interface Props {
   href: string;
-  icon: React.ReactNode;
+  icon: IconProp;
+  fontSize?: number;
 }
 
-const SocialIcon = (props: Props) => {
-  const { href, icon } = props;
-  return (
+const SocialIcon: React.FC<Props> = ({ href, icon, fontSize }) => (
     <SAnchor href={href} target='_blank' rel='noopener noreferrer'>
-      {icon || null}
+      <FontAwesomeIcon icon={icon} style={{ fontSize }} />
     </SAnchor>
-  );
-};
+);
 
 export default SocialIcon;
 

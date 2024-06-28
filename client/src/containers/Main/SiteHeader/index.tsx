@@ -24,7 +24,7 @@ const SiteHeader = () => {
           disabled={ctx.loading}
           style={{ width: '200px' }}
         />
-        <SocialIcon href='https://github.com/greven145/yet-another-factory-planner' icon={<FontAwesomeIcon icon={faGithub} fontSize={32} />} />
+        <SocialIcon href='https://github.com/greven145/yet-another-factory-planner' icon={faGithub} fontSize={32} />
       </RightAlign>
     </HeaderContainer>
   );
