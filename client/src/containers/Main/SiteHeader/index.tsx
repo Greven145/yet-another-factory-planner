@@ -1,7 +1,5 @@
-import React from 'react';
 import styled from 'styled-components';
 import { Title, Container, Group, Select } from '@mantine/core';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import logo from '../../../assets/satisfactory_logo_full_color_small.png';
 import SocialIcon from '../../../components/SocialIcon';

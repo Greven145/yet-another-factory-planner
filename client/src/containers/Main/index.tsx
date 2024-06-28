@@ -1,9 +1,7 @@
-import React from 'react';
 import styled from 'styled-components';
 import { AppShell, Header, Container, useMantineTheme } from '@mantine/core';
 import SiteHeader from './SiteHeader';
 import ProductionPlanner from '../ProductionPlanner';
-import PaypalButton from '../../components/PaypalButton';
 import ExternalLink from '../../components/ExternalLink';
 import ErrorBoundary from '../ErrorBoundary';
 
