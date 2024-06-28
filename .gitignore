@@ -1,3 +1,4 @@
 .vs/
 *.sln.DotSettings.user
 .vscode
+.mono
