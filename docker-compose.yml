@@ -41,7 +41,7 @@ services:
       cosmosdb:
         condition: service_healthy
   cosmosdb:
-    image: "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest"
+    image: "mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:2.14.24"
     tty: true
     restart: always
     mem_limit: 3G
