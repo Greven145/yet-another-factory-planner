@@ -1,10 +1,12 @@
+name: yafp-legacy
+
 networks:
   default:
     external: false
     ipam:
       driver: default
       config:
-        - subnet: "172.16.238.0/24"
+        - subnet: "172.16.239.0/24"
 
 services:
   client:
@@ -12,11 +14,11 @@ services:
       context: .
       dockerfile: client/Dockerfile
     ports:
-      - '80:80'
+      - '3000:80'
   api-proxy:
     image: nginx:latest
     ports:
-      - '8080:80'
+      - '3001:80'
     depends_on:
       - api
     volumes:
@@ -26,12 +28,12 @@ services:
       context: .
       dockerfile: api/Dockerfile
     environment:
-      - EndPointUri=https://172.16.238.246:8081
+      - EndPointUri=https://172.16.239.246:8081
       - CosmosKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
     entrypoint: ["/bin/bash","-c"]
     command:
        - |
-        curl -fk -o ~/cosmosemulatorcert.crt https://172.16.238.246:8081/_explorer/emulator.pem
+        curl -fk -o ~/cosmosemulatorcert.crt https://172.16.239.246:8081/_explorer/emulator.pem
         cp ~/cosmosemulatorcert.crt /usr/local/share/ca-certificates/
         update-ca-certificates
         /azure-functions-host/Microsoft.Azure.WebJobs.Script.WebHost
@@ -45,11 +47,11 @@ services:
     mem_limit: 3G
     cpu_count: 4
     ports:
-      - '8081:8081'
-      - '10250-10255:10250-10255'
+      - '8082:8081'
+      - '10260-10265:10250-10255'
     networks:
       default:
-        ipv4_address: 172.16.238.246
+        ipv4_address: 172.16.239.246
     environment:
       - AZURE_COSMOS_EMULATOR_PARTITION_COUNT=10
       - AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE=true
