@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useState, useEffect, useMemo, useCallback } from 'react';
-import _ from 'lodash';
+import debounce from 'lodash/debounce';
 import { usePrevious } from '../../hooks/usePrevious';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
 import { GraphError } from '../../utilities/error/GraphError';
@@ -45,11 +45,11 @@ export function useProductionContext() {
 }
 
 
-const _setCalculating = _.debounce((value: boolean, setCalculating: React.Dispatch<React.SetStateAction<boolean>>) => {
+const _setCalculating = debounce((value: boolean, setCalculating: React.Dispatch<React.SetStateAction<boolean>>) => {
   setCalculating(value);
 }, 300, { leading: false, trailing: true });
 
-const _handleCalculateFactory = _.debounce(async (
+const _handleCalculateFactory = debounce(async (
   state: FactoryOptions,
   gameData: GameData,
   setSolverResults: React.Dispatch<React.SetStateAction<SolverResults | null>>,

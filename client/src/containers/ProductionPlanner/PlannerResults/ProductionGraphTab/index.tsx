@@ -432,8 +432,7 @@ const ProductionGraphTab = () => {
   }
 
   function areNodesSame(node1: NodeInfo, node2: NodeInfo): boolean {
-    console.log(node1 === node2);
-    return false;
+    return node1.key === node2.key && node1.x === node2.x && node1.y === node2.y;
   }
   function updateStateNodePosition(key: string, x: number, y: number) {
     let existingNode = nodesPositions?.find(node => node.key === key);
