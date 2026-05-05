@@ -264,4 +264,10 @@ __pycache__/
 *.pyc
 
 Properties/*
-!Properties/launchSettings.json
+!Properties/launchSettings.json# Parsed input data files
+*.json
+meta/
+output/
+
+# Keep the Dockerfile
+!Dockerfile

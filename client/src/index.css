@@ -1,1 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Fjalla+One&family=Indie+Flower&family=M+PLUS+1+Code&display=swap');
+
+/* Fix active outline tab connection: solid background covers the list
+   border behind it, transparent bottom creates seamless join to panel */
+.mantine-Tabs-tab[data-active] {
+  background-color: #26282b !important;
+  border-bottom-color: transparent !important;
+}
+.mantine-Tabs-tab[data-active]::before,
+.mantine-Tabs-tab[data-active]::after {
+  display: none !important;
+}

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader, Divider, Text, Title } from '@mantine/core';
+import { Loader, Divider, Text, Title, Button } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 import bgImage from '../../assets/stripe-bg.png';
@@ -41,8 +41,14 @@ const ProductionPlanner = () => {
               {gdCtx.loadingError ? (
                 <>
                   <Title style={{ marginTop: '15px' }}>
-                    An error occured connecting to the server x_x
+                    An error occurred connecting to the server x_x
                   </Title>
+                  <Button
+                    style={{ marginTop: '20px' }}
+                    onClick={() => { window.location.href = '/'; }}
+                  >
+                    Start a new factory
+                  </Button>
                 </>
               ) : (
                 <>
@@ -106,7 +112,7 @@ const ProductionPlanner = () => {
 
 export default ProductionPlanner;
 
-const LoadingOverlay = motion(styled.div<any>`
+const LoadingOverlay = motion.create(styled.div<any>`
   position: fixed;
   top: 0;
   bottom: 0;

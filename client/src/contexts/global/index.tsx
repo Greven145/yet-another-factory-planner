@@ -30,7 +30,7 @@ const ONE_HOUR = 1000 * 60 * 60;
 const TIPS = [
   'Pet the lizard doggo!',
   'Get back to work!',
-  'Update 6 now available!',
+  'Conveyor belts go brrr!',
   'Arachnophobia mode enabled.',
   'FICSIT does not waste.',
   'Linear programming!',
@@ -42,6 +42,16 @@ const TIPS = [
   'Check out the new Spire Coast!',
   'ADA says it\'s my turn to play with the nuke nobelisk.',
   'Harvest.',
+  'Spaghetti is a valid strategy.',
+  'Overclocking intensifies...',
+  'ONE. MORE. EXPANSION.',
+  'Space Elevator go whoosh!',
+  'Factorio is that way ->',
+  'Maximum efficiency achieved!',
+  'Time to rearrange the factory.',
+  'FICSIT Milestone: COMPLETE!',
+  'Feed the factory!',
+  'Power? UNLIMITED!',
 ];
 
 function getTip() {

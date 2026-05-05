@@ -1,51 +1,54 @@
-﻿using System.Net;
-using api.Models;
+﻿using api.Models;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Extensions.Configuration;
 using OneOf;
 using OneOf.Types;
 
 namespace api;
 
-public sealed class FactoryClient(IConfiguration configuration) {
-    private const string ContainerId = "factories";
-    private const string DatabaseId = "shared-factory";
+public sealed class FactoryClient
+{
+    private readonly CosmosClient _cosmosClient;
 
-    private static readonly CosmosClientOptions ClientOptions = new() {
-        ApplicationName = "yafpclone",
-        SerializerOptions = new CosmosSerializationOptions
-            { PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase }
-    };
+    public FactoryClient(CosmosClient cosmosClient)
+    {
+        _cosmosClient = cosmosClient;
+    }
 
-    internal async Task SaveFactory(FactoryConfigSchema factoryConfig, CancellationToken cancellationToken = default) {
-        var container = await GetContainer();
-        await container.CreateItemAsync(factoryConfig, cancellationToken: cancellationToken);
+    internal async Task SaveFactory(FactoryConfigSchema factoryConfig)
+    {
+        var database = _cosmosClient.GetDatabase("shared-factory");
+        var container = database.GetContainer("factories");
+        
+        try
+        {
+            await container.CreateItemAsync(factoryConfig, new PartitionKey(factoryConfig.GameVersion));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving factory: {ex}");
+            throw;
+        }
     }
 
     internal async Task<GetFactoryResult> GetFactory(string factoryKey, string gameVersion,
-        CancellationToken cancellationToken = default) {
-        var container = await GetContainer();
-        var readResponse = await container.ReadItemAsync<FactoryConfigSchema>(factoryKey, new PartitionKey(gameVersion),
-            cancellationToken: cancellationToken);
-
-        if (readResponse.StatusCode == HttpStatusCode.NotFound) {
+        CancellationToken cancellationToken = default)
+    {
+        var database = _cosmosClient.GetDatabase("shared-factory");
+        var container = database.GetContainer("factories");
+        
+        try
+        {
+            var factory = await container.ReadItemAsync<FactoryConfigSchema>(factoryKey, new PartitionKey(gameVersion), cancellationToken: cancellationToken);
+            return factory.Resource;
+        }
+        catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
             return new None();
         }
-
-        return readResponse.Resource;
-    }
-
-    private async Task<Container> GetContainer() {
-        var client = new CosmosClient(configuration["EndPointUri"],
-            configuration["CosmosKey"],
-            ClientOptions);
-        DatabaseResponse databaseResponse = await client.CreateDatabaseIfNotExistsAsync(DatabaseId);
-        Database targetDatabase = databaseResponse.Database;
-        ContainerResponse containerResponse = await targetDatabase.CreateContainerIfNotExistsAsync(ContainerId,"/gameVersion");
-        return containerResponse.Container;
     }
 }
 
 [GenerateOneOf]
-public partial class GetFactoryResult : OneOfBase<FactoryConfigSchema, None> {
+public partial class GetFactoryResult : OneOfBase<FactoryConfigSchema, None>
+{
 }

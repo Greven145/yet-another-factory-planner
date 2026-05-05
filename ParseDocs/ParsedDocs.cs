@@ -14,6 +14,7 @@ internal static class ParsedDocs
     private static readonly JsonSerializerOptions Options = new() {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
+        NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals,
         Converters = {
             new JsonStringEnumConverter(),
             new DecimalJsonConverter()

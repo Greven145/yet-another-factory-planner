@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { Title, List, Divider, Text, Container, Group } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
-import { ProducedItemInformation } from '../../../../utilities/production-solver';
+import { ProducedItemInformation } from '../../../../utilities/production-solver/models';
 
 function formatFloat(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 3 });

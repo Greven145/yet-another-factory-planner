@@ -1,0 +1,22 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.2.4">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>c5f4788b-a22f-4033-904e-08b9beaedce5</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.AppContainers" Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.Azure.CosmosDB" Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.NodeJs" Version="9.5.2" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\api.web\api.web.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useGetInitialize } from '../../api/modules/initialize/useGetInitialize';
 import { GameData } from './types';
-import { DEFAULT_GAME_VERSION, LEGACY_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
+import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM, API_GAME_VERSION_TO_DISPLAY } from './consts';
 import { usePrevious } from '../../hooks/usePrevious';
 import { FactoryOptions } from '../production/types';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -82,7 +82,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       if (shareKey) {
         getInitialize.request({ factoryKey: shareKey });
       } else if (legacyEncoding) {
-        getInitialize.request({ gameVersion: LEGACY_GAME_VERSION });
+        getInitialize.request({ gameVersion: DEFAULT_GAME_VERSION });
       } else if (sessionVersion && sessionState) {
         getInitialize.request({ gameVersion: sessionVersion });
       } else {
@@ -119,9 +119,9 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       window.sessionStorage?.removeItem('state');
 
       if (factoryConfig?.gameVersion) {
-        setGameVersion(factoryConfig.gameVersion);
+        setGameVersion(API_GAME_VERSION_TO_DISPLAY[factoryConfig.gameVersion] ?? factoryConfig.gameVersion);
       } else if (legacyEncoding) {
-        setGameVersion(LEGACY_GAME_VERSION);
+        setGameVersion(DEFAULT_GAME_VERSION);
       } else if (sessionVersion && sessionState) {
         setGameVersion(sessionVersion);
       } else {

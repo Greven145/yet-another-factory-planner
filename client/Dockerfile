@@ -1,7 +1,7 @@
 FROM node:20-alpine3.17 as build
 WORKDIR /home/node/app
 COPY client/package.json client/package-lock.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npx update-browserslist-db@latest
 COPY client/. .
 RUN echo 'REACT_APP_API_BASE_URL="http://localhost:8080/"' > .env

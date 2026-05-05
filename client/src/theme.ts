@@ -39,14 +39,14 @@ export const theme: MantineThemeOverride = {
   radius: { xs: 0, sm: 2, md: 4, lg: 8, xl: 16 },
   headings: {
     fontFamily: defaultFont,
-    fontWeight: 700,
+    fontWeight: '700',
     sizes: {
-      h1: { fontSize: 36, lineHeight: 1.3 },
-      h2: { fontSize: 30, lineHeight: 1.35 },
-      h3: { fontSize: 22, lineHeight: 1.4 },
-      h4: { fontSize: 18, lineHeight: 1.45 },
-      h5: { fontSize: 16, lineHeight: 1.5 },
-      h6: { fontSize: 14, lineHeight: 1.5 },
+      h1: { fontSize: '36px', lineHeight: '1.3' },
+      h2: { fontSize: '30px', lineHeight: '1.35' },
+      h3: { fontSize: '22px', lineHeight: '1.4' },
+      h4: { fontSize: '18px', lineHeight: '1.45' },
+      h5: { fontSize: '16px', lineHeight: '1.5' },
+      h6: { fontSize: '14px', lineHeight: '1.5' },
     }
   },
   other: {
@@ -55,144 +55,106 @@ export const theme: MantineThemeOverride = {
     drawerWidth: '620px',
     drawerZIndex: '10',
     tooltipZIndex: '9999',
-    scrollbarTrackColor: '#212226',
-    scrollbarThumbColor: '#6c6c73',
+  },
+  components: {
+    AppShell: {
+      styles: {
+        root: { minHeight: '100vh' },
+        header: { background: '#ec7821', borderBottom: 'none', padding: '10px', overflow: 'hidden' },
+        main: { background: 'transparent', paddingTop: '80px' },
+      },
+    },
+    Paper: {
+      styles: {
+        root: { background: 'light-dark(#ffffff, #373b40)', padding: '15px' },
+      },
+    },
+    Text: {
+      styles: {
+        root: { color: 'light-dark(#212529, #eee)' },
+      },
+    },
+    Title: {
+      styles: {
+        root: { color: 'light-dark(#212529, #eee)' },
+      },
+    },
+    Select: {
+      styles: {
+        label: { color: 'light-dark(#212529, #eee)' },
+      },
+    },
+    TextInput: {
+      styles: {
+        label: { color: 'light-dark(#212529, #eee)' },
+      },
+    },
+    Checkbox: {
+      styles: {
+        label: { cursor: 'pointer', color: 'light-dark(#212529, #eee)' },
+        input: { cursor: 'pointer' },
+      },
+    },
+    Switch: {
+      styles: {
+        label: { cursor: 'pointer', color: 'light-dark(#212529, #eee)' },
+      },
+    },
+    Divider: {
+      styles: {
+        root: { borderTopColor: 'light-dark(#dee2e6, #50565e)' },
+      },
+    },
+    Button: {
+      styles: {
+        root: { color: '#fff' },
+      },
+    },
+    Tabs: {
+      styles: {
+        root: {
+          '--mantine-color-body': 'light-dark(#f8f9fa, #373b40)',
+        },
+        tab: {
+          color: 'light-dark(#212529, #eee)',
+          fontFamily: "'M PLUS 1 Code', sans-serif",
+          fontSize: '16px',
+          '--tab-border-color': 'light-dark(#aaa, #fff)',
+          marginBottom: '-1px',
+          position: 'relative',
+          zIndex: 1,
+          justifyContent: 'center',
+        },
+        tabLabel: {
+          flex: '0 1 auto',
+        },
+        list: {
+          borderBottom: 'calc(0.0625rem * var(--mantine-scale)) solid light-dark(#aaa, #fff)',
+        },
+        panel: {
+          paddingTop: '0px',
+          background: 'light-dark(#f0f2f5, #26282b)',
+          borderBottomLeftRadius: '2px',
+          borderBottomRightRadius: '2px',
+        },
+      },
+    },
+    Tooltip: {
+      styles: {
+        tooltip: {
+          background: 'light-dark(#fff, #3f434a)',
+          border: '1px solid light-dark(#ccc, #aaa)',
+        },
+      },
+    },
+    Popover: {
+      styles: {
+        dropdown: {
+          background: 'light-dark(#fff, #3f434a)',
+          borderColor: 'light-dark(#ccc, #aaa)',
+        },
+      },
+    },
   },
 };
 
-
-export const styles: any = {
-  AppShell: (theme: any) => ({
-    root: {
-      minHeight: '100vh',
-    }
-  }),
-  Paper: (theme: any) => ({
-    root: {
-      background: theme.colors.background[1],
-      padding: '15px',
-    }
-  }),
-  Text: (theme: any) => ({
-    root: {
-      color: theme.white,
-    }
-  }),
-  Title: (theme: any) => ({
-    root: {
-      color: theme.white,
-    }
-  }),
-  List: (theme: any) => ({
-    item: {
-      color: theme.white,
-    }
-  }),
-  Anchor: (theme: any) => ({
-    root: {
-      color: theme.colors.primary[6],
-    }
-  }),
-  Select: (theme: any) => ({
-    label: {
-      color: theme.white,
-    },
-    item: {
-      borderRadius: '0px',
-    },
-    hovered: {
-      background: theme.colors.background[8],
-    },
-    selected: {
-      color: theme.white,
-      background: theme.colors.primary[5],
-    },
-  }),
-  TextInput: (theme: any) => ({
-    label: {
-      color: theme.white,
-    }
-  }),
-  Checkbox: (theme: any) => ({
-    label: {
-      cursor: 'pointer',
-      color: theme.white,
-    },
-    input: {
-      cursor: 'pointer',
-    }
-  }),
-  Switch: (theme: any) => ({
-    label: {
-      cursor: 'pointer',
-      color: theme.white,
-    },
-    input: {
-      cursor: 'pointer',
-      background: theme.colors.background[1],
-      borderWidth: '2px',
-      '&:checked': {
-        background: theme.colors.primary[6],
-        borderColor: theme.colors.primary[6],
-      }
-    }
-  }),
-  Divider: (theme: any) => ({
-    horizontal: {
-      borderTopColor: theme.colors.background[3],
-    }
-  }),
-  Button: (theme: any) => ({
-    root: {
-      color: '#fff',
-      '&[disabled]': {
-        color: `${theme.white} !important`,
-        opacity: 0.5,
-        '&:not(.mantine-Button-loading)': {
-          backgroundColor: `${theme.colors.primary[6]} !important`,
-        }
-      }
-    }
-  }),
-  Tabs: (theme: any) => ({
-    tabLabel: {
-      color: theme.white,
-      fontFamily: "'M PLUS 1 Code', sans-serif",
-      fontSize: '16px',
-    },
-    tabIcon: {
-      color: theme.white,
-    },
-    tabActive: {
-      background: `${theme.colors.background[1]} !important`,
-      borderBottomWidth: `0px !important`,
-    },
-    body: {
-      paddingTop: '0px',
-      background: theme.colors.background[0],
-      borderBottomLeftRadius: '2px',
-      borderBottomRightRadius: '2px',
-    },
-  }),
-  Tooltip: (theme: any) => ({
-    body: {
-      background: theme.colors.background[2],
-      border: '1px solid #aaa',
-    },
-    arrow: {
-      background: theme.colors.background[2],
-      borderBottom: '1px solid #aaa',
-      borderRight: '1px solid #aaa',
-    }
-  }),
-  Popover: (theme: any) => ({
-    body: {
-      background: theme.colors.background[2],
-      borderColor: '#aaa',
-    },
-    arrow: {
-      background: theme.colors.background[2],
-      borderColor: '#aaa',
-    }
-  }),
-};

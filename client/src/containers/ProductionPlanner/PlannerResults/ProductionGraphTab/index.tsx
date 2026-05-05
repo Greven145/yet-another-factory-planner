@@ -2,12 +2,10 @@ import React, { useMemo, useRef, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { nanoid } from 'nanoid';
 import Cytoscape, { Stylesheet } from 'cytoscape';
-import klay from 'cytoscape-klay';
 import GraphVisualizer from 'react-cytoscapejs';
-import popper from 'cytoscape-popper';
-import { Text, Container, Center, Group, Loader, Button, ButtonProps } from '@mantine/core';
+import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
-import { GraphNode, GraphEdge, NODE_TYPE } from '../../../../utilities/production-solver';
+import { GraphNode, GraphEdge, NODE_TYPE } from '../../../../utilities/production-solver/models';
 import { graphColors } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
 import { truncateFloat } from '../../../../utilities/number';
@@ -15,8 +13,26 @@ import { useProductionContext } from '../../../../contexts/production';
 import { GameData } from '../../../../contexts/gameData/types';
 import { NodeInfo } from '../../../../contexts/production/types';
 
-Cytoscape.use(popper);
-Cytoscape.use(klay);
+let graphPluginsReadyPromise: Promise<void> | null = null;
+
+async function ensureGraphPluginsReady() {
+  if (!graphPluginsReadyPromise) {
+    graphPluginsReadyPromise = Promise.all([
+      import('cytoscape-klay'),
+      import('cytoscape-popper'),
+      import('@popperjs/core'),
+    ]).then(([klayModule, cytoscapePopperModule, popperModule]) => {
+      const klay = klayModule.default;
+      const cytoscapePopper = cytoscapePopperModule.default;
+      const createPopper = popperModule.createPopper;
+
+      Cytoscape.use(cytoscapePopper(createPopper));
+      Cytoscape.use(klay);
+    });
+  }
+
+  await graphPluginsReadyPromise;
+}
 
 if (process.env.NODE_ENV !== 'development') {
   Cytoscape.warnings(false);
@@ -237,8 +253,11 @@ const GraphButtonGroup = styled(Group)`
 `;
 
 //Extend the mantine/core button component to add a custom style
-const GraphButton = styled(Button) <ButtonProps<'button'>>`
+const GraphButton = styled(Button)<ButtonProps & React.ComponentPropsWithoutRef<'button'>>`
   opacity: 0.1;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 5px;
+  padding: 5px;
   &:hover {
     opacity: 0.8;
   }
@@ -314,8 +333,12 @@ export interface EdgeData extends GraphEdge {
 
 const ProductionGraphTab = () => {
   const [doFirstRender, setDoFirstRender] = useState(false);
+  const [pluginsReady, setPluginsReady] = useState(false);
   const graphRef = useRef<HTMLDivElement | null>(null);
   const cyRef = useRef<Cytoscape.Core | null>(null);
+  // Stable key so GraphVisualizer is never unmounted/remounted on recalculation.
+  // Using a ref ensures the value is created once per component mount.
+  const graphKey = useRef(nanoid()).current;
   const popupRef = useRef<HTMLDivElement | null>(null);
   const popperRef = useRef<PopperRef | null>(null);
   const [popupNode, setPopupNode] = useState<any | null>(null);
@@ -430,6 +453,10 @@ const ProductionGraphTab = () => {
       content: () => popupRef.current || undefined,
       popper: {
         placement: 'top',
+        strategy: 'fixed',
+        modifiers: [
+          { name: 'offset', options: { offset: [0, 45] } },
+        ],
       }
     });
     popperRef.current = { popper, nodeId: node.id() };
@@ -448,6 +475,27 @@ const ProductionGraphTab = () => {
     setPopupNode(null);
   }
 
+  // Re-position tooltip after React renders the content so Popper measures the correct width
+  useEffect(() => {
+    if (popupNode && popperRef.current) {
+      popperRef.current.popper.update();
+    }
+  }, [popupNode]);
+
+  useEffect(() => {
+    let active = true;
+
+    ensureGraphPluginsReady().then(() => {
+      if (active) {
+        setPluginsReady(true);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     function resizeListener() {
       _resizeListener(graphRef);
@@ -463,7 +511,6 @@ const ProductionGraphTab = () => {
       return null;
     }
 
-    const key = nanoid();
     const elements: any[] = [];
 
     Object.entries(resultsGraph.nodes).forEach(([key, node]) => {
@@ -489,7 +536,7 @@ const ProductionGraphTab = () => {
       });
     });
 
-    return { key, elements };
+    return { key: graphKey, elements };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resultsGraph]);
 
@@ -501,14 +548,14 @@ const ProductionGraphTab = () => {
           <GraphButton onClick={() => { resetNodePositions(); }}>Reset positions</GraphButton>
         </GraphButtonGroup>
         {
-          isLoading && (
+          (isLoading || !pluginsReady) && (
             <Center style={{ position: 'absolute', height: '100%', width: '100%' }}>
               <Loader size={50} />
             </Center>
           )
         }
         {
-          doFirstRender && !isLoading && (
+          doFirstRender && !isLoading && pluginsReady && (
             graphProps != null
               ? (
                 <GraphVisualizer
@@ -527,8 +574,8 @@ const ProductionGraphTab = () => {
               : (
                 <Center style={{ position: 'absolute', height: '100%', width: '100%' }}>
                   <Group>
-                    <AlertCircle color="#eee" size={85} style={{ position: 'relative', top: '3px' }} />
-                    <Group direction='column' style={{ gap: '0px' }}>
+                    <AlertCircle size={85} style={{ position: 'relative', top: '3px' }} />
+                    <Stack style={{ gap: '0px' }}>
                       <Text style={{ fontSize: '28px' }}>
                         Could not build graph
                       </Text>
@@ -540,7 +587,7 @@ const ProductionGraphTab = () => {
                           </Text>
                         )
                         : null}
-                    </Group>
+                    </Stack>
                   </Group>
                 </Center>
               )
@@ -558,7 +605,7 @@ const GraphContainer = styled(Container)`
   position: relative;
   min-height: 600px;
   min-width: 800px;
-  border: 1px solid #fff;
+  border: 1px solid var(--yafp-graph-border);
   border-top-width: 0px;
   margin: 0px;
   padding: 0px;
