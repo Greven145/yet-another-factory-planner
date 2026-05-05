@@ -25,3 +25,6 @@ playwright-report/
 # Environment
 .env.local
 .env.development.local
+
+# Git worktrees
+.worktrees/
