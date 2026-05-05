@@ -1,8 +1,10 @@
+using System.Net;
 using api.Models;
+using api.web.Data;
+using Microsoft.Azure.Cosmos;
+using Microsoft.EntityFrameworkCore;
 using OneOf;
 using OneOf.Types;
-using api.web.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace api.web.Services;
 
@@ -34,8 +36,21 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
 
         config.GameVersion = normalizedVersion;
         dbContext.Factories.Add(config);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return config.Id!;
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return config.Id!;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is CosmosException { StatusCode: HttpStatusCode.Conflict })
+        {
+            // Another concurrent request inserted the same entity; re-query and return its Id.
+            var conflict = await dbContext.Factories
+                .Where(f => f.Id == config.Id && f.GameVersion == normalizedVersion)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return conflict!.Id!;
+        }
     }
 
     internal async Task<GetFactoryResult> GetFactory(string factoryKey, string gameVersion,
@@ -51,9 +66,9 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
 
             return factory is not null ? (GetFactoryResult)factory : new None();
         }
-        catch (Exception ex)
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
-            logger.LogError(ex, "Failed to retrieve factory {FactoryKey}", factoryKey);
+            logger.LogWarning(ex, "Factory {FactoryKey} not found in Cosmos", factoryKey);
             return new None();
         }
     }
