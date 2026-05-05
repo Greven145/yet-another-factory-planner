@@ -32,4 +32,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <Target Name="InstallPlaywright" AfterTargets="Build">
+    <Exec Command="pwsh $(OutputPath)playwright.ps1 install chromium" />
+  </Target>
+
 </Project>
