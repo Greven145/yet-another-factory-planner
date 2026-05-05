@@ -47,7 +47,7 @@
         "@mantine/core": "^8.3.16",
         "@mantine/hooks": "^8.3.16",
         "@popperjs/core": "^2.11.8",
-        "axios": "^1.13.6",
+        "axios": "^1.15.2",
         "chroma-js": "^3.2.0",
         "cytoscape": "^3.33.1",
         "cytoscape-klay": "^3.1.4",
