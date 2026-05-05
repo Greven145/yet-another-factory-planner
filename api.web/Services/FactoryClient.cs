@@ -10,13 +10,13 @@ namespace api.web.Services;
 
 public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryClient> logger)
 {
-    internal async Task SaveFactoryAsync(FactoryConfigSchema factoryConfig)
+    internal async Task SaveFactoryAsync(FactoryConfigSchema factoryConfig, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrEmpty(factoryConfig.Id))
             factoryConfig.Id = Guid.NewGuid().ToString("N");
 
         dbContext.Factories.Add(factoryConfig);
-        await dbContext.SaveChangesAsync();
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>

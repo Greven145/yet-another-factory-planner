@@ -112,7 +112,7 @@ app.MapPost("/share-factory", async (
     try
     {
         var config = request.FactoryConfig;
-        var validationResult = await validator.ValidateAsync(config);
+        var validationResult = await validator.ValidateAsync(config, cancellationToken);
 
         if (!validationResult.IsValid)
             return Results.BadRequest(new { message = string.Join(".", validationResult.Errors.Select(x => x.ErrorMessage)) });
