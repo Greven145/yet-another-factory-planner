@@ -1,4 +1,27 @@
+# IDE / tools
 .vs/
+.vscode/
+.aspire/
+.mcp.json
+.claude/
 *.sln.DotSettings.user
-.vscode
-.mono
+
+# .NET build output
+bin/
+obj/
+
+# Node / client
+node_modules/
+client/dist/
+package-lock.json
+
+# Test artifacts
+test-results/
+playwright-report/
+*.png
+.playwright-cli/
+.playwright-mcp/
+
+# Environment
+.env.local
+.env.development.local

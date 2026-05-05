@@ -34,7 +34,7 @@ public static class Parser {
             }
 
             var recipeData = buildableRecipes.Values.FirstOrDefault(br => br.Product == buildingKey);
-            var buildCost = recipeData?.Ingredients ?? [];
+            var buildCost = recipeData?.Ingredients ?? new List<ItemQuantity>();
             if (buildCost.Count == 0)
             {
                 Console.WriteLine($"Building {buildingKey} HAS NOT BUILD COST");
@@ -42,11 +42,11 @@ public static class Parser {
 
             buildingsOutput.Add(buildingKey,
                 new Building(buildingData.Slug.Replace('-', '_'), buildingData.Name, power, area, buildCost,
-                    buildingData.Event == EventType.Ficsmas));
+                    buildingData.Event == EventType.FICSMAS));
         }
 
         var recipesOutput = new Dictionary<string, Recipe>();
-        foreach (var (recipeKey, recipeData) in recipes.Where(r => !string.IsNullOrEmpty(r.Value.ProducedIn)))
+        foreach (var (recipeKey, recipeData) in recipes.Where(r => r.Value.ProducedIn.Count > 0))
         {
             var ingredients = recipeData.Ingredients
                 .Select(i => new ItemPerMinute(i.ItemClass, 60 * i.Quantity / recipeData.CraftTime)).ToList();
@@ -54,17 +54,17 @@ public static class Parser {
                 .Select(p => new ItemPerMinute(p.ItemClass, 60 * p.Quantity / recipeData.CraftTime)).ToList();
             recipesOutput.Add(recipeKey,
                 new Recipe(recipeData.Slug.Replace('-', '_'), recipeData.Name, recipeData.IsAlternate, ingredients, products,
-                    recipeData.ProducedIn, recipeData.Event == EventType.Ficsmas));
+                    recipeData.ProducedIn.First(), recipeData.Event == EventType.FICSMAS));
         }
 
         recipesOutput.Add("Recipe_CUSTOM_NuclearPower_C",
             new Recipe("uranium_power_recipe", "Uranium Power", false,
-                [new("Desc_NuclearFuelRod_C", 0.2m), new("Desc_Water_C", 240)],
-                [new("Desc_NuclearWaste_C", 10)], "Desc_GeneratorNuclear_C", false));
+                new List<ItemPerMinute> { new("Desc_NuclearFuelRod_C", 0.2m), new("Desc_Water_C", 240) },
+                new List<ItemPerMinute> { new("Desc_NuclearWaste_C", 10) }, "Desc_GeneratorNuclear_C", false));
         recipesOutput.Add("Recipe_CUSTOM_PlutoniumPower_C",
             new Recipe("plutonium_power_recipe", "Plutonium Power", false,
-                [new("Desc_PlutoniumFuelRod_C", 0.1m), new("Desc_Water_C", 240)],
-                [new("Desc_PlutoniumWaste_C", 1)], "Desc_GeneratorNuclear_C", false));
+                new List<ItemPerMinute> { new("Desc_PlutoniumFuelRod_C", 0.1m), new("Desc_Water_C", 240) },
+                new List<ItemPerMinute> { new("Desc_PlutoniumWaste_C", 1) }, "Desc_GeneratorNuclear_C", false));
 
         var resourcesOutput = new Dictionary<string, Resource>();
         var maxExtraction = 0d;
@@ -104,7 +104,7 @@ public static class Parser {
 
             itemOutput.Add(itemKey,
                 new Item(itemData.Slug.Replace('-', '_'), itemData.Name, itemData.IsFluid ? 0 : itemData.SinkPoints,
-                    usedInRecipes, producedFromRecipes, itemData.Event == EventType.Ficsmas));
+                    usedInRecipes, producedFromRecipes, itemData.Event == EventType.FICSMAS));
         }
 
 await Task.WhenAll(ParsedDocs.Save($"{output.FullName}/buildings.json", buildingsOutput),

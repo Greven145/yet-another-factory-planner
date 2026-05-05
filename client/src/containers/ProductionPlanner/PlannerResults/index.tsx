@@ -1,30 +1,38 @@
-import React from 'react';
-import { Container, MantineTheme, Tabs, useMantineTheme } from '@mantine/core';
+import React, { Suspense, lazy } from 'react';
+import { Center, Container, Loader, Tabs } from '@mantine/core';
 import { Share2, Edit } from 'react-feather';
-import ProductionGraphTab from './ProductionGraphTab';
-import ReportTab from './ReportTab';
 import Card from '../../../components/Card';
 
-const tabSx = (theme: MantineTheme) => ({
-  '&.mantine-Tabs-tabControl': {
-    minWidth: '200px',
-  },
-});
+const ProductionGraphTab = lazy(() => import('./ProductionGraphTab'));
+const ReportTab = lazy(() => import('./ReportTab'));
+
+const TabLoader = () => (
+  <Center py="xl">
+    <Loader size="lg" />
+  </Center>
+);
 
 const PlannerResults = () => {
-  const theme = useMantineTheme();
   return (
-    <Tabs variant='outline'>
-      <Tabs.Tab label='Production Graph' icon={<Share2 size={18} />} sx={tabSx}>
+    <Tabs defaultValue="graph" variant='outline'>
+      <Tabs.List>
+        <Tabs.Tab value="graph" leftSection={<Share2 size={18} />} style={{ minWidth: '200px' }}>Production Graph</Tabs.Tab>
+        <Tabs.Tab value="report" leftSection={<Edit size={18} />} style={{ minWidth: '200px' }}>Factory Report</Tabs.Tab>
+      </Tabs.List>
+      <Tabs.Panel value="graph" keepMounted>
         <Container fluid style={{ padding: '0px' }}>
-          <ProductionGraphTab />
+          <Suspense fallback={<TabLoader />}>
+            <ProductionGraphTab />
+          </Suspense>
         </Container>
-      </Tabs.Tab>
-      <Tabs.Tab label='Factory Report' icon={<Edit size={18} />} sx={tabSx}>
-        <Card style={{ paddingLeft: '10px', background: theme.colors.background[0] }}>
-          <ReportTab  />
+      </Tabs.Panel>
+      <Tabs.Panel value="report">
+        <Card style={{ paddingLeft: '10px', background: 'var(--yafp-container-bg)' }}>
+          <Suspense fallback={<TabLoader />}>
+            <ReportTab />
+          </Suspense>
         </Card>
-      </Tabs.Tab>
+      </Tabs.Panel>
     </Tabs>
   );
 };

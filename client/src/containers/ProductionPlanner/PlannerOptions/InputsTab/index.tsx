@@ -23,7 +23,6 @@ const InputsTab = () => {
 
   function renderItemInputs() {
     return ctx.state.inputItems.map((data) => {
-      const selectedItem = itemOptions.find((io) => io.value === data.itemKey);
       return (
         <ItemContainer key={data.key}>
           <Row>
@@ -32,18 +31,12 @@ const InputsTab = () => {
               label='Item'
               clearable
               searchable
-              filter={(value, item) => {
-                if (selectedItem && value === selectedItem.label) {
-                  return true;
-                }
-                return !!item.label?.toLowerCase().includes(value.toLowerCase());
-              }}
               data={itemOptions}
-              value={data.itemKey ? data.itemKey : ''}
+              value={data.itemKey || null}
               onChange={(value) => {
                 ctx.dispatch({
                   type: 'UPDATE_INPUT_ITEM',
-                  data: { ...data, itemKey: (value as string) },
+                  data: { ...data, itemKey: value || '' },
                 });
               }}
               style={{ flex: '1 1 auto' }}
@@ -225,7 +218,7 @@ const InputsTab = () => {
           Adjust the weights affecting the importance of various properties of the factory. A value of 0 indicates that that property is not considered during factory layout.
         </SectionDescription>
         {renderWeightInputs()}
-        <Button color='danger' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
+        <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
           Reset All Weights
         </Button>
       </Section>
@@ -235,10 +228,10 @@ const InputsTab = () => {
           Select the raw resources that are available to your factory. The default values are set to the map limits. The weight value is a number representing how valuable that resource is when comparing recipes. The defaults are calculated automatically according to node rarity.
         </SectionDescription>
         <Group style={{ marginBottom: '15px' }}>
-          <Button color='danger' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
+          <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
             Set All To Maximum
           </Button>
-          <Button color='danger' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_0' }) }}>
+          <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_0' }) }}>
             Set All To 0
           </Button>
         </Group>

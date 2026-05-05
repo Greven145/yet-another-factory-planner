@@ -2,7 +2,7 @@ import React, { forwardRef } from 'react';
 import styled from 'styled-components';
 import { Title, Text, Divider, List, useMantineTheme, Paper } from '@mantine/core';
 import { truncateFloat } from '../../utilities/number';
-import { NODE_TYPE } from '../../utilities/production-solver';
+import { NODE_TYPE } from '../../utilities/production-solver/models';
 import { NodeData } from '../../containers/ProductionPlanner/PlannerResults/ProductionGraphTab';
 import Portal from '../Portal';
 import { useProductionContext } from '../../contexts/production';
@@ -60,7 +60,7 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
         <List listStyleType='none' withPadding>
           {
             recipeInfo.ingredients.map((ingredient) => (
-              <List.Item>
+              <List.Item key={ingredient.itemClass}>
                 <TooltipText>{ctx.gameData.items[ingredient.itemClass].name}: {truncateFloat(ingredient.perMinute * data.multiplier)} / min</TooltipText>
               </List.Item>
             ))
@@ -70,7 +70,7 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
         <List listStyleType='none' withPadding>
           {
             recipeInfo.products.map((product) => (
-              <List.Item>
+              <List.Item key={product.itemClass}>
                 <TooltipText>{ctx.gameData.items[product.itemClass].name}: {truncateFloat(product.perMinute * data.multiplier)} / min</TooltipText>
               </List.Item>
             ))
@@ -193,8 +193,6 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
 export default GraphTooltip;
 
 const Tooltip = styled(Paper)`
-  position: relative;
-  bottom: 50px;
   background: ${({ theme }) => theme.colors.background[2]};
   border: 1px solid #aaa;
   min-width: 300px;

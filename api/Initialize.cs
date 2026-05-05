@@ -1,56 +1,52 @@
+using System.Net;
 using System.Text.Json;
+using api.Extensions;
 using api.Models;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 
 namespace api;
 
-public class Initialize(FactoryClient factoryClient) {
+public class Initialize {
+    private static readonly JsonSerializerOptions JsonOptions = new() 
+    { 
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase 
+    };
+    
+    private readonly FactoryClient _factoryClient;
     private string _factoryData = "";
-    private static readonly JsonSerializerOptions JsonSerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
-    private static readonly List<string> GameVersions = ["U5", "U6", "U7", "U8"];
+
+    public Initialize(FactoryClient factoryClient) {
+        _factoryClient = factoryClient;
+    }
 
     [Function(nameof(Initialize))]
-    public async Task<IActionResult> Run(
+    public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "initialize")]
-        HttpRequest req, CancellationToken cancellationToken) {
+        HttpRequestData req, CancellationToken cancellationToken) {
+        var request = req.Query["gameVersion"] ?? "1.1";
+        var factoryKey = req.Query["factoryKey"];
 
-        var request = req.Query.TryGetValue("gameVersion", out var requestValue) ? requestValue.ToString() : "U8";
-        if (!GameVersions.Contains(request))
-        {
-            return new BadRequestObjectResult(new { message = "Invalid game version" });
-        }
-
-        var factoryKey = req.Query.TryGetValue("factoryKey", out var factoryKeyValue) ? factoryKeyValue.ToString() : null;
         if (factoryKey is not null) {
-            var result = await factoryClient.GetFactory(factoryKey, request, cancellationToken);
+            var result = await _factoryClient.GetFactory(factoryKey, request, cancellationToken);
             result.Switch(
                 factory => _factoryData = $"""
-                                           "factory_config" : {JsonSerializer.Serialize(factory, JsonSerializerOptions)},
+                                           "factory_config" : {JsonSerializer.Serialize(factory, JsonOptions)},
                                            """,
                 none => { }
             );
-
-if (result.IsT1) {
-                return new BadRequestObjectResult(new { message = "Invalid factory id" });
-            }
         }
 
-        var responseData = request switch
-        {
-            "U5" => GetGameData(GameData.U5Data, _factoryData),
-            "U6" => GetGameData(GameData.U6Data, _factoryData),
-            "U7" => GetGameData(GameData.U7Data, _factoryData),
-            "U8" => GetGameData(GameData.U8Data, _factoryData),
-            _ => null
+        if (factoryKey is not null && _factoryData == "") {
+            return await req.CreateBadRequestResponseAsync(new { message = "Invalid factory id" }, cancellationToken);
+        }
+
+        var responseData = request switch {
+            "1.1" => new ResponseData(HttpStatusCode.OK, "application/json", GetGameData(GameData.V1_1Data, _factoryData)),
+            _ => new ResponseData(HttpStatusCode.BadRequest, "text/plain", "Invalid game version")
         };
 
-        return new ContentResult {
-            StatusCode = StatusCodes.Status200OK,
-            Content = responseData,
-            ContentType = "application/json; charset=utf-8"
-        };
+        return await req.CreateResponseFromDataAsync(responseData, cancellationToken);
     }
 
     private static string GetGameData(GameData gameData, string factoryConfig) =>

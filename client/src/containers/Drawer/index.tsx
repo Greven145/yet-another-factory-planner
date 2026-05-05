@@ -87,7 +87,7 @@ const DrawerDimmer = styled.div<{ open: boolean }>`
   margin: 0;
   padding: 0;
   background: #000;
-  opacity: ${({ open }) => open ? 0.7 : 0.0 };
+  opacity: ${({ open }) => open ? 'var(--yafp-dimmer-opacity)' : 0 };
   transition: opacity 550ms;
   pointer-events: ${({ open }) => open ? 'auto' : 'none' };
 `;
@@ -98,7 +98,7 @@ const DrawerContainer = styled.div<{ open: boolean }>`
   left: ${({ open, theme }) => (open ? '0px' : `-${theme.other.drawerWidth}`)};
   width: ${({ theme }) => theme.other.drawerWidth};
   height: 100%;
-  background: ${({ theme }) => theme.colors.background[0]};
+  background: var(--yafp-drawer-bg);
   transition: left 550ms;
   transition-timing-function: cubic-bezier(.68, -0.21, .38, 1.26);
   pointer-events: auto;
@@ -121,7 +121,7 @@ const DrawerToggle = styled.div`
   }
 `;
 
-const ToggleLabel = styled(UnstyledButton)`
+const ToggleLabel = styled.button`
   position: relative;
   display: flex;
   align-items: center;
@@ -130,6 +130,7 @@ const ToggleLabel = styled(UnstyledButton)`
   right: -25px;
   width: 30px;
   height: 160px;
+  border: none;
   border-radius: 2px;
   font-size: 18px;
   font-weight: bold;
@@ -137,12 +138,14 @@ const ToggleLabel = styled(UnstyledButton)`
   color: ${({ theme }) => theme.white};
   overflow: visible;
   white-space: nowrap;
+  cursor: pointer;
+  padding: 0;
 
   ${DrawerToggle}:hover & {
     background: ${({ theme }) => theme.colors.primary[7]};
   }
 
-  ::before {
+  &::before {
     content: '';
     position: absolute;
     top: -24px;
@@ -158,7 +161,7 @@ const ToggleLabel = styled(UnstyledButton)`
     }
   }
 
-  ::after {
+  &::after {
     content: '';
     position: absolute;
     bottom: -24px;
@@ -189,7 +192,7 @@ const ToggleLabelIcon = styled.span`
   z-index: 2;
 `;
 
-const Tooltip = styled(Paper)`
+const Tooltip = styled.div`
   @keyframes lookAtMe {
     from {
       left: 84px;
@@ -210,7 +213,7 @@ const Tooltip = styled(Paper)`
   border-radius: 2px;
   pointer-events: none;
 
-  ::before {
+  &::before {
     content: '';
     position: absolute;
     top: calc(50% - 10px);

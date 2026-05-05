@@ -2,7 +2,7 @@ import React from 'react';
 import { ThemeProvider } from 'styled-components';
 import { MantineProvider, useMantineTheme } from '@mantine/core';
 import Main from './containers/Main';
-import { theme, styles } from './theme';
+import { theme } from './theme';
 import GlobalStylesheet from './global-stylesheet';
 import { DrawerProvider } from './contexts/drawer';
 import { GlobalContextProvider } from './contexts/global';
@@ -12,7 +12,7 @@ function App() {
   return (
     <MantineProvider
       theme={theme}
-      styles={styles}
+      defaultColorScheme="auto"
     >
       <ThemeTransfer />
     </MantineProvider>

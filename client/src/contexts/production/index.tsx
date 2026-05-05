@@ -2,7 +2,6 @@ import React, { createContext, useContext, useReducer, useState, useEffect, useM
 import _ from 'lodash';
 import { usePrevious } from '../../hooks/usePrevious';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
-import { ProductionSolver, SolverResults } from '../../utilities/production-solver';
 import { GraphError } from '../../utilities/error/GraphError';
 import { usePostSharedFactory } from '../../api/modules/shared-factories/usePostSharedFactory';
 import { reducer, FactoryAction, getInitialState } from './reducer';
@@ -11,6 +10,7 @@ import { FactoryInitializer } from '../gameData';
 import { GameData } from '../gameData/types';
 import { SHARE_QUERY_PARAM } from '../gameData/consts';
 import { useGlobalContext } from '../global';
+import { SolverResults } from '../../utilities/production-solver/models';
 
 
 export type ShareLinkProps = { link: string, copyToClipboard: boolean, loading: boolean };
@@ -57,6 +57,7 @@ const _handleCalculateFactory = _.debounce(async (
 ) => {
   _setCalculating(true, setCalculating);
   try {
+    const { ProductionSolver } = await import('../../utilities/production-solver');
     const solver = new ProductionSolver(state, gameData);
     const results = await solver.exec();
     setSolverResults((prevState) => {
