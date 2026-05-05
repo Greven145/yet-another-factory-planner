@@ -73,6 +73,14 @@ type ItemMap = {
   [key: string]: boolean;
 }
 
+let _glpkInstance: Awaited<ReturnType<typeof loadGLPK>> | null = null;
+async function getGLPK() {
+  if (!_glpkInstance) {
+    _glpkInstance = await loadGLPK();
+  }
+  return _glpkInstance;
+}
+
 export class ProductionSolver {
   private gameData: GameData;
   private globalWeights: GlobalWeights;
@@ -284,7 +292,7 @@ export class ProductionSolver {
   public async exec(): Promise<SolverResults> {
     const timestamp = performance.now();
     try {
-      const glpk = await loadGLPK();
+      const glpk = await getGLPK();
       const productionSolution = await this.productionSolverPass(RATE_TARGET_KEY, this.inputs, glpk);
       let productionGraph = this.generateProductionGraph(productionSolution);
 
@@ -357,6 +365,7 @@ export class ProductionSolver {
 
     const doPoints = (targetKey === RATE_TARGET_KEY && this.rateTargets[POINTS_ITEM_KEY]) || targetKey === POINTS_ITEM_KEY;
     const pointsVars: Var[] = [];
+    const objectiveVarMap = new Map<string, Var>();
 
     for (const [recipeKey, recipeInfo] of Object.entries(this.gameData.recipes)) {
       if (!this.allowedRecipes[recipeKey]) continue;
@@ -373,10 +382,12 @@ export class ProductionSolver {
       }
 
 
-      model.objective.vars.push({
+      const recipeObjVar: Var = {
         name: recipeKey,
         coef: powerScore + resourceScore + buildingsScore,
-      });
+      };
+      model.objective.vars.push(recipeObjVar);
+      objectiveVarMap.set(recipeKey, recipeObjVar);
 
 
       if (targetKey === RATE_TARGET_KEY) {
@@ -426,14 +437,13 @@ export class ProductionSolver {
         });
       } else if (targetKey === POINTS_ITEM_KEY) {
         pointsVars.forEach((v) => {
-          const existingVar = model.objective.vars.find((ov) => ov.name === v.name);
+          const existingVar = objectiveVarMap.get(v.name);
           if (existingVar) {
             existingVar.coef += v.coef * MAXIMIZE_WEIGHT;
           } else {
-            model.objective.vars.push({
-              name: v.name,
-              coef: v.coef * MAXIMIZE_WEIGHT,
-            });
+            const newVar: Var = { name: v.name, coef: v.coef * MAXIMIZE_WEIGHT };
+            model.objective.vars.push(newVar);
+            objectiveVarMap.set(v.name, newVar);
           }
         });
       }
@@ -443,6 +453,7 @@ export class ProductionSolver {
     for (const [itemKey, itemInfo] of Object.entries(this.gameData.items)) {
       if (!this.allowedItems[itemKey]) continue;
       const vars: Var[] = [];
+      const varsMap = new Map<string, Var>();
 
       const binKey = `${itemKey}_BIN`;
       const binVars: Var[] = [];
@@ -451,7 +462,9 @@ export class ProductionSolver {
         if (!this.allowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.ingredients.find((i) => i.itemClass === itemKey)!;
-        vars.push({ name: recipeKey, coef: target.perMinute });
+        const v: Var = { name: recipeKey, coef: target.perMinute };
+        vars.push(v);
+        varsMap.set(recipeKey, v);
 
         if (!this.gameData.handGatheredItems[itemKey]) {
           binVars.push({ name: recipeKey, coef: -1 });
@@ -463,11 +476,13 @@ export class ProductionSolver {
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.products.find((p) => p.itemClass === itemKey)!;
 
-        const existingVar = vars.find((v) => v.name === recipeKey);
+        const existingVar = varsMap.get(recipeKey);
         if (existingVar) {
           existingVar.coef -= target.perMinute;
         } else {
-          vars.push({ name: recipeKey, coef: -target.perMinute });
+          const v: Var = { name: recipeKey, coef: -target.perMinute };
+          vars.push(v);
+          varsMap.set(recipeKey, v);
         }
       }
 
@@ -516,14 +531,13 @@ export class ProductionSolver {
         });
 
         vars.forEach((v) => {
-          const existingVar = model.objective.vars.find((ov) => ov.name === v.name);
+          const existingVar = objectiveVarMap.get(v.name);
           if (existingVar) {
             existingVar.coef += v.coef * MAXIMIZE_WEIGHT;
           } else {
-            model.objective.vars.push({
-              name: v.name,
-              coef: v.coef * MAXIMIZE_WEIGHT,
-            });
+            const newVar: Var = { name: v.name, coef: v.coef * MAXIMIZE_WEIGHT };
+            model.objective.vars.push(newVar);
+            objectiveVarMap.set(v.name, newVar);
           }
         });
       }
@@ -932,6 +946,12 @@ export class ProductionSolver {
   }
 
   private hasLoop(productionGraph: ProductionGraph): boolean {
+    const adjacency = new Map<string, string[]>();
+    for (const edge of productionGraph.edges) {
+      if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+      adjacency.get(edge.from)!.push(edge.to);
+    }
+
     const visited = new Set<string>();
     const stack = new Set<string>();
 
@@ -939,7 +959,7 @@ export class ProductionSolver {
       visited.add(node);
       stack.add(node);
 
-      for (const edge of productionGraph.edges.filter(e => e.from === node).map((e) => e.to)) {
+      for (const edge of (adjacency.get(node) ?? [])) {
         if ( stack.has(edge) ) {
           return true;
         } else if (!visited.has(edge)) {
