@@ -57,12 +57,10 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 		var tooltip = page.GetByText("Link copied!", new PageGetByTextOptions { Exact = true });
 		await Expect(tooltip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 10_000 });
 
-		// Act — wait 4 seconds (tooltip should have auto-dismissed after 2–3 s)
-		await Task.Delay(TimeSpan.FromSeconds(4));
-
 		// Assert
-		// BUG 4: tooltip never dismisses — this assertion will fail until auto-dismiss is implemented
-		await Expect(tooltip).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 1_000 });
+		// BUG 4: tooltip never dismisses — this assertion will fail until auto-dismiss is implemented.
+		// Allow up to 5 s for the tooltip to disappear (it should auto-dismiss after 2–3 s).
+		await Expect(tooltip).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 5_000 });
 	}
 
 	/// <summary>
