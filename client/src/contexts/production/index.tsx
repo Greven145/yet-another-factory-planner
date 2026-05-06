@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useReducer, useState, useEffect, useMemo, useCallback } from 'react';
-import _ from 'lodash';
+import React, { createContext, useContext, useReducer, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import debounce from 'lodash/debounce';
 import { usePrevious } from '../../hooks/usePrevious';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
 import { GraphError } from '../../utilities/error/GraphError';
@@ -11,6 +11,7 @@ import { GameData } from '../gameData/types';
 import { SHARE_QUERY_PARAM } from '../gameData/consts';
 import { useGlobalContext } from '../global';
 import { SolverResults } from '../../utilities/production-solver/models';
+import type { WorkerOutput } from '../../utilities/production-solver/solver.worker';
 
 
 export type ShareLinkProps = { link: string, copyToClipboard: boolean, loading: boolean };
@@ -45,40 +46,9 @@ export function useProductionContext() {
 }
 
 
-const _setCalculating = _.debounce((value: boolean, setCalculating: React.Dispatch<React.SetStateAction<boolean>>) => {
+const _setCalculating = debounce((value: boolean, setCalculating: React.Dispatch<React.SetStateAction<boolean>>) => {
   setCalculating(value);
 }, 300, { leading: false, trailing: true });
-
-const _handleCalculateFactory = _.debounce(async (
-  state: FactoryOptions,
-  gameData: GameData,
-  setSolverResults: React.Dispatch<React.SetStateAction<SolverResults | null>>,
-  setCalculating: React.Dispatch<React.SetStateAction<boolean>>,
-) => {
-  _setCalculating(true, setCalculating);
-  try {
-    const { ProductionSolver } = await import('../../utilities/production-solver');
-    const solver = new ProductionSolver(state, gameData);
-    const results = await solver.exec();
-    setSolverResults((prevState) => {
-      if (!prevState || prevState.timestamp < results.timestamp) {
-        console.log(`Computed in: ${results.computeTime}ms`);
-        return results;
-      }
-      return prevState;
-    });
-  } catch (e: unknown) {
-    setSolverResults({
-      productionGraph: null,
-      report: null,
-      timestamp: performance.now(),
-      computeTime: 0,
-      error: e as GraphError,
-    });
-  } finally {
-    _setCalculating(false, setCalculating);
-  }
-}, 300, { leading: true, trailing: true });
 
 
 // PROVIDER
@@ -102,9 +72,66 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
 
   const postSharedFactory = usePostSharedFactory();
 
+  // Debounced post ref: 300ms leading+trailing, matching the previous module-level debounce.
+  const debouncedSolveRef = useRef<ReturnType<typeof debounce> | null>(null);
+
+  useEffect(() => {
+    const worker = new Worker(
+      new URL('../../utilities/production-solver/solver.worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+
+    worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
+      const data = event.data;
+      if (data.ok) {
+        setSolverResults((prevState) => {
+          if (!prevState || prevState.timestamp < data.results.timestamp) {
+            console.log(`Computed in: ${data.results.computeTime}ms`);
+            return data.results;
+          }
+          return prevState;
+        });
+      } else {
+        setSolverResults({
+          productionGraph: null,
+          report: null,
+          timestamp: performance.now(),
+          computeTime: 0,
+          error: new GraphError(data.message, data.helpText),
+        });
+      }
+      _setCalculating(false, setCalculating);
+    };
+
+    worker.onerror = (e) => {
+      setSolverResults({
+        productionGraph: null,
+        report: null,
+        timestamp: performance.now(),
+        computeTime: 0,
+        error: new GraphError(e.message ?? 'Worker error'),
+      });
+      _setCalculating(false, setCalculating);
+    };
+
+    const debouncedSolve = debounce((state: FactoryOptions, gameData: GameData) => {
+      _setCalculating(true, setCalculating);
+      worker.postMessage({ state, gameData });
+    }, 300, { leading: true, trailing: true });
+
+    debouncedSolveRef.current = debouncedSolve;
+
+    return () => {
+      debouncedSolve.cancel();
+      worker.terminate();
+      debouncedSolveRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCalculateFactory = useCallback(() => {
     ctx.refreshTip();
-    _handleCalculateFactory(state, gameData, setSolverResults, setCalculating)
+    debouncedSolveRef.current?.(state, gameData);
   }, [ctx, gameData, state]);
 
   const handleSetAutoCalculate = (checked: boolean) => {

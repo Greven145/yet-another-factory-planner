@@ -12,18 +12,29 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         "1.1",
     ];
 
+    private static readonly HashSet<string> ValidModes = ["per-minute", "maximize", "rate"];
+
     public FactoryConfigSchemaValidator()
     {
         RuleFor(x => x.GameVersion).Must(v => ValidGameVersions.Contains(v))
             .WithMessage("'{PropertyValue}' is not a valid game version.");
-        RuleFor(x => x.ProductionItems).NotEmpty();
+        RuleFor(x => x.ProductionItems).NotEmpty()
+            .Must(x => x.Count <= 500).WithMessage("ProductionItems must not exceed 500 items.");
         RuleForEach(x => x.ProductionItems).SetValidator(new ProductionItemsValidator());
+        RuleFor(x => x.InputItems)
+            .Must(x => x.Count <= 500).WithMessage("InputItems must not exceed 500 items.");
         RuleForEach(x => x.InputItems).SetValidator(new InputValidator());
         // InputResources may be empty (no constraints means unlimited resources)
+        RuleFor(x => x.InputResources)
+            .Must(x => x.Count <= 500).WithMessage("InputResources must not exceed 500 items.");
         RuleForEach(x => x.InputResources).SetValidator(new InputValidator());
         RuleFor(x => x.WeightingOptions).NotNull().SetValidator(new WeightingOptionsValidator());
         // AllowedRecipes may be empty (means all recipes are allowed)
+        RuleFor(x => x.AllowedRecipes)
+            .Must(x => x.Count <= 500).WithMessage("AllowedRecipes must not exceed 500 items.");
         RuleForEach(x => x.AllowedRecipes).NotEmpty();
+        RuleFor(x => x.NodesPositions)
+            .Must(x => x.Count <= 1000).WithMessage("NodesPositions must not exceed 1000 items.");
         RuleForEach(x => x.NodesPositions).SetValidator(new NodePositionValidator());
     }
 
@@ -32,7 +43,9 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         public ProductionItemsValidator()
         {
             RuleFor(x => x.ItemKey).NotEmpty();
-            RuleFor(x => x.Mode).NotEmpty();
+            RuleFor(x => x.Mode).NotEmpty()
+                .Must(m => ValidModes.Contains(m))
+                .WithMessage($"Mode must be one of: {string.Join(", ", ValidModes)}.");
             RuleFor(x => x.Value).NotNull();
         }
     }

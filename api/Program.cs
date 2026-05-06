@@ -8,30 +8,12 @@ var host = new HostBuilder()
     .ConfigureFunctionsWorkerDefaults()
     .ConfigureServices((context, services) => {
         var configuration = context.Configuration;
-        
-        // Print all environment variables for debugging
-        var envVars = Environment.GetEnvironmentVariables();
-        foreach (var key in envVars.Keys)
-        {
-            var keyStr = key as string;
-            if (keyStr is null)
-            {
-                continue;
-            }
 
-            if (keyStr.Contains("cosmos", StringComparison.OrdinalIgnoreCase) || 
-                keyStr.Contains("Aspire", StringComparison.OrdinalIgnoreCase))
-            {
-                Console.WriteLine($"{keyStr}={envVars[key]}");
-            }
-        }
-        
-        // Get the Cosmos connection string from Aspire - try all possible keys
-        var connectionString = 
+        var connectionString =
             configuration["Aspire__Microsoft__Azure__Cosmos__cosmos-db__ConnectionString"]
             ?? configuration["Aspire:Microsoft:Azure:Cosmos:cosmos-db:ConnectionString"]
             ?? configuration["ConnectionStrings:cosmos-db"];
-            
+
         if (string.IsNullOrEmpty(connectionString))
         {
             throw new InvalidOperationException(
@@ -40,10 +22,8 @@ var host = new HostBuilder()
                 "Aspire:Microsoft:Azure:Cosmos:cosmos-db:ConnectionString, " +
                 "ConnectionStrings:cosmos-db");
         }
-        
-        Console.WriteLine($"Using connection string: {connectionString}");
-        
-        // Test that we can create a CosmosClient
+
+        // Create a CosmosClient
         var cosmosClient = new CosmosClient(connectionString, new CosmosClientOptions
         {
             ConnectionMode = ConnectionMode.Gateway,

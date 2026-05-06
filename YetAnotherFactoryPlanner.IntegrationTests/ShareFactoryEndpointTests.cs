@@ -4,12 +4,11 @@ using System.Text.Json;
 namespace YetAnotherFactoryPlanner.IntegrationTests;
 
 /// <summary>
-/// Integration tests covering Bug 6:
-///   "Save &amp; Share" creates a new CosmosDB entry on every click with no deduplication.
+/// Integration tests covering Bug 6 (fixed):
+///   "Save &amp; Share" was creating a new CosmosDB entry on every click with no deduplication.
 ///   A second POST with an identical factory configuration should return the same key as
 ///   the first, not a brand-new one.
-///   These tests are written TDD-style: they fail against the current implementation and
-///   will pass once the bug is fixed.
+///   Bug is fixed in api.web via content-hashed IDs (FindOrSaveAsync) — these tests now pass.
 /// </summary>
 [Collection(AppHostCollection.Name)]
 public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
@@ -20,8 +19,9 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 	};
 
 	/// <summary>
-	/// Bug 6 — reproducer.
+	/// Bug 6 (fixed) — verifier.
 	/// Posting the same factory configuration twice must return the same share key.
+	/// api.web uses content-hashed IDs via FindOrSaveAsync so duplicates are deduplicated.
 	/// </summary>
 	[Fact]
 	public async Task PostShareFactory_SameConfigPostedTwice_ReturnsSameKey()
@@ -42,7 +42,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var firstKey = await ExtractKeyAsync(firstResponse);
 		var secondKey = await ExtractKeyAsync(secondResponse);
 
-		// BUG: currently returns two different GUIDs; they should be identical
+		// FIXED: api.web returns the same content-hashed key for identical configurations.
+		// Previously returned two different GUIDs.
 		Assert.Equal(firstKey, secondKey);
 	}
 

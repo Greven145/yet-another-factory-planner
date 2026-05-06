@@ -7,6 +7,8 @@ using api.web.Resources;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.AddServiceDefaults();
+
 // CORS: allow specific origins when configured, otherwise allow all.
 // In production, set "AllowedOrigins" in config/env to restrict to known client URLs.
 // Without that setting (dev / integration-test environments) wildcard is intentional.
@@ -30,6 +32,8 @@ builder.AddCosmosDbContext<FactoryDbContext>("cosmos-db", "shared-factory");
 builder.Services.AddScoped<FactoryClient>();
 
 var app = builder.Build();
+
+app.MapDefaultEndpoints();
 
 app.UseCors("CorsPolicy");
 
@@ -108,7 +112,7 @@ app.MapPost("/share-factory", async (
     try
     {
         var config = request.FactoryConfig;
-        var validationResult = await validator.ValidateAsync(config);
+        var validationResult = await validator.ValidateAsync(config, cancellationToken);
 
         if (!validationResult.IsValid)
             return Results.BadRequest(new { message = string.Join(".", validationResult.Errors.Select(x => x.ErrorMessage)) });

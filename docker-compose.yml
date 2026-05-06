@@ -1,3 +1,7 @@
+# NOTE: This docker-compose.yml is preserved for reference only.
+# It is NOT the active deployment path. The canonical dev and deployment path is
+# the .NET Aspire AppHost (YetAnotherFactoryPlanner.AppHost).
+
 networks:
   default:
     external: false

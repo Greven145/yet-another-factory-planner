@@ -21,6 +21,7 @@ public sealed class BrowserFixture : IAsyncLifetime
 		_browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
 		{
 			Headless = true,
+			Args = ["--no-sandbox", "--disable-dev-shm-usage"],
 		});
 	}
 

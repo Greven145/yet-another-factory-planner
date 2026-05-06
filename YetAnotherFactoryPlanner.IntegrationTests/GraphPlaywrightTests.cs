@@ -77,8 +77,9 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 		// Close the drawer; we're still on the Production Graph tab
 		await CloseDrawerAsync(page);
 
-		// Allow React to flush the recalculation and any resulting DOM mutations
-		await Task.Delay(500);
+		// Wait for React to flush the recalculation and any resulting DOM mutations.
+		// Poll until the canvas element reference stabilises (i.e. a canvas is present in the DOM).
+		await page.WaitForFunctionAsync("() => document.querySelector('canvas') !== null");
 
 		// Assert — the canvas element must be the same DOM node (no remount occurred)
 		var isSameCanvas = await page.EvaluateAsync<bool>(
