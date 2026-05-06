@@ -1,3 +1,6 @@
+using Azure.Provisioning.AppContainers;
+using Azure.Provisioning.CosmosDB;
+
 var builder = DistributedApplication.CreateBuilder(args);
 
 builder.AddAzureContainerAppEnvironment("env");
@@ -19,6 +22,15 @@ var cosmosDb = builder.AddAzureCosmosDB("cosmos-db")
     });
 var db = cosmosDb.AddCosmosDatabase("shared-factory");
 var container = db.AddContainer("factories", "/gameVersion");
+cosmosDb.ConfigureInfrastructure(infra =>
+{
+    // Set 7-day TTL on the factories container so stale shared plans are auto-expired.
+    // cosmosDb is the account-level AzureProvisioningResource; its infra contains all child resources.
+    foreach (var sqlContainer in infra.GetProvisionableResources().OfType<CosmosDBSqlContainer>())
+    {
+        sqlContainer.Resource.DefaultTtl = 604800;
+    }
+});
 #pragma warning restore ASPIRECOSMOSDB001
 
 // Add ASP.NET Core Web API project
@@ -27,6 +39,12 @@ var api = builder.AddProject<Projects.api_web>("api")
     .WithExternalHttpEndpoints()
     .WithReference(cosmosDb)
     .WaitFor(cosmosDb);
+
+api.PublishAsAzureContainerApp((infra, containerApp) =>
+{
+    containerApp.Template.Scale.MinReplicas = 0; // scale to zero when idle
+    containerApp.Template.Scale.MaxReplicas = 3;
+});
 
 if (string.Equals(builder.Environment.EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase)
     || string.Equals(builder.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase))
