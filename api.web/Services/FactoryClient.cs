@@ -68,7 +68,7 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
-            logger.LogWarning(ex, "Factory {FactoryKey} not found in Cosmos", factoryKey);
+            logger.LogWarning(ex, "Factory {FactoryKey} not found in Cosmos", factoryKey.ReplaceLineEndings(string.Empty));
             return new None();
         }
     }
