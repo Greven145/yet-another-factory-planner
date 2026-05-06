@@ -1,19 +1,19 @@
 namespace YetAnotherFactoryPlanner.IntegrationTests;
 
 /// <summary>
-/// Integration tests covering Bug 1:
-///   API returns 400 Bad Request instead of 404 Not Found for a missing factory key.
+/// Integration tests covering Bug 1 (fixed):
+///   API was returning 400 Bad Request instead of 404 Not Found for a missing factory key.
 ///   The request is well-formed; the resource simply does not exist.
-///   These tests are written TDD-style: they fail against the current implementation and
-///   will pass once the bug is fixed.
+///   Bug is fixed in api.web — these tests now pass against the current implementation.
 /// </summary>
 [Collection(AppHostCollection.Name)]
 public sealed class InitializeEndpointTests(AppHostFixture fixture)
 {
 	/// <summary>
-	/// Bug 1 — reproducer.
+	/// Bug 1 (fixed) — verifier.
 	/// A factory key that matches the expected format (16 hex/alphanumeric chars) but has
 	/// never been saved should return 404 Not Found, not 400 Bad Request.
+	/// api.web now correctly returns 404 for this case.
 	/// </summary>
 	[Fact]
 	public async Task GetInitialize_WithValidFormatNonExistentFactoryKey_ReturnsNotFound()
@@ -28,8 +28,8 @@ public sealed class InitializeEndpointTests(AppHostFixture fixture)
 		var response = await client.GetAsync($"/initialize?factoryKey={nonExistentKey}");
 
 		// Assert
-		// BUG: currently returns 400 BadRequest with {"message":"Invalid factory id"}
-		// EXPECTED: 404 NotFound — the key is syntactically valid, the resource just doesn't exist
+		// FIXED: api.web now correctly returns 404 NotFound for a valid-format key that doesn't exist.
+		// Previously returned 400 BadRequest with {"message":"Invalid factory id"}.
 		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 	}
 
