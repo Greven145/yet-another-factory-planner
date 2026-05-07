@@ -429,6 +429,7 @@ const ProductionGraphTab = () => {
   function resetNodePositions() {
     nodesPositions.length = 0;
     ctx.dispatch({ type: 'UPDATE_NODES_POSTIONS', nodesPositions: nodesPositions });
+    cyRef.current?.layout(layout).run();
   }
 
   function areNodesSame(node1: NodeInfo, node2: NodeInfo): boolean {
@@ -522,11 +523,16 @@ const ProductionGraphTab = () => {
         classes: getNodeClasses(node, ctx.gameData),
       });
     });
+    const edgeIdCount: Record<string, number> = {};
     resultsGraph.edges.forEach((edge) => {
+      const baseId = `${edge.from}__${edge.to}__${edge.key}`;
+      edgeIdCount[baseId] = (edgeIdCount[baseId] ?? 0) + 1;
+      const edgeId = edgeIdCount[baseId] === 1 ? baseId : `${baseId}__${edgeIdCount[baseId]}`;
       elements.push({
         group: 'edges',
         data: {
           ...edge,
+          id: edgeId,
           source: edge.from,
           target: edge.to,
           label: getEdgeLabel(edge, ctx.gameData),

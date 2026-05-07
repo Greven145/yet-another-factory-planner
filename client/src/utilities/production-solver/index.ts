@@ -1,5 +1,4 @@
 import loadGLPK, { GLPK, LP, Var } from 'glpk.js';
-import { nanoid } from 'nanoid';
 import { FactoryOptions, RecipeSelectionMap } from '../../contexts/production/types';
 import { GameData, ItemRate } from '../../contexts/gameData/types';
 import { GraphError } from '../error/GraphError';
@@ -608,7 +607,7 @@ export class ProductionSolver {
       }
 
       graph.nodes[recipeKey] = {
-        id: nanoid(),
+        id: recipeKey,
         key: recipeKey,
         type: NODE_TYPE.RECIPE,
         multiplier,
@@ -638,7 +637,7 @@ export class ProductionSolver {
             let itemNode = graph.nodes[itemKey];
             if (!itemNode) {
               itemNode = {
-                id: nanoid(),
+                id: itemKey,
                 key: itemKey,
                 type: NODE_TYPE.FINAL_PRODUCT,
                 multiplier: recipeAmount,
@@ -697,7 +696,7 @@ export class ProductionSolver {
           if (!itemNode) {
             const inputInfo = this.inputs[itemKey];
             itemNode = {
-              id: nanoid(),
+              id: itemKey,
               key: itemKey,
               type: inputInfo.type,
               multiplier: usageInfo.amount,
@@ -730,7 +729,7 @@ export class ProductionSolver {
               nodeType = NODE_TYPE.FINAL_PRODUCT;
             }
             itemNode = {
-              id: nanoid(),
+              id: itemKey,
               key: itemKey,
               type: nodeType,
               multiplier: productionInfo.amount
