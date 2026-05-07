@@ -193,6 +193,9 @@ const Count = styled.span`
 
 const ListWithLine = styled(List)`
   position: relative;
+  & li {
+    padding-left: 20px;
+  }
   &::after {
     content: '';
     position: absolute;
