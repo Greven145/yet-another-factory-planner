@@ -255,16 +255,16 @@ This module must run AFTER the DNS update (Task 4) because SWA validates the cus
 
 - [ ] **Step 1: Create the file**
 
-  Create `infra/app/swa-domain.bicep` with this exact content:
+  Create `infra/app/swa-domain.bicep` with this exact content (use `2024-11-01` to match `swa.bicep`):
 
   ```bicep
   param swaName string
 
-  resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' existing = {
+  resource staticWebApp 'Microsoft.Web/staticSites@2024-11-01' existing = {
     name: swaName
   }
 
-  resource customDomain 'Microsoft.Web/staticSites/customDomains@2023-12-01' = {
+  resource customDomain 'Microsoft.Web/staticSites/customDomains@2024-11-01' = {
     parent: staticWebApp
     name: 'yafp.game.gottselig.ca'
     properties: {
