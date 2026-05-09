@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: yet-another-factory-planner
+services:
+  api:
+    project: ./YetAnotherFactoryPlanner.AppHost/YetAnotherFactoryPlanner.AppHost.csproj
+    language: dotnet
+    host: containerapp
+  web:
+    project: ./client
+    dist: dist
+    language: js
+    host: staticwebapp
+    hooks:
+      predeploy:
+        windows:
+          shell: pwsh
+          run: |
+            $apiUrl = azd env get-value SERVICE_API_ENDPOINT_URL
+            Set-Content -Path .env.production -Value "VITE_REACT_APP_API_BASE_URL=$apiUrl"
+        posix:
+          shell: sh
+          run: |
+            echo "VITE_REACT_APP_API_BASE_URL=$(azd env get-value SERVICE_API_ENDPOINT_URL)" > .env.production
