@@ -17,8 +17,11 @@ services:
           shell: pwsh
           run: |
             $apiUrl = azd env get-value SERVICE_API_ENDPOINT_URL
+            if (-not $apiUrl) { throw "SERVICE_API_ENDPOINT_URL is empty — deploy api service before web" }
             Set-Content -Path .env.production -Value "VITE_REACT_APP_API_BASE_URL=$apiUrl"
         posix:
           shell: sh
           run: |
-            echo "VITE_REACT_APP_API_BASE_URL=$(azd env get-value SERVICE_API_ENDPOINT_URL)" > .env.production
+            apiUrl=$(azd env get-value SERVICE_API_ENDPOINT_URL)
+            if [ -z "$apiUrl" ]; then echo "ERROR: SERVICE_API_ENDPOINT_URL is empty — deploy api service before web" >&2; exit 1; fi
+            echo "VITE_REACT_APP_API_BASE_URL=$apiUrl" > .env.production
