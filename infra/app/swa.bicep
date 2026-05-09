@@ -2,7 +2,7 @@ param location string
 param appName string
 param tags object = {}
 
-resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
+resource staticWebApp 'Microsoft.Web/staticSites@2024-11-01' = {
   name: appName
   location: location
   sku: {
