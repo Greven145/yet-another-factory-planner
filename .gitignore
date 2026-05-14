@@ -27,5 +27,9 @@ playwright-report/
 .env.development.local
 client/.env.production
 
+# Bicep compiled ARM templates (*.json = compiled output, *.parameters.json = AZD input - keep the latter)
+infra/**/*.json
+!infra/**/*.parameters.json
+
 # Git worktrees
 .worktrees/
