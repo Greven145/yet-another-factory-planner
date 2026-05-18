@@ -52,11 +52,12 @@ jobs:
 
       - name: Build web client
         run: |
-          apiUrl=$(azd env get-value SERVICE_API_ENDPOINT_URL)
-          if [ -z "$apiUrl" ]; then
-            echo "ERROR: SERVICE_API_ENDPOINT_URL is empty — api must deploy before web" >&2
+          caDomain=$(azd env get-value AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)
+          if [ -z "$caDomain" ]; then
+            echo "ERROR: AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN is empty — provision must run first" >&2
             exit 1
           fi
+          apiUrl="https://api.$caDomain"
           echo "VITE_REACT_APP_API_BASE_URL=$apiUrl" > client/.env.production
           npm install --prefix client
           npm run build --prefix client
@@ -67,6 +68,7 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
+          deployment_environment: production
           app_location: client
           output_location: dist
           skip_app_build: true
