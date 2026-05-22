@@ -13,7 +13,6 @@ obj/
 # Node / client
 node_modules/
 client/dist/
-package-lock.json
 
 # Test artifacts
 test-results/
