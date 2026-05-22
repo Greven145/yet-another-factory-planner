@@ -35,7 +35,7 @@ cosmosDb.ConfigureInfrastructure(infra =>
 
 // Add ASP.NET Core Web API project
 var api = builder.AddProject<Projects.api_web>("api")
-    .WithHttpEndpoint(port: 8000)
+    .WithHttpEndpoint()
     .WithExternalHttpEndpoints()
     .WithReference(cosmosDb)
     .WaitFor(cosmosDb);
@@ -46,8 +46,9 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
     containerApp.Template.Scale.MaxReplicas = 3;
 });
 
-if (string.Equals(builder.Environment.EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase)
-    || string.Equals(builder.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase))
+if (builder.ExecutionContext.IsRunMode &&
+    (string.Equals(builder.Environment.EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase)
+    || string.Equals(builder.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase)))
 {
     // Keep the Vite app in local/test orchestration. Production frontend is served by Azure Static Web Apps.
     var client = builder.AddViteApp("client", "../client")
