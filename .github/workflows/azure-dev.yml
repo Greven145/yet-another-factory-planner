@@ -71,7 +71,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           deployment_environment: production
-          app_location: client
-          output_location: dist
+          app_location: client/dist
           skip_app_build: true
           skip_api_build: true
