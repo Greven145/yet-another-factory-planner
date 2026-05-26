@@ -1,15 +1,17 @@
-export const GV_U5 = 'U5';
-export const GV_U6 = 'U6';
-export const GV_U7 = 'U7';
-export const GV_U8 = 'U8';
-export const DEFAULT_GAME_VERSION = GV_U7;
-export const LEGACY_GAME_VERSION = GV_U5;
+export const GV_1_1 = '1.1';
+export const DEFAULT_GAME_VERSION = GV_1_1;
 
 export const SHARE_QUERY_PARAM = 'factory';
 
 export const GAME_VERSION_OPTIONS = [
-  { value: GV_U8, label: 'Update 8 (Experimental)' },
-  { value: GV_U7, label: 'Update 7 (Current)' },
-  { value: GV_U6, label: 'Update 6 (Legacy)' },
-  { value: GV_U5, label: 'Update 5 (Legacy)' },
+  { value: GV_1_1, label: '1.1 (Current)' },
 ];
+
+/** Maps API enum names back to client display values */
+export const API_GAME_VERSION_TO_DISPLAY: Record<string, string> = {
+  V1_1: GV_1_1,
+  U8: 'U8',
+  U7: 'U7',
+  U6: 'U6',
+  U5: 'U5',
+};

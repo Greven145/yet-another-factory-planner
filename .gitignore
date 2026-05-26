@@ -1,3 +1,34 @@
+# IDE / tools
 .vs/
+.vscode/
+.aspire/
+.mcp.json
+.claude/
 *.sln.DotSettings.user
-.vscode
+
+# .NET build output
+bin/
+obj/
+
+# Node / client
+node_modules/
+client/dist/
+
+# Test artifacts
+test-results/
+playwright-report/
+*.png
+.playwright-cli/
+.playwright-mcp/
+
+# Environment
+.env.local
+.env.development.local
+client/.env.production
+
+# Bicep compiled ARM templates (*.json = compiled output, *.parameters.json = AZD input - keep the latter)
+infra/**/*.json
+!infra/**/*.parameters.json
+
+# Git worktrees
+.worktrees/

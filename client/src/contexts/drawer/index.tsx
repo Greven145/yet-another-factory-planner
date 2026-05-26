@@ -40,15 +40,15 @@ export const DrawerProvider = (props: Props) => {
 
   return (
     <DrawerContext.Provider value={{ rootNode }}>
-      <DrawerRoot ref={setRef} topOffset={theme.other.headerHeight} />
+      <DrawerRoot ref={setRef} $topOffset={theme.other.headerHeight} />
       {children}
     </DrawerContext.Provider>
   );
 }
 
-const DrawerRoot = styled.div<{ topOffset: string }>`
+const DrawerRoot = styled.div<{ $topOffset: string }>`
   position: fixed;
-  top: ${({ topOffset }) => topOffset};
+  top: ${({ $topOffset }) => $topOffset};
   left: 0px;
   bottom: 0px;
   right: 0px;

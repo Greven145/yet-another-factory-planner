@@ -2,11 +2,11 @@
 
 public enum EquipmentSlotType
 {
-    Hand,
-    Body,
-    Arms,
-    Back,
-    Head,
-    Legs,
-    Undefined
+    HAND,
+    BODY,
+    ARMS,
+    BACK,
+    HEAD,
+    LEGS,
+    UNDEFINED
 }

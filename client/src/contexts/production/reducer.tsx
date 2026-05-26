@@ -277,9 +277,11 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
         }));
         newState.inputResources.forEach((r) => {
           const resourceOptions = (action.config.inputResources as any[]).find((i) => r.itemKey === i.itemKey);
-          r.value = String(resourceOptions.value);
-          r.weight = String(resourceOptions.weight);
-          r.unlimited = resourceOptions.unlimited;
+          if (resourceOptions) {
+            r.value = String(resourceOptions.value);
+            r.weight = String(resourceOptions.weight);
+            r.unlimited = resourceOptions.unlimited;
+          }
         });
         newState.allowHandGatheredItems = action.config.allowHandGatheredItems;
         newState.weightingOptions.resources = String(action.config.weightingOptions.resources);

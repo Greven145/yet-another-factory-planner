@@ -14,15 +14,15 @@ internal static class CreateResponseExtensions {
 
     internal static async Task<HttpResponseData> CreateCreatedResponseAsync(this HttpRequestData req, object body,
         CancellationToken cancellationToken = default) {
-        var response = req.CreateResponse();
-        await response.WriteAsJsonAsync(body, HttpStatusCode.Created, cancellationToken);
+        var response = req.CreateResponse(HttpStatusCode.Created);
+        await response.WriteAsJsonAsync(body, cancellationToken);
         return response;
     }
 
     internal static async Task<HttpResponseData> CreateBadRequestResponseAsync(this HttpRequestData req, object body,
         CancellationToken cancellationToken = default) {
-        var response = req.CreateResponse();
-        await response.WriteAsJsonAsync(body, HttpStatusCode.BadRequest, cancellationToken);
+        var response = req.CreateResponse(HttpStatusCode.BadRequest);
+        await response.WriteAsJsonAsync(body, cancellationToken);
         return response;
     }
 

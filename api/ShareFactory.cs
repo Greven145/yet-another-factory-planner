@@ -3,16 +3,15 @@ using api.Models;
 using api.Validation;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Configuration;
 using NanoidDotNet;
 
 namespace api;
 
 public class ShareFactory {
-    private readonly IConfiguration _configuration;
+    private readonly FactoryClient _factoryClient;
 
-    public ShareFactory(IConfiguration configuration) {
-        _configuration = configuration;
+    public ShareFactory(FactoryClient factoryClient) {
+        _factoryClient = factoryClient;
     }
 
     [Function(nameof(ShareFactory))]
@@ -40,8 +39,14 @@ public class ShareFactory {
 
         var factoryId = await Nanoid.GenerateAsync();
 
-        var factoryClient = new FactoryClient(_configuration);
-        await factoryClient.SaveFactory(factoryConfig.FactoryConfig with { Id = factoryId }, cancellationToken);
+        try
+        {
+            await _factoryClient.SaveFactory(factoryConfig.FactoryConfig with { Id = factoryId });
+        }
+        catch (Exception ex)
+        {
+            return await req.CreateBadRequestResponseAsync(new { message = $"Failed to save factory: {ex.Message}" }, cancellationToken);
+        }
 
         return await req.CreateCreatedResponseAsync(new { data = new { key = factoryId } }, cancellationToken);
     }

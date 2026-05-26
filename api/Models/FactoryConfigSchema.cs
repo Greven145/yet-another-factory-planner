@@ -3,7 +3,7 @@
 public record FactoryConfigSchema {
     public string[] AllowedRecipes { get; init; } = Array.Empty<string>();
     public bool AllowHandGatheredItems { get; init; }
-    public string GameVersion { get; init; } = "U7";
+    public string GameVersion { get; init; } = "1.1";
     public string? Id { get; init; }
     public Input[] InputItems { get; init; } = Array.Empty<Input>();
     public Input[] InputResources { get; init; } = Array.Empty<Input>();

@@ -1,8 +1,31 @@
 import loadGLPK, { GLPK, LP, Var } from 'glpk.js';
-import { nanoid } from 'nanoid';
 import { FactoryOptions, RecipeSelectionMap } from '../../contexts/production/types';
 import { GameData, ItemRate } from '../../contexts/gameData/types';
 import { GraphError } from '../error/GraphError';
+import {
+  GraphEdge,
+  GraphNode,
+  NODE_TYPE,
+  POINTS_ITEM_KEY,
+  ProducedItemInformation,
+  ProductionGraph,
+  Report,
+  SolverResults,
+} from './models';
+
+export {
+  NODE_TYPE,
+  POINTS_ITEM_KEY,
+} from './models';
+
+export type {
+  GraphEdge,
+  GraphNode,
+  ProducedItemInformation,
+  ProductionGraph,
+  Report,
+  SolverResults,
+} from './models';
 
 const EPSILON = 1e-8;
 const MIN_RESOURCE_WEIGHT = 0.0001;
@@ -10,17 +33,6 @@ const MAXIMIZE_WEIGHT = 1e5;
 const ENFORCE_BIN_WEIGHT = 1000;
 const TIME_LIMIT = 3.0;
 const RATE_TARGET_KEY = 'RATE_TARGET_PASS';
-
-export const NODE_TYPE = {
-  FINAL_PRODUCT: 'FINAL_PRODUCT',
-  SIDE_PRODUCT: 'SIDE_PRODUCT',
-  INPUT_ITEM: 'INPUT_ITEM',
-  HAND_GATHERED_RESOURCE: 'HAND_GATHERED_RESOURCE',
-  RESOURCE: 'RESOURCE',
-  RECIPE: 'RECIPE',
-};
-
-export const POINTS_ITEM_KEY = 'POINTS_ITEM_KEY';
 
 type Inputs = {
   [key: string]: {
@@ -56,72 +68,16 @@ type ItemProductionTotals = {
   }
 };
 
-export type SolverResults = {
-  productionGraph: ProductionGraph | null,
-  report: Report | null,
-  timestamp: number,
-  computeTime: number,
-  error: GraphError | null,
-};
-
-export type ProducedItemInformation = {
-  key: string,
-  name: string,
-  amount: number,
-  step: number,
-
-}
-
-export type Report = {
-  pointsProduced: number,
-  powerUsageEstimate: {
-    production: number,
-    extraction: number,
-    generators: number,
-    total: number,
-  },
-  resourceEfficiencyScore: number,
-  totalBuildArea: number,
-  estimatedFoundations: number,
-  buildingsUsed: {
-    [key: string]: {
-      count: number,
-      materialCost: {
-        [key: string]: number,
-      }
-    },
-  },
-  totalMaterialCost: {
-    [key: string]: number,
-  },
-  totalRawResources: {
-    [key: string]: number,
-  },
-  totalItemsRecap: ProducedItemInformation[],
-  loopWarning: boolean,
-}
-
-export type ProductionGraph = {
-  nodes: { [key: string]: GraphNode },
-  edges: GraphEdge[],
-};
-
-export type GraphNode = {
-  id: string,
-  key: string,
-  type: string,
-  multiplier: number,
-};
-
-export type GraphEdge = {
-  key: string,
-  from: string,
-  to: string,
-  productionRate: number,
-};
-
 type ItemMap = {
   [key: string]: boolean;
+}
+
+let _glpkInstance: Awaited<ReturnType<typeof loadGLPK>> | null = null;
+async function getGLPK() {
+  if (!_glpkInstance) {
+    _glpkInstance = await loadGLPK();
+  }
+  return _glpkInstance;
 }
 
 export class ProductionSolver {
@@ -335,7 +291,7 @@ export class ProductionSolver {
   public async exec(): Promise<SolverResults> {
     const timestamp = performance.now();
     try {
-      const glpk = await loadGLPK();
+      const glpk = await getGLPK();
       const productionSolution = await this.productionSolverPass(RATE_TARGET_KEY, this.inputs, glpk);
       let productionGraph = this.generateProductionGraph(productionSolution);
 
@@ -408,6 +364,7 @@ export class ProductionSolver {
 
     const doPoints = (targetKey === RATE_TARGET_KEY && this.rateTargets[POINTS_ITEM_KEY]) || targetKey === POINTS_ITEM_KEY;
     const pointsVars: Var[] = [];
+    const objectiveVarMap = new Map<string, Var>();
 
     for (const [recipeKey, recipeInfo] of Object.entries(this.gameData.recipes)) {
       if (!this.allowedRecipes[recipeKey]) continue;
@@ -424,10 +381,12 @@ export class ProductionSolver {
       }
 
 
-      model.objective.vars.push({
+      const recipeObjVar: Var = {
         name: recipeKey,
         coef: powerScore + resourceScore + buildingsScore,
-      });
+      };
+      model.objective.vars.push(recipeObjVar);
+      objectiveVarMap.set(recipeKey, recipeObjVar);
 
 
       if (targetKey === RATE_TARGET_KEY) {
@@ -477,14 +436,13 @@ export class ProductionSolver {
         });
       } else if (targetKey === POINTS_ITEM_KEY) {
         pointsVars.forEach((v) => {
-          const existingVar = model.objective.vars.find((ov) => ov.name === v.name);
+          const existingVar = objectiveVarMap.get(v.name);
           if (existingVar) {
             existingVar.coef += v.coef * MAXIMIZE_WEIGHT;
           } else {
-            model.objective.vars.push({
-              name: v.name,
-              coef: v.coef * MAXIMIZE_WEIGHT,
-            });
+            const newVar: Var = { name: v.name, coef: v.coef * MAXIMIZE_WEIGHT };
+            model.objective.vars.push(newVar);
+            objectiveVarMap.set(v.name, newVar);
           }
         });
       }
@@ -494,6 +452,7 @@ export class ProductionSolver {
     for (const [itemKey, itemInfo] of Object.entries(this.gameData.items)) {
       if (!this.allowedItems[itemKey]) continue;
       const vars: Var[] = [];
+      const varsMap = new Map<string, Var>();
 
       const binKey = `${itemKey}_BIN`;
       const binVars: Var[] = [];
@@ -502,7 +461,9 @@ export class ProductionSolver {
         if (!this.allowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.ingredients.find((i) => i.itemClass === itemKey)!;
-        vars.push({ name: recipeKey, coef: target.perMinute });
+        const v: Var = { name: recipeKey, coef: target.perMinute };
+        vars.push(v);
+        varsMap.set(recipeKey, v);
 
         if (!this.gameData.handGatheredItems[itemKey]) {
           binVars.push({ name: recipeKey, coef: -1 });
@@ -514,11 +475,13 @@ export class ProductionSolver {
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.products.find((p) => p.itemClass === itemKey)!;
 
-        const existingVar = vars.find((v) => v.name === recipeKey);
+        const existingVar = varsMap.get(recipeKey);
         if (existingVar) {
           existingVar.coef -= target.perMinute;
         } else {
-          vars.push({ name: recipeKey, coef: -target.perMinute });
+          const v: Var = { name: recipeKey, coef: -target.perMinute };
+          vars.push(v);
+          varsMap.set(recipeKey, v);
         }
       }
 
@@ -567,14 +530,13 @@ export class ProductionSolver {
         });
 
         vars.forEach((v) => {
-          const existingVar = model.objective.vars.find((ov) => ov.name === v.name);
+          const existingVar = objectiveVarMap.get(v.name);
           if (existingVar) {
             existingVar.coef += v.coef * MAXIMIZE_WEIGHT;
           } else {
-            model.objective.vars.push({
-              name: v.name,
-              coef: v.coef * MAXIMIZE_WEIGHT,
-            });
+            const newVar: Var = { name: v.name, coef: v.coef * MAXIMIZE_WEIGHT };
+            model.objective.vars.push(newVar);
+            objectiveVarMap.set(v.name, newVar);
           }
         });
       }
@@ -645,7 +607,7 @@ export class ProductionSolver {
       }
 
       graph.nodes[recipeKey] = {
-        id: nanoid(),
+        id: recipeKey,
         key: recipeKey,
         type: NODE_TYPE.RECIPE,
         multiplier,
@@ -675,7 +637,7 @@ export class ProductionSolver {
             let itemNode = graph.nodes[itemKey];
             if (!itemNode) {
               itemNode = {
-                id: nanoid(),
+                id: itemKey,
                 key: itemKey,
                 type: NODE_TYPE.FINAL_PRODUCT,
                 multiplier: recipeAmount,
@@ -734,7 +696,7 @@ export class ProductionSolver {
           if (!itemNode) {
             const inputInfo = this.inputs[itemKey];
             itemNode = {
-              id: nanoid(),
+              id: itemKey,
               key: itemKey,
               type: inputInfo.type,
               multiplier: usageInfo.amount,
@@ -767,7 +729,7 @@ export class ProductionSolver {
               nodeType = NODE_TYPE.FINAL_PRODUCT;
             }
             itemNode = {
-              id: nanoid(),
+              id: itemKey,
               key: itemKey,
               type: nodeType,
               multiplier: productionInfo.amount
@@ -983,6 +945,12 @@ export class ProductionSolver {
   }
 
   private hasLoop(productionGraph: ProductionGraph): boolean {
+    const adjacency = new Map<string, string[]>();
+    for (const edge of productionGraph.edges) {
+      if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
+      adjacency.get(edge.from)!.push(edge.to);
+    }
+
     const visited = new Set<string>();
     const stack = new Set<string>();
 
@@ -990,7 +958,7 @@ export class ProductionSolver {
       visited.add(node);
       stack.add(node);
 
-      for (const edge of productionGraph.edges.filter(e => e.from === node).map((e) => e.to)) {
+      for (const edge of (adjacency.get(node) ?? [])) {
         if ( stack.has(edge) ) {
           return true;
         } else if (!visited.has(edge)) {

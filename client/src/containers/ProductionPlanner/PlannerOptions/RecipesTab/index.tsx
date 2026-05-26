@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
-import { List, Checkbox, TextInput, Button, Group, Title, Grid, Col } from '@mantine/core';
+import { List, Checkbox, TextInput, Button, Group, Title, Grid } from '@mantine/core';
 import { Search } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { Section, SectionDescription } from '../../../../components/Section';
@@ -78,7 +78,7 @@ const RecipesTab = () => {
             Select None
           </Button>
         </Group>
-        <List listStyleType='none' spacing={6}>
+        <List listStyleType='none' gap={6}>
           {filteredRecipes.map(({ component }) => component)}
         </List>
       </>
@@ -95,20 +95,20 @@ const RecipesTab = () => {
         <TextInput
           placeholder='Search...'
           aria-label='search recipes'
-          icon={<Search size={16} />}
+          leftSection={<Search size={16} />}
           value={searchValue}
           onChange={(e) => { setSearchValue(e.currentTarget.value); }}
           style={{ marginBottom: '10px' }}
         />
         <Grid grow style={{ position: 'relative' }}>
-          <Col span={6}>
+          <Grid.Col span={6}>
             <Title order={3}>Alternate Recipes</Title>
             {renderRecipeOptions(true)}
-          </Col>
-          <Col span={6}>
+          </Grid.Col>
+          <Grid.Col span={6}>
             <Title order={3}>Base Recipes</Title>
             {renderRecipeOptions(false)}
-          </Col>
+          </Grid.Col>
           <VDivider />
         </Grid>
       </Section>

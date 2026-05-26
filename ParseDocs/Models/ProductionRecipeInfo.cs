@@ -12,6 +12,6 @@ public class ProductionRecipeInfo
     public bool MachineCraftable { get; set; }
     public List<ItemQuantity> Ingredients { get; set; } = new();
     public List<ItemQuantity> Products { get; set; } = new();
-    public string ProducedIn { get; set; } = string.Empty;
+    public List<string> ProducedIn { get; set; } = new();
     public EventType Event { get; set; }
 }

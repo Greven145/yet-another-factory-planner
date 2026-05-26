@@ -2,7 +2,7 @@ import axios from "axios";
 import { PlainObject } from "./types";
 
 const apiClient = axios.create({
-  baseURL: process.env.REACT_APP_API_BASE_URL,
+  baseURL: import.meta.env.VITE_REACT_APP_API_BASE_URL,
   responseType: 'json',
 });
 

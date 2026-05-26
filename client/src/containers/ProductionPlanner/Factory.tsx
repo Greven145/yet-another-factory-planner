@@ -5,7 +5,7 @@ import PlannerResults from './PlannerResults';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
 
 const Factory = () => {
-  const [drawerOpen, setDrawerOpen] = useSessionStorage<'false' | 'true'>({ key: 'drawer-open', defaultValue: 'false' });
+  const [drawerOpen, setDrawerOpen] = useSessionStorage<'false' | 'true'>({ key: 'drawer-open', defaultValue: 'true' });
   return (
     <>
       <PlannerResults />
