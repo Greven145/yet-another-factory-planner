@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { nanoid } from 'nanoid';
 import Cytoscape, { Stylesheet } from 'cytoscape';
@@ -358,13 +358,15 @@ const ProductionGraphTab = () => {
   }
   layout.transform = modifyNodePositions;
 
-  function setGraphRef(instance: HTMLDivElement | null) {
-    if (instance && !graphRef.current) {
+  const setGraphRef = useCallback((instance: HTMLDivElement | null) => {
+    if (instance) {
       graphRef.current = instance;
       _resizeListener(graphRef);
       setDoFirstRender(true);
+    } else {
+      graphRef.current = null;
     }
-  }
+  }, []);
 
   function setCyRef(instance: Cytoscape.Core | null) {
     if (instance && cyRef.current !== instance) {
@@ -542,8 +544,7 @@ const ProductionGraphTab = () => {
     });
 
     return { key: graphKey, elements };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resultsGraph]);
+  }, [resultsGraph, ctx.gameData]);
 
   return (
     <>
@@ -560,7 +561,7 @@ const ProductionGraphTab = () => {
           )
         }
         {
-          doFirstRender && !isLoading && pluginsReady && (
+          doFirstRender && !isLoading && pluginsReady && ctx.solverResults != null && (
             graphProps != null
               ? (
                 <GraphVisualizer
