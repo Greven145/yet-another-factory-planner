@@ -74,6 +74,8 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
 
   // Debounced post ref: 300ms leading+trailing, matching the previous module-level debounce.
   const debouncedSolveRef = useRef<ReturnType<typeof debounce> | null>(null);
+  // Set to true in triggerInitialize effect so the state-change effect runs the solve after dispatch applies.
+  const forceCalculateRef = useRef(false);
 
   useEffect(() => {
     const worker = new Worker(
@@ -169,13 +171,16 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
       } else {
         dispatch({ type: 'RESET_FACTORY', gameData });
       }
-      handleCalculateFactory();
+      // Don't call handleCalculateFactory() here — state hasn't updated yet (dispatch is async).
+      // Set the flag so the state-change effect below runs the solve after the new state is applied.
+      forceCalculateRef.current = true;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerInitialize]);
 
   useEffect(() => {
-    if (autoCalculateBool && prevState !== state) {
+    if (prevState !== state && (autoCalculateBool || forceCalculateRef.current)) {
+      forceCalculateRef.current = false;
       handleCalculateFactory();
     }
   }, [autoCalculateBool, handleCalculateFactory, prevState, state]);
