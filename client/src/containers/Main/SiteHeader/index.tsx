@@ -73,7 +73,7 @@ const MainTitle = styled(Title)`
   color: #fff;
   margin-left: 25px;
   white-space: nowrap;
-  font-family: 'Indie Flower', sans-serif;
+  font-family: 'Caveat', sans-serif;
 `;
 
 const RightAlign = styled(Group)`
