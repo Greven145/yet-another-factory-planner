@@ -491,6 +491,8 @@ const ProductionGraphTab = () => {
       if (active) {
         setPluginsReady(true);
       }
+    }).catch((err) => {
+      console.error('[graph] ensureGraphPluginsReady failed:', err);
     });
 
     return () => {

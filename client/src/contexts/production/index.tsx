@@ -76,6 +76,9 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
   const debouncedSolveRef = useRef<ReturnType<typeof debounce> | null>(null);
   // Set to true in triggerInitialize effect so the state-change effect runs the solve after dispatch applies.
   const forceCalculateRef = useRef(false);
+  // Monotonically-increasing ID for each solve request. Used to discard stale results from the worker,
+  // since worker and main-thread performance.now() have different origins and can't be compared.
+  const solveIdRef = useRef(0);
 
   useEffect(() => {
     const worker = new Worker(
@@ -85,14 +88,11 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
 
     worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
       const data = event.data;
+      if (data.solveId < solveIdRef.current) {
+        return;
+      }
       if (data.ok) {
-        setSolverResults((prevState) => {
-          if (!prevState || prevState.timestamp < data.results.timestamp) {
-            console.log(`Computed in: ${data.results.computeTime}ms`);
-            return data.results;
-          }
-          return prevState;
-        });
+        setSolverResults(data.results);
       } else {
         setSolverResults({
           productionGraph: null,
@@ -117,8 +117,9 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
     };
 
     const debouncedSolve = debounce((state: FactoryOptions, gameData: GameData) => {
+      const solveId = ++solveIdRef.current;
       _setCalculating(true, setCalculating);
-      worker.postMessage({ state, gameData });
+      worker.postMessage({ state, gameData, solveId });
     }, 300, { leading: true, trailing: true });
 
     debouncedSolveRef.current = debouncedSolve;
