@@ -161,7 +161,7 @@ app.MapGet("/get-factory", async (
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to retrieve factory {FactoryKey}", factoryKey);
+        logger.LogError(ex, "Failed to retrieve factory {FactoryKey}", factoryKey.ReplaceLineEndings(""));
         return Results.Problem("An error occurred while retrieving the factory.", statusCode: 500);
     }
 })
