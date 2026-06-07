@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { decodeState_v1_U5 } from './legacy-state-decoders/v1_U5';
 import { decodeState_v2_U5 } from './legacy-state-decoders/v2_U5';
 import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
-import { ProductionItemOptions, InputItemOptions, WeightingOptions, RecipeSelectionMap, FactoryOptions, NodeInfo } from './types';
+import { ProductionItemOptions, InputItemOptions, WeightingOptions, RecipeSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
 import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 
@@ -77,6 +77,13 @@ function getInitialWeightingOptions(): WeightingOptions {
   };
 }
 
+function getInitialTransportOptions(): TransportOptions {
+  return {
+    beltCapacity: null,
+    pipeCapacity: null,
+  };
+}
+
 function getInitialAllowedRecipes(recipes: RecipeMap): RecipeSelectionMap {
   const recipeMap: RecipeSelectionMap = {};
   Object.entries(recipes).forEach(([key, data]) => {
@@ -96,6 +103,7 @@ export function getInitialState(gameData: GameData): FactoryOptions {
     allowedRecipes: getInitialAllowedRecipes(gameData.recipes),
     nodesPositions: [],
     maximizeBalanceMode: DEFAULT_MAXIMIZE_BALANCE_MODE,
+    transportOptions: getInitialTransportOptions(),
   };
 }
 
@@ -123,7 +131,8 @@ export type FactoryAction =
   | { type: 'LOAD_FROM_LEGACY_ENCODING', encoding: string, gameData: GameData }
   | { type: 'LOAD_FROM_SESSION_STORAGE', sessionState: FactoryOptions, gameData: GameData }
   | { type: 'UPDATE_NODES_POSTIONS', nodesPositions: NodeInfo[] }
-  | { type: 'SET_MAXIMIZE_BALANCE_MODE', mode: MaximizeBalanceMode };
+  | { type: 'SET_MAXIMIZE_BALANCE_MODE', mode: MaximizeBalanceMode }
+  | { type: 'UPDATE_TRANSPORT_OPTIONS', data: TransportOptions };
 
 export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOptions {
   switch (action.type) {
@@ -297,6 +306,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
         });
         newState.nodesPositions = action.config.nodesPositions;
         newState.maximizeBalanceMode = action.config.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE;
+        newState.transportOptions = action.config.transportOptions ?? getInitialTransportOptions();
         return newState;
       } catch (e) {
         console.error(e);
@@ -317,6 +327,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
         return {
           ...action.sessionState,
           maximizeBalanceMode: action.sessionState.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
+          transportOptions: action.sessionState.transportOptions ?? getInitialTransportOptions(),
         };
       } catch (e) {
         console.error(e);
@@ -329,6 +340,9 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
     }
     case 'SET_MAXIMIZE_BALANCE_MODE': {
       return { ...state, maximizeBalanceMode: action.mode };
+    }
+    case 'UPDATE_TRANSPORT_OPTIONS': {
+      return { ...state, transportOptions: { ...action.data } };
     }
     default:
       return state;

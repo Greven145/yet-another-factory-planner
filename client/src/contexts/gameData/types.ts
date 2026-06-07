@@ -37,6 +37,7 @@ export type ItemInfo = {
   slug: string,
   name: string,
   sinkPoints: number,
+  isFluid: boolean,
   usedInRecipes: string[],
   producedFromRecipes: string[],
   isFicsmas: boolean,

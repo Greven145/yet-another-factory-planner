@@ -32,6 +32,11 @@ export type NodeInfo = {
   y: number
 }
 
+export type TransportOptions = {
+  beltCapacity: string | null,
+  pipeCapacity: string | null,
+};
+
 export type FactoryOptions = {
   key: string,
   productionItems: ProductionItemOptions[],
@@ -42,6 +47,7 @@ export type FactoryOptions = {
   allowedRecipes: RecipeSelectionMap,
   nodesPositions: NodeInfo[],
   maximizeBalanceMode: MaximizeBalanceMode,
+  transportOptions: TransportOptions,
 };
 
 export type NodeInformation = {

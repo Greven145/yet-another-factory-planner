@@ -92,10 +92,20 @@ export class ProductionSolver {
   private allowedItems: ItemMap;
   private scale: number;
   private maximizeBalanceMode: MaximizeBalanceMode;
+  private beltCapacity: number | null;
+  private pipeCapacity: number | null;
 
   public constructor(options: FactoryOptions, gameData: GameData) {
     this.gameData = gameData;
     this.maximizeBalanceMode = options.maximizeBalanceMode;
+
+    const rawBelt = options.transportOptions?.beltCapacity;
+    const parsedBelt = rawBelt != null ? Number(rawBelt) : NaN;
+    this.beltCapacity = !Number.isNaN(parsedBelt) && parsedBelt > 0 ? parsedBelt : null;
+
+    const rawPipe = options.transportOptions?.pipeCapacity;
+    const parsedPipe = rawPipe != null ? Number(rawPipe) : NaN;
+    this.pipeCapacity = !Number.isNaN(parsedPipe) && parsedPipe > 0 ? parsedPipe : null;
 
     this.allowedRecipes = options.allowedRecipes;
     this.allowedItems = {};
@@ -413,6 +423,20 @@ export class ProductionSolver {
       model.objective.vars.push(recipeObjVar);
       objectiveVarMap.set(recipeKey, recipeObjVar);
 
+      if (this.beltCapacity !== null || this.pipeCapacity !== null) {
+        for (const product of recipeInfo.products) {
+          if (!this.allowedItems[product.itemClass] || product.perMinute <= 0) continue;
+          const isFluid = this.gameData.items[product.itemClass]?.isFluid ?? false;
+          const capacity = isFluid ? this.pipeCapacity : this.beltCapacity;
+          if (capacity !== null) {
+            model.subjectTo.push({
+              name: `${recipeKey}_${product.itemClass}_capacity`,
+              vars: [{ name: recipeKey, coef: product.perMinute }],
+              bnds: { type: glpk.GLP_UP, ub: capacity, lb: NaN },
+            });
+          }
+        }
+      }
 
       if (isRateTargetPass) {
         if (this.rateTargets[recipeKey]) {

@@ -103,7 +103,7 @@ public static class Parser {
             }
 
             itemOutput.Add(itemKey,
-                new Item(itemData.Slug.Replace('-', '_'), itemData.Name, itemData.IsFluid ? 0 : itemData.SinkPoints,
+                new Item(itemData.Slug.Replace('-', '_'), itemData.Name, itemData.IsFluid ? 0 : itemData.SinkPoints, itemData.IsFluid,
                     usedInRecipes, producedFromRecipes, itemData.Event == EventType.FICSMAS));
         }
 

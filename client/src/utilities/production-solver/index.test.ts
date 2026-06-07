@@ -79,6 +79,7 @@ const mockGameData: GameData = {
       slug: 'iron_ore',
       name: 'Iron Ore',
       sinkPoints: 1,
+      isFluid: false,
       usedInRecipes: ['Recipe_IronIngot_C'],
       producedFromRecipes: [],
       isFicsmas: false,
@@ -87,6 +88,7 @@ const mockGameData: GameData = {
       slug: 'iron_ingot',
       name: 'Iron Ingot',
       sinkPoints: 2,
+      isFluid: false,
       usedInRecipes: ['Recipe_IronPlate_C'],
       producedFromRecipes: ['Recipe_IronIngot_C'],
       isFicsmas: false,
@@ -95,6 +97,7 @@ const mockGameData: GameData = {
       slug: 'iron_plate',
       name: 'Iron Plate',
       sinkPoints: 6,
+      isFluid: false,
       usedInRecipes: [],
       producedFromRecipes: ['Recipe_IronPlate_C'],
       isFicsmas: false,
@@ -133,6 +136,7 @@ function createValidOptions(overrides?: Partial<FactoryOptions>): FactoryOptions
     },
     nodesPositions: [],
     maximizeBalanceMode: 'proportional',
+    transportOptions: { beltCapacity: null, pipeCapacity: null },
     ...overrides,
   };
 }
