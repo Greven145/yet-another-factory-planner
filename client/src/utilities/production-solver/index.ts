@@ -316,7 +316,19 @@ export class ProductionSolver {
             };
           }
         }
-        const solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk);
+        let solution: ProductionSolution;
+        if (groupTargetKeys.length === 1) {
+          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk);
+        } else {
+          const maxima = new Map<string, number>();
+          for (const targetKey of groupTargetKeys) {
+            const individualSol = await this.productionSolverPass([targetKey], remainingInputs, glpk);
+            const tempGraph = this.generateProductionGraph(individualSol);
+            const node = Object.values(tempGraph.nodes).find(n => n.key === targetKey && n.type === NODE_TYPE.FINAL_PRODUCT);
+            maxima.set(targetKey, node?.multiplier ?? 0);
+          }
+          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, maxima);
+        }
         for (const [key, multiplier] of Object.entries(solution)) {
           if (productionSolution[key]) {
             productionSolution[key] += multiplier;
@@ -355,8 +367,9 @@ export class ProductionSolver {
     return itemInfo.isFicsmas ? 0 : itemInfo.sinkPoints;
   }
 
-  private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK): Promise<ProductionSolution> {
+  private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK, maxima?: Map<string, number>): Promise<ProductionSolution> {
     const isRateTargetPass = targetKeys.length === 1 && targetKeys[0] === RATE_TARGET_KEY;
+    const targetItemVars = new Map<string, Var[]>();
     const model: LP = {
       name: 'production',
       objective: {
@@ -529,6 +542,7 @@ export class ProductionSolver {
       }
 
       else if (targetKeys.includes(itemKey)) {
+        targetItemVars.set(itemKey, [...vars]);
         model.subjectTo.push({
           name: `${itemKey} final product constraint`,
           vars,
@@ -553,6 +567,40 @@ export class ProductionSolver {
           vars,
           bnds: { type: glpk.GLP_UP, ub: 0, lb: NaN },
         });
+      }
+    }
+
+    if (maxima && targetKeys.length > 1) {
+      const producibleKeys = targetKeys.filter(k => (maxima.get(k) ?? 0) > EPSILON);
+      if (producibleKeys.length > 1) {
+        const referenceKey = producibleKeys[0];
+        const referenceVars = targetItemVars.get(referenceKey) ?? [];
+        const referenceMax = maxima.get(referenceKey)!;
+        for (let i = 1; i < producibleKeys.length; i++) {
+          const otherKey = producibleKeys[i];
+          const otherVars = targetItemVars.get(otherKey) ?? [];
+          const otherMax = maxima.get(otherKey)!;
+          // Proportionality: net_production_reference / referenceMax = net_production_other / otherMax
+          // Since vars encode (consumption - production), net_production = -sum(vars * x)
+          // → otherMax * sum(referenceVars * x) - referenceMax * sum(otherVars * x) = 0
+          const coefMap = new Map<string, number>();
+          for (const v of referenceVars) {
+            coefMap.set(v.name, (coefMap.get(v.name) ?? 0) + otherMax * v.coef);
+          }
+          for (const v of otherVars) {
+            coefMap.set(v.name, (coefMap.get(v.name) ?? 0) - referenceMax * v.coef);
+          }
+          const constraintVars: Var[] = [...coefMap.entries()]
+            .filter(([, coef]) => Math.abs(coef) > EPSILON)
+            .map(([name, coef]) => ({ name, coef }));
+          if (constraintVars.length > 0) {
+            model.subjectTo.push({
+              name: `${referenceKey}_${otherKey}_proportional`,
+              vars: constraintVars,
+              bnds: { type: glpk.GLP_FX, ub: 0, lb: 0 },
+            });
+          }
+        }
       }
     }
 
