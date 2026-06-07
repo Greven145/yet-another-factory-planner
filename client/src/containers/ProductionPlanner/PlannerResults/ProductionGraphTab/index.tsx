@@ -5,7 +5,7 @@ import Cytoscape from 'cytoscape';
 import GraphVisualizer from 'react-cytoscapejs';
 import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
-import { GraphNode, GraphEdge, NODE_TYPE } from '../../../../utilities/production-solver/models';
+import { GraphNode, GraphEdge, NODE_TYPE, ProductionGraph } from '../../../../utilities/production-solver/models';
 import { graphColors } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
 import { truncateFloat } from '../../../../utilities/number';
@@ -341,6 +341,7 @@ const ProductionGraphTab = () => {
   const graphKey = useRef(nanoid()).current;
   const popupRef = useRef<HTMLDivElement | null>(null);
   const popperRef = useRef<PopperRef | null>(null);
+  const prevResultsGraphRef = useRef<ProductionGraph | null>(null);
   const [popupNode, setPopupNode] = useState<any | null>(null);
   const ctx = useProductionContext();
   const resultsGraph = ctx.solverResults?.productionGraph || null;
@@ -509,6 +510,22 @@ const ProductionGraphTab = () => {
       window.removeEventListener('resize', resizeListener);
     }
   }, []);
+
+  useEffect(() => {
+    const prevGraph = prevResultsGraphRef.current;
+    prevResultsGraphRef.current = resultsGraph;
+
+    if (!resultsGraph || !prevGraph) return;
+
+    const prevNodeKeys = new Set(Object.keys(prevGraph.nodes));
+    const hasNewNodes = Object.keys(resultsGraph.nodes).some(key => !prevNodeKeys.has(key));
+
+    if (hasNewNodes) {
+      nodesPositions.length = 0;
+      ctx.dispatch({ type: 'UPDATE_NODES_POSTIONS', nodesPositions: nodesPositions });
+      cyRef.current?.layout(layout).run();
+    }
+  }, [resultsGraph]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const graphProps = useMemo<any>(() => {
     if (resultsGraph == null) {
