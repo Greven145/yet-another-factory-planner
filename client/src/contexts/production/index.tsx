@@ -180,7 +180,7 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
   }, [triggerInitialize]);
 
   useEffect(() => {
-    if (prevState !== state && (autoCalculateBool || forceCalculateRef.current)) {
+    if (prevState !== undefined && prevState !== state && (autoCalculateBool || forceCalculateRef.current)) {
       forceCalculateRef.current = false;
       handleCalculateFactory();
     }
