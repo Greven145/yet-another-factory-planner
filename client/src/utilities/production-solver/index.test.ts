@@ -215,14 +215,14 @@ describe('ProductionSolver constructor', () => {
     expect(() => new ProductionSolver(options, mockGameData)).toThrow(GraphError);
   });
 
-  it('throws on duplicate maximization priority', () => {
+  it('allows duplicate maximization priority', () => {
     const options = createValidOptions({
       productionItems: [
         { key: 'prod-1', itemKey: 'Desc_IronPlate_C', mode: 'maximize', value: '1' },
         { key: 'prod-2', itemKey: 'Desc_IronIngot_C', mode: 'maximize', value: '1' },
       ],
     });
-    expect(() => new ProductionSolver(options, mockGameData)).toThrow(GraphError);
+    expect(() => new ProductionSolver(options, mockGameData)).not.toThrow();
   });
 
   it('handles unlimited resource inputs', () => {

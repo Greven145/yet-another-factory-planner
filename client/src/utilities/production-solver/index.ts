@@ -264,12 +264,7 @@ export class ProductionSolver {
       this.scale = 1;
     }
 
-    this.maximizeTargets
-      .sort((a, b) => {
-        if (a.priority > b.priority) return -1;
-        if (a.priority < b.priority) return 1;
-        throw new GraphError('DUPLICATE MAXIMIZATION PRIORITY', 'Two items have the same maximization priority, which is currently not allowed.');
-      });
+    this.maximizeTargets.sort((a, b) => b.priority - a.priority);
 
     this.rateTargets = {
       ...perMinTargets,
@@ -292,10 +287,20 @@ export class ProductionSolver {
     const timestamp = performance.now();
     try {
       const glpk = await getGLPK();
-      const productionSolution = await this.productionSolverPass(RATE_TARGET_KEY, this.inputs, glpk);
+      const productionSolution = await this.productionSolverPass([RATE_TARGET_KEY], this.inputs, glpk);
       let productionGraph = this.generateProductionGraph(productionSolution);
 
+      const priorityGroups = new Map<number, string[]>();
       for (const target of this.maximizeTargets) {
+        if (!priorityGroups.has(target.priority)) {
+          priorityGroups.set(target.priority, []);
+        }
+        priorityGroups.get(target.priority)!.push(target.key);
+      }
+      const sortedPriorities = [...priorityGroups.keys()].sort((a, b) => b - a);
+
+      for (const priority of sortedPriorities) {
+        const groupTargetKeys = priorityGroups.get(priority)!;
         const remainingInputs: Inputs = {};
         for (const [inputKey, input] of Object.entries(this.inputs)) {
           const inputNode = Object.values(productionGraph.nodes).find((n) => n.key === inputKey);
@@ -311,7 +316,7 @@ export class ProductionSolver {
             };
           }
         }
-        const solution = await this.productionSolverPass(target.key, remainingInputs, glpk);
+        const solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk);
         for (const [key, multiplier] of Object.entries(solution)) {
           if (productionSolution[key]) {
             productionSolution[key] += multiplier;
@@ -350,7 +355,8 @@ export class ProductionSolver {
     return itemInfo.isFicsmas ? 0 : itemInfo.sinkPoints;
   }
 
-  private async productionSolverPass(targetKey: string, remainingInputs: Inputs, glpk: GLPK): Promise<ProductionSolution> {
+  private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK): Promise<ProductionSolution> {
+    const isRateTargetPass = targetKeys.length === 1 && targetKeys[0] === RATE_TARGET_KEY;
     const model: LP = {
       name: 'production',
       objective: {
@@ -362,7 +368,7 @@ export class ProductionSolver {
       binaries: [],
     };
 
-    const doPoints = (targetKey === RATE_TARGET_KEY && this.rateTargets[POINTS_ITEM_KEY]) || targetKey === POINTS_ITEM_KEY;
+    const doPoints = (isRateTargetPass && this.rateTargets[POINTS_ITEM_KEY]) || targetKeys.includes(POINTS_ITEM_KEY);
     const pointsVars: Var[] = [];
     const objectiveVarMap = new Map<string, Var>();
 
@@ -389,7 +395,7 @@ export class ProductionSolver {
       objectiveVarMap.set(recipeKey, recipeObjVar);
 
 
-      if (targetKey === RATE_TARGET_KEY) {
+      if (isRateTargetPass) {
         if (this.rateTargets[recipeKey]) {
           model.subjectTo.push({
             name: `${recipeKey} recipe constraint`,
@@ -423,7 +429,7 @@ export class ProductionSolver {
           intrinsicPoints += this.getItemPoints(itemKey) * inputInfo.amount;
         }
       }
-      if (targetKey === RATE_TARGET_KEY) {
+      if (isRateTargetPass) {
         for (const [itemKey, targetInfo] of Object.entries(this.rateTargets)) {
           if (itemKey !== POINTS_ITEM_KEY) {
             intrinsicPoints -= this.getItemPoints(itemKey) * targetInfo.value;
@@ -434,7 +440,7 @@ export class ProductionSolver {
           vars: pointsVars,
           bnds: { type: glpk.GLP_UP, ub: -this.rateTargets[POINTS_ITEM_KEY].value - intrinsicPoints, lb: NaN },
         });
-      } else if (targetKey === POINTS_ITEM_KEY) {
+      } else if (targetKeys.includes(POINTS_ITEM_KEY)) {
         pointsVars.forEach((v) => {
           const existingVar = objectiveVarMap.get(v.name);
           if (existingVar) {
@@ -485,7 +491,7 @@ export class ProductionSolver {
         }
       }
 
-      if (targetKey === RATE_TARGET_KEY) {
+      if (isRateTargetPass) {
         if (this.globalWeights.complexity > 0 && binVars.length > 0) {
           model.binaries!.push(binKey);
           model.objective.vars.push({ name: binKey, coef: this.globalWeights.complexity });
@@ -513,7 +519,7 @@ export class ProductionSolver {
         }
       }
 
-      else if (targetKey === RATE_TARGET_KEY && this.rateTargets[itemKey]) {
+      else if (isRateTargetPass && this.rateTargets[itemKey]) {
         const outputInfo = this.rateTargets[itemKey];
         model.subjectTo.push({
           name: `${itemKey} final product constraint`,
@@ -522,7 +528,7 @@ export class ProductionSolver {
         });
       }
 
-      else if (targetKey === itemKey) {
+      else if (targetKeys.includes(itemKey)) {
         model.subjectTo.push({
           name: `${itemKey} final product constraint`,
           vars,
@@ -555,7 +561,7 @@ export class ProductionSolver {
       throw new GraphError('TIMED OUT', 'Try setting the complexity weight to 0. Unfortunately it is currently very slow for large factories. For complex factories, you might try the Buildings optimizer instead.');
     }
     if (solution.result.status !== glpk.GLP_OPT && solution.result.status !== glpk.GLP_FEAS) {
-      if (targetKey === RATE_TARGET_KEY) {
+      if (isRateTargetPass) {
         throw new GraphError('NO SOLUTION', 'This could be due to missing recipes, impossible demands, or any number of reasons. Double check your factory settings.');
       } else {
         throw new GraphError('SOLUTION IS UNBOUNDED', 'Somehow an infinite amount of items can be produced. Double check the inputs tab for infinite resources (including the hand gathered resources option).');
