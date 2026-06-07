@@ -342,7 +342,7 @@ const ProductionGraphTab = () => {
   const popupRef = useRef<HTMLDivElement | null>(null);
   const popperRef = useRef<PopperRef | null>(null);
   const prevResultsGraphRef = useRef<ProductionGraph | null>(null);
-  const [popupNode, setPopupNode] = useState<any | null>(null);
+  const [popupNode, setPopupNode] = useState<NodeData | null>(null);
   const ctx = useProductionContext();
   const resultsGraph = ctx.solverResults?.productionGraph || null;
   const graphError = ctx.solverResults?.error || null;
@@ -465,7 +465,7 @@ const ProductionGraphTab = () => {
     popperRef.current = { popper, nodeId: node.id() };
     node.on('position', () => { popper.update(); });
     cy.on('pan zoom resize', () => { popper.update(); });
-    setPopupNode(node);
+    setPopupNode(node.data() as NodeData);
   }
 
   function deactivatePopper(cy: Cytoscape.Core) {

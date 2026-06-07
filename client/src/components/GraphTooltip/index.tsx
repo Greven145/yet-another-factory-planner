@@ -8,7 +8,7 @@ import Portal from '../Portal';
 import { useProductionContext } from '../../contexts/production';
 
 interface Props {
-  currentNode: any | null,
+  currentNode: NodeData | null,
 }
 
 const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
@@ -17,7 +17,7 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
   const ctx = useProductionContext();
 
   function renderInner() {
-    const data = currentNode.data() as NodeData;
+    const data = currentNode!;
     if (data.type === NODE_TYPE.RECIPE) {
       return renderRecipeInfo(data);
     }
