@@ -1,5 +1,6 @@
 import loadGLPK, { GLPK, LP, Var } from 'glpk.js';
 import { FactoryOptions, RecipeSelectionMap } from '../../contexts/production/types';
+import { MaximizeBalanceMode } from '../../contexts/production/consts';
 import { GameData, ItemRate } from '../../contexts/gameData/types';
 import { GraphError } from '../error/GraphError';
 import {
@@ -90,9 +91,11 @@ export class ProductionSolver {
   private allowedRecipes: RecipeSelectionMap;
   private allowedItems: ItemMap;
   private scale: number;
+  private maximizeBalanceMode: MaximizeBalanceMode;
 
   public constructor(options: FactoryOptions, gameData: GameData) {
     this.gameData = gameData;
+    this.maximizeBalanceMode = options.maximizeBalanceMode;
 
     this.allowedRecipes = options.allowedRecipes;
     this.allowedItems = {};
@@ -327,7 +330,10 @@ export class ProductionSolver {
             const node = Object.values(tempGraph.nodes).find(n => n.key === targetKey && n.type === NODE_TYPE.FINAL_PRODUCT);
             maxima.set(targetKey, node?.multiplier ?? 0);
           }
-          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, maxima);
+          const balancedMaxima = this.maximizeBalanceMode === 'equal'
+            ? new Map([...maxima.entries()].map(([k, v]) => [k, v > EPSILON ? 1 : 0]))
+            : maxima;
+          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, balancedMaxima);
         }
         for (const [key, multiplier] of Object.entries(solution)) {
           if (productionSolution[key]) {

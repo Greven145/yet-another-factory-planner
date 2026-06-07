@@ -1,9 +1,9 @@
 import React, { useMemo, useRef } from 'react';
 import styled from 'styled-components';
-import { Button, Select, TextInput, Group, Divider, Title } from '@mantine/core';
+import { Button, Select, TextInput, Group, Divider, Title, SegmentedControl, Text } from '@mantine/core';
 import { useProductionContext } from '../../../../contexts/production';
 import { POINTS_ITEM_KEY } from '../../../../utilities/production-solver/models';
-import { MAX_PRIORITY } from '../../../../contexts/production/consts';
+import { MAX_PRIORITY, MaximizeBalanceMode } from '../../../../contexts/production/consts';
 import { Section, SectionDescription } from '../../../../components/Section';
 import TrashButton from '../../../../components/TrashButton';
 import { ProductionItemOptions } from '../../../../contexts/production/types';
@@ -127,6 +127,11 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
   );
 };
 
+const balanceModeOptions = [
+  { value: 'proportional', label: 'Proportional' },
+  { value: 'equal', label: 'Equal output' },
+];
+
 const ProductionTab = () => {
   const ctx = useProductionContext();
 
@@ -149,6 +154,8 @@ const ProductionTab = () => {
     return opts;
   }, [ctx.gameData]);
 
+  const maximizeCount = ctx.state.productionItems.filter((i) => i.mode === 'maximize').length;
+
   return (
     <>
       <Section>
@@ -156,6 +163,19 @@ const ProductionTab = () => {
         <SectionDescription>
           Select the items you want to produce. When maximizing multiple outputs, higher priority items will be maximized first. When selecting a recipe as a target, the factory will be forced to use that recipe for the final output.
         </SectionDescription>
+        {maximizeCount >= 2 && (
+          <BalanceModeRow>
+            <Text size='sm' fw={500}>Balance mode</Text>
+            <SegmentedControl
+              size='xs'
+              data={balanceModeOptions}
+              value={ctx.state.maximizeBalanceMode}
+              onChange={(value) => {
+                ctx.dispatch({ type: 'SET_MAXIMIZE_BALANCE_MODE', mode: value as MaximizeBalanceMode });
+              }}
+            />
+          </BalanceModeRow>
+        )}
         {ctx.state.productionItems.map((data) => (
           <ProductionItemRow
             key={data.key}
@@ -181,4 +201,11 @@ const Row = styled(Group)`
 
 const ItemContainer = styled.div`
   margin-bottom: 20px;
+`;
+
+const BalanceModeRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 `;

@@ -4,7 +4,7 @@ import { decodeState_v2_U5 } from './legacy-state-decoders/v2_U5';
 import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
 import { ProductionItemOptions, InputItemOptions, WeightingOptions, RecipeSelectionMap, FactoryOptions, NodeInfo } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
-import { MAX_PRIORITY } from './consts';
+import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 
 // DEFAULTS
 function getDefaultProductionItem(): ProductionItemOptions {
@@ -95,6 +95,7 @@ export function getInitialState(gameData: GameData): FactoryOptions {
     weightingOptions: getInitialWeightingOptions(),
     allowedRecipes: getInitialAllowedRecipes(gameData.recipes),
     nodesPositions: [],
+    maximizeBalanceMode: DEFAULT_MAXIMIZE_BALANCE_MODE,
   };
 }
 
@@ -121,7 +122,8 @@ export type FactoryAction =
   | { type: 'LOAD_FROM_SHARED_FACTORY', config: any, gameData: GameData }
   | { type: 'LOAD_FROM_LEGACY_ENCODING', encoding: string, gameData: GameData }
   | { type: 'LOAD_FROM_SESSION_STORAGE', sessionState: FactoryOptions, gameData: GameData }
-  | { type: 'UPDATE_NODES_POSTIONS', nodesPositions: NodeInfo[] };
+  | { type: 'UPDATE_NODES_POSTIONS', nodesPositions: NodeInfo[] }
+  | { type: 'SET_MAXIMIZE_BALANCE_MODE', mode: MaximizeBalanceMode };
 
 export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOptions {
   switch (action.type) {
@@ -294,6 +296,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
           }
         });
         newState.nodesPositions = action.config.nodesPositions;
+        newState.maximizeBalanceMode = action.config.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE;
         return newState;
       } catch (e) {
         console.error(e);
@@ -311,7 +314,10 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
     case 'LOAD_FROM_SESSION_STORAGE': {
       try {
         // TODO: some validation
-        return action.sessionState;
+        return {
+          ...action.sessionState,
+          maximizeBalanceMode: action.sessionState.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
+        };
       } catch (e) {
         console.error(e);
         return getInitialState(action.gameData);
@@ -320,6 +326,9 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
     case 'UPDATE_NODES_POSTIONS': {
       const updatedNodesPositions = [ ...action.nodesPositions ];
       return { ...state, nodesPositions: updatedNodesPositions };
+    }
+    case 'SET_MAXIMIZE_BALANCE_MODE': {
+      return { ...state, maximizeBalanceMode: action.mode };
     }
     default:
       return state;

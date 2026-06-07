@@ -1,4 +1,4 @@
-import { type } from "os";
+import { MaximizeBalanceMode } from './consts';
 
 export type ProductionItemOptions = {
   key: string,
@@ -41,6 +41,7 @@ export type FactoryOptions = {
   weightingOptions: WeightingOptions,
   allowedRecipes: RecipeSelectionMap,
   nodesPositions: NodeInfo[],
+  maximizeBalanceMode: MaximizeBalanceMode,
 };
 
 export type NodeInformation = {

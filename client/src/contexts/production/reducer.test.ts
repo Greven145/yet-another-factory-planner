@@ -506,7 +506,7 @@ describe('reducer', () => {
         sessionState: savedState,
         gameData: mockGameData,
       });
-      expect(result).toBe(savedState);
+      expect(result).toEqual(savedState);
     });
   });
 
