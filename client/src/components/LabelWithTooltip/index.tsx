@@ -18,8 +18,8 @@ const LabelWithTooltip = (props: Props) => {
         label={tooltip}
         withArrow
         color='dark'
-        width={230}
-        wrapLines
+        w={230}
+        multiline
         arrowSize={8}
       >
         <Info size={12} />

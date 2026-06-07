@@ -36,7 +36,7 @@ export const theme: MantineThemeOverride = {
   },
   white: '#eee',
   fontFamily: defaultFont,
-  radius: { xs: 0, sm: 2, md: 4, lg: 8, xl: 16 },
+  radius: { xs: '0', sm: '2px', md: '4px', lg: '8px', xl: '16px' },
   headings: {
     fontFamily: defaultFont,
     fontWeight: '700',

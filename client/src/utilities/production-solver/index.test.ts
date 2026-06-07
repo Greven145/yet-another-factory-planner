@@ -132,6 +132,7 @@ function createValidOptions(overrides?: Partial<FactoryOptions>): FactoryOptions
       'Recipe_IronPlate_C': true,
     },
     nodesPositions: [],
+    maximizeBalanceMode: 'proportional',
     ...overrides,
   };
 }

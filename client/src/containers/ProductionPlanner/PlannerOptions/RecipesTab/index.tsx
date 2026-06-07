@@ -78,7 +78,7 @@ const RecipesTab = () => {
             Select None
           </Button>
         </Group>
-        <List listStyleType='none' gap={6}>
+        <List listStyleType='none' style={{ gap: '6px' }}>
           {filteredRecipes.map(({ component }) => component)}
         </List>
       </>

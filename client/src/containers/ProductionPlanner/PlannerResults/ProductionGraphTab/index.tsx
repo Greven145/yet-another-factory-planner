@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { nanoid } from 'nanoid';
-import Cytoscape, { Stylesheet } from 'cytoscape';
+import Cytoscape from 'cytoscape';
 import GraphVisualizer from 'react-cytoscapejs';
 import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
@@ -34,7 +34,7 @@ async function ensureGraphPluginsReady() {
   await graphPluginsReadyPromise;
 }
 
-if (process.env.NODE_ENV !== 'development') {
+if (import.meta.env.MODE !== 'development') {
   Cytoscape.warnings(false);
 }
 
@@ -53,7 +53,7 @@ const layout = {
   },
 };
 
-const stylesheet: Stylesheet[] = [
+const stylesheet: Cytoscape.StylesheetStyle[] = [
   {
     // ====== BASE ====== //
     selector: 'core',
