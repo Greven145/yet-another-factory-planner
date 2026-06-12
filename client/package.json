@@ -87,7 +87,7 @@
         "babel-plugin-styled-components": "^2.0.1",
         "jsdom": "^26.0.0",
         "satisfactory-docs-parser": "^7.0.1",
-        "vite": "^6.3.5",
+        "vite": "^8.0.16",
         "vitest": "^4.1.0"
     }
 }
