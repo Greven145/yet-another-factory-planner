@@ -84,7 +84,7 @@
         "@types/seedrandom": "^3.0.8",
         "@types/styled-components": "^5.1.36",
         "@vitejs/plugin-react": "^4.4.1",
-        "babel-plugin-styled-components": "^2.0.1",
+        "babel-plugin-styled-components": "^2.3.0",
         "jsdom": "^26.0.0",
         "satisfactory-docs-parser": "^7.0.1",
         "vite": "^6.3.5",
