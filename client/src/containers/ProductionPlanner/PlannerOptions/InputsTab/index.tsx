@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import styled from 'styled-components';
-import { Button, Select, TextInput, Checkbox, Group, Title, Divider, Text } from '@mantine/core';
+import { Button, Select, TextInput, Checkbox, Group, Title, Text } from '@mantine/core';
 import { useProductionContext } from '../../../../contexts/production';
 import TrashButton from '../../../../components/TrashButton';
-import { Section, SectionDescription } from '../../../../components/Section';
+import { Section } from '../../../../components/Section';
 import LabelWithTooltip from '../../../../components/LabelWithTooltip';
 import { TransportOptions } from '../../../../contexts/production/types';
 
@@ -39,7 +39,7 @@ function getSelectValue(capacity: string | null, presets: Set<string>): string {
 
 const InputsTab = () => {
   const ctx = useProductionContext();
-  
+
   const itemOptions = useMemo(() => Object.keys(ctx.gameData.items)
     .filter((key) => ctx.gameData.items[key].producedFromRecipes.length !== 0 && ctx.gameData.items[key].usedInRecipes.length !== 0 && !ctx.gameData.resources[key])
     .map((key) => ({
@@ -101,7 +101,6 @@ const InputsTab = () => {
               style={{ position: 'relative', top: '13px' }}
             />
           </Row>
-          <Divider style={{ marginTop: '10px', marginBottom: '10px' }} />
         </ItemContainer>
       )
     });
@@ -252,67 +251,67 @@ const InputsTab = () => {
   }
 
   function renderResourceInputs() {
-    return ctx.state.inputResources.map((data) => (
-      <ItemContainer key={data.key}>
-        <Row>
-          <Text style={{ fontWeight: 'bold' }}>{ctx.gameData.items[data.itemKey].name}</Text>
-        </Row>
-        <Row>
-          <TextInput
-            label='Amount'
-            className='no-spinner'
-            type='number'
-            min='0'
-            step='1'
-            value={data.value}
-            onChange={(e) => {
-              ctx.dispatch({
-                type: 'UPDATE_INPUT_RESOURCE',
-                data: { ...data, value: e.currentTarget.value },
-              });
-            }}
-            disabled={data.unlimited}
-            style={{ flex: '1 1 auto' }}
-          />
-          <Checkbox
-            label='Unlimited'
-            checked={data.unlimited}
-            onChange={(e) => {
-              ctx.dispatch({
-                type: 'UPDATE_INPUT_RESOURCE',
-                data: { ...data, unlimited: e.currentTarget.checked },
-              });
-            }}
-            style={{ position: 'relative', top: '13px', flex: '1 1 auto' }}
-          />
-          <TextInput
-            label='Weight'
-            className='no-spinner'
-            type='number'
-            min='0'
-            step='1'
-            value={data.weight}
-            onChange={(e) => {
-              ctx.dispatch({
-                type: 'UPDATE_INPUT_RESOURCE',
-                data: { ...data, weight: e.currentTarget.value },
-              });
-            }}
-            style={{ flex: '0 0 100px' }}
-          />
-        </Row>
-        <Divider style={{ marginTop: '10px', marginBottom: '10px' }} />
-      </ItemContainer>
-    ));
+    return (
+      <ResourceTable>
+        <ResourceTableHeader>
+          <ResourceHeaderCell>Resource</ResourceHeaderCell>
+          <ResourceHeaderCell style={{ textAlign: 'right' }}>Amount</ResourceHeaderCell>
+          <ResourceHeaderCell style={{ textAlign: 'center' }}>UL</ResourceHeaderCell>
+          <ResourceHeaderCell style={{ textAlign: 'right' }}>Weight</ResourceHeaderCell>
+        </ResourceTableHeader>
+        {ctx.state.inputResources.map((data) => (
+          <ResourceRow key={data.key}>
+            <ResourceName>{ctx.gameData.items[data.itemKey].name}</ResourceName>
+            <TextInput
+              className='no-spinner'
+              type='number'
+              min='0'
+              step='1'
+              value={data.value}
+              onChange={(e) => {
+                ctx.dispatch({
+                  type: 'UPDATE_INPUT_RESOURCE',
+                  data: { ...data, value: e.currentTarget.value },
+                });
+              }}
+              disabled={data.unlimited}
+              styles={{ input: { textAlign: 'right' } }}
+            />
+            <ResourceCheckboxCell>
+              <Checkbox
+                checked={data.unlimited}
+                onChange={(e) => {
+                  ctx.dispatch({
+                    type: 'UPDATE_INPUT_RESOURCE',
+                    data: { ...data, unlimited: e.currentTarget.checked },
+                  });
+                }}
+              />
+            </ResourceCheckboxCell>
+            <TextInput
+              className='no-spinner'
+              type='number'
+              min='0'
+              step='1'
+              value={data.weight}
+              onChange={(e) => {
+                ctx.dispatch({
+                  type: 'UPDATE_INPUT_RESOURCE',
+                  data: { ...data, weight: e.currentTarget.value },
+                });
+              }}
+              styles={{ input: { textAlign: 'right' } }}
+            />
+          </ResourceRow>
+        ))}
+      </ResourceTable>
+    );
   }
 
   return (
     <>
       <Section>
         <Title order={3}>Input Items</Title>
-        <SectionDescription>
-          Select the items that you already have available and don't need to produce in this factory.
-        </SectionDescription>
         {renderItemInputs()}
         <Button onClick={() => { ctx.dispatch({ type: 'ADD_INPUT_ITEM' }) }}>
           + Add Input
@@ -320,9 +319,6 @@ const InputsTab = () => {
       </Section>
       <Section>
         <Title order={3}>Weighting Options</Title>
-        <SectionDescription>
-          Adjust the weights affecting the importance of various properties of the factory. A value of 0 indicates that that property is not considered during factory layout.
-        </SectionDescription>
         {renderWeightInputs()}
         <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
           Reset All Weights
@@ -330,17 +326,11 @@ const InputsTab = () => {
       </Section>
       <Section>
         <Title order={3}>Transport Capacity</Title>
-        <SectionDescription>
-          Constrain the solver to only produce solutions where each recipe node's output rate does not exceed a single belt or pipe's capacity. Useful for planning factories within physical transport limits.
-        </SectionDescription>
         {renderTransportOptions()}
       </Section>
       <Section>
         <Title order={3}>Raw Resources</Title>
-        <SectionDescription>
-          Select the raw resources that are available to your factory. The default values are set to the map limits. The weight value is a number representing how valuable that resource is when comparing recipes. The defaults are calculated automatically according to node rarity.
-        </SectionDescription>
-        <Group style={{ marginBottom: '15px' }}>
+        <Group style={{ marginBottom: '12px' }}>
           <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
             Set All To Maximum
           </Button>
@@ -352,8 +342,8 @@ const InputsTab = () => {
           label='Allow hand-gathered resources (mycelia, flower petals, etc)'
           checked={ctx.state.allowHandGatheredItems}
           onChange={(e) => { ctx.dispatch({ type: 'SET_ALLOW_HAND_GATHERED_ITEMS', active: e.currentTarget.checked }) }}
-          style={{ marginBottom: '25px' }}
-          />
+          style={{ marginBottom: '12px' }}
+        />
         {renderResourceInputs()}
       </Section>
     </>
@@ -367,5 +357,55 @@ const Row = styled(Group)`
 `;
 
 const ItemContainer = styled.div`
-  margin-bottom: 20px;
+  margin-bottom: 15px;
+`;
+
+const ResourceTable = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+`;
+
+const ResourceTableHeader = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 110px 52px 80px;
+  gap: 6px;
+  padding: 4px 6px 6px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.background[3]};
+  margin-bottom: 2px;
+`;
+
+const ResourceHeaderCell = styled.div`
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+  color: light-dark(#212529, #eee);
+`;
+
+const ResourceRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 110px 52px 80px;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 3px;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.background[3]};
+  }
+`;
+
+const ResourceName = styled(Text)`
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const ResourceCheckboxCell = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
 `;

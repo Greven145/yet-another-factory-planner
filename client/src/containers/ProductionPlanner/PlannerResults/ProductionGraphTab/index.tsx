@@ -504,6 +504,7 @@ const ProductionGraphTab = () => {
   useEffect(() => {
     function resizeListener() {
       _resizeListener(graphRef);
+      cyRef.current?.resize();
     }
     window.addEventListener('resize', resizeListener);
     return () => {

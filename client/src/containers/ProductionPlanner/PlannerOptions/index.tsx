@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Container, Tabs, Paper, Title, Divider, Group, Button, Switch, Space, TextInput, Popover, Text, Modal } from '@mantine/core';
+import { Container, Tabs, Paper, Title, Group, Button, Switch, Space, TextInput, Popover, Text, Modal } from '@mantine/core';
 import { TrendingUp, Shuffle, Box } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import ProductionTab from './ProductionTab';
@@ -37,8 +37,7 @@ const PlannerOptions = () => {
   return (
     <>
       <Paper style={{ marginBottom: '20px', paddingTop: '10px' }}>
-        <Title order={2}>Control Panel</Title>
-        <Divider style={{ marginTop: '5px', marginBottom: '15px' }} />
+        <Title order={2} style={{ marginBottom: '15px' }}>Control Panel</Title>
         <Group style={{ marginBottom: '15px' }}>
           <Button
             onClick={() => { ctx.calculate(); }}

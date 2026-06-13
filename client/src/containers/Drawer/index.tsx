@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { UnstyledButton, Paper, Text, Container } from '@mantine/core';
+import { UnstyledButton, Text } from '@mantine/core';
 import { useLocalStorage } from '@mantine/hooks';
 import { ChevronsLeft, ChevronsRight } from 'react-feather';
-import { useDrawerContext } from '../../contexts/drawer';
-import Portal from '../../components/Portal';
 
 interface Props {
   open?: boolean,
@@ -16,7 +14,6 @@ const Drawer = (props: Props) => {
   const { open, onToggle, children } = props;
   const [fullyClosed, setFullyClosed] = useState(!open);
   const [tooltipDismissed, setTooltipDismissed] = useLocalStorage<'false' | 'true'>({ key: 'tooltip-dismissed', defaultValue: 'false' });
-  const ctx = useDrawerContext();
 
   const showTooltip = tooltipDismissed === 'false';
 
@@ -36,72 +33,75 @@ const Drawer = (props: Props) => {
     if (!open) {
       setFullyClosed(true);
     }
+    window.dispatchEvent(new Event('resize'));
   }
 
   return (
-    <Portal rootNode={ctx.rootNode}>
-      <DrawerDimmer open={!!open || showTooltip} onClick={() => { !!open && onToggle?.(!open); }} />
-      <DrawerContainer open={!!open} onTransitionEnd={handleTransitionEnd}>
-        <DrawerToggle onClick={() => { onToggle?.(!open); }}>
-          <ToggleLabel>
-            <ToggleLabelText>{open ? 'Close' : 'Open'} Control Panel</ToggleLabelText>
-            <ToggleLabelIcon>
-              {
-                open
-                  ? <ChevronsLeft />
-                  : <ChevronsRight />
-              }
-            </ToggleLabelIcon>
-          </ToggleLabel>
-          {
-            showTooltip && (
-              <Tooltip>
-                <TooltipText>
-                  Click here to get started!
-                </TooltipText>
-                <TooltipConfirmContainer>
-                  <TooltipConfirm onClick={(e: any) => { setTooltipDismissed('true'); e.stopPropagation(); }}>
-                    Dismiss
-                  </TooltipConfirm>
-                </TooltipConfirmContainer>
-              </Tooltip>
-            )
-          }
-        </DrawerToggle>
-        <DrawerContent className='custom-scrollbar' aria-hidden={!open} $fullyClosed={fullyClosed} fluid>
+    <DrawerOuter open={!!open} onTransitionEnd={handleTransitionEnd}>
+      <ClipWrapper>
+        <DrawerContent className='custom-scrollbar' aria-hidden={!open} $fullyClosed={fullyClosed}>
           {children}
         </DrawerContent>
-      </DrawerContainer>
-    </Portal>
-  )
+      </ClipWrapper>
+      <DrawerToggle onClick={() => { onToggle?.(!open); }}>
+        <ToggleLabel>
+          <ToggleLabelText>{open ? 'Close' : 'Open'} Control Panel</ToggleLabelText>
+          <ToggleLabelIcon>
+            {open ? <ChevronsLeft /> : <ChevronsRight />}
+          </ToggleLabelIcon>
+        </ToggleLabel>
+        {showTooltip && (
+          <Tooltip>
+            <TooltipText>
+              Click here to get started!
+            </TooltipText>
+            <TooltipConfirmContainer>
+              <TooltipConfirm onClick={(e: any) => { setTooltipDismissed('true'); e.stopPropagation(); }}>
+                Dismiss
+              </TooltipConfirm>
+            </TooltipConfirmContainer>
+          </Tooltip>
+        )}
+      </DrawerToggle>
+    </DrawerOuter>
+  );
 };
 
 export default Drawer;
 
-const DrawerDimmer = styled.div<{ open: boolean }>`
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  bottom: 0px;
-  right: 0px;
-  margin: 0;
-  padding: 0;
-  background: #000;
-  opacity: ${({ open }) => open ? 'var(--yafp-dimmer-opacity)' : 0 };
-  transition: opacity 550ms;
-  pointer-events: ${({ open }) => open ? 'auto' : 'none' };
+// How far the tab protrudes past DrawerOuter's right edge (DrawerToggle width + ToggleLabel right shift).
+// MainContent uses this to set left padding so content clears the visual tab.
+export const TOGGLE_TAB_CLEARANCE = '57px'; // 25px strip + 25px label shift + ~7px buffer
+
+const DrawerOuter = styled.div<{ open: boolean }>`
+  position: relative;
+  flex: 0 0 auto;
+  width: ${({ open, theme }) => open ? theme.other.drawerWidth : '0px'};
+  height: 100%;
+  transition: width 400ms ease-in-out;
 `;
 
-const DrawerContainer = styled.div<{ open: boolean }>`
-  position: relative;
-  top: 0px;
-  left: ${({ open, theme }) => (open ? '0px' : `-${theme.other.drawerWidth}`)};
-  width: ${({ theme }) => theme.other.drawerWidth};
-  height: 100%;
+const ClipWrapper = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  overflow: hidden;
   background: var(--yafp-drawer-bg);
-  transition: left 550ms;
-  transition-timing-function: cubic-bezier(.68, -0.21, .38, 1.26);
-  pointer-events: auto;
+`;
+
+const DrawerContent = styled.div<{ $fullyClosed: boolean }>`
+  visibility: ${({ $fullyClosed }) => $fullyClosed ? 'hidden' : 'visible'};
+  position: absolute;
+  top: 0px;
+  bottom: 0px;
+  left: 0px;
+  width: ${({ theme }) => theme.other.drawerWidth};
+  padding: 10px;
+  padding-bottom: 30px;
+  overflow: auto;
+  overscroll-behavior: contain;
 `;
 
 const DrawerToggle = styled.div`
@@ -113,6 +113,7 @@ const DrawerToggle = styled.div`
   bottom: 0px;
   right: -25px;
   width: 25px;
+  overflow: visible;
   background: ${({ theme }) => theme.colors.primary[6]};
   cursor: pointer;
 
@@ -194,17 +195,11 @@ const ToggleLabelIcon = styled.span`
 
 const Tooltip = styled.div`
   @keyframes lookAtMe {
-    from {
-      left: 84px;
-    }
-
-    to {
-      left: 80px;
-    }
+    from { left: 84px; }
+    to { left: 80px; }
   }
 
   animation: 300ms infinite alternate lookAtMe;
-
   position: absolute;
   left: 80px;
   padding: 20px;
@@ -221,7 +216,6 @@ const Tooltip = styled.div`
     width: 20px;
     height: 20px;
     background: ${({ theme }) => theme.colors.info[6]};
-
     transform: rotate(45deg);
     z-index: -1;
   }
@@ -242,17 +236,4 @@ const TooltipConfirm: any = styled(UnstyledButton)`
   pointer-events: auto;
   color: ${({ theme }) => theme.white};
   text-decoration: underline;
-`;
-
-const DrawerContent = styled(Container)<{ $fullyClosed: boolean }>`
-  visibility: ${({ $fullyClosed }) => $fullyClosed ? 'hidden' : 'visible'};
-  position: absolute;
-  top: 0px;
-  bottom: 0px;
-  left: 0px;
-  right: 0px;
-  padding: 10px;
-  padding-bottom: 30px;
-  overflow: auto;
-  overscroll-behavior: contain;
 `;

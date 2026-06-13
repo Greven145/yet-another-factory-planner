@@ -4,7 +4,6 @@ import { MantineProvider, useMantineTheme } from '@mantine/core';
 import Main from './containers/Main';
 import { theme } from './theme';
 import GlobalStylesheet from './global-stylesheet';
-import { DrawerProvider } from './contexts/drawer';
 import { GlobalContextProvider } from './contexts/global';
 import { GameDataProvider } from './contexts/gameData';
 
@@ -26,13 +25,11 @@ const ThemeTransfer = () => {
   return (
     <ThemeProvider theme={mergedTheme}>
       <GlobalStylesheet />
-      <DrawerProvider>
-        <GlobalContextProvider>
-          <GameDataProvider>
-            <Main />
-          </GameDataProvider>
-        </GlobalContextProvider>
-      </DrawerProvider>
+      <GlobalContextProvider>
+        <GameDataProvider>
+          <Main />
+        </GameDataProvider>
+      </GlobalContextProvider>
     </ThemeProvider>
   );
 };
