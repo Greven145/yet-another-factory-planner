@@ -64,8 +64,10 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background-color: #ffffff !important;
   }
 
+  // Tabs supply their own backgrounds (above); keep the list strip transparent
+  // so it doesn't paint a block to the right of the tabs.
   :root[data-mantine-color-scheme="light"] [role="tablist"] {
-    background-color: #f8f9fa !important;
+    background-color: transparent !important;
   }
 
   :root[data-mantine-color-scheme="light"] [role="tabpanel"] {
