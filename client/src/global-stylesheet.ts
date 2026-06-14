@@ -74,6 +74,47 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background: #f0f2f5 !important;
   }
 
+  // Results view switcher (Production Graph / Factory Report): a segmented HUD
+  // toggle styled like a machine view-mode selector. Scoped to .results-view-tabs
+  // and placed after the generic tab rules above so it overrides them for this
+  // one strip only; the drawer tabs keep the rules above.
+  :root .results-view-tabs [role="tablist"] {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border-radius: 6px;
+    border: 1px solid light-dark(#cfc9bf, #50565e) !important;
+    background-color: light-dark(#e3e1da, #2b2e33) !important;
+  }
+
+  :root .results-view-tabs button[role="tab"] {
+    font-family: 'M PLUS 1 Code', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 13px !important;
+    font-weight: 600;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 7px 18px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    color: light-dark(#6b6459, #b0a89c) !important;
+    background-color: transparent !important;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  :root .results-view-tabs button[role="tab"]:hover {
+    background-color: light-dark(#d8d4cb, #3a3e44) !important;
+    color: light-dark(#3f3a32, #ece6dc) !important;
+  }
+
+  :root .results-view-tabs button[role="tab"][data-active],
+  :root .results-view-tabs button[role="tab"][data-active]:hover {
+    background-color: #ec7821 !important;
+    color: #ffffff !important;
+  }
+
   html,
   .custom-scrollbar {
     scrollbar-color: var(--yafp-scrollbar-thumb) var(--yafp-scrollbar-track);

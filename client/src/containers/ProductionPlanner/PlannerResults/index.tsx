@@ -14,10 +14,10 @@ const TabLoader = () => (
 
 const PlannerResults = () => {
   return (
-    <Tabs defaultValue="graph" variant='outline'>
+    <Tabs defaultValue="graph" variant='pills' className='results-view-tabs'>
       <Tabs.List>
-        <Tabs.Tab value="graph" leftSection={<Share2 size={18} />} style={{ minWidth: '200px' }}>Production Graph</Tabs.Tab>
-        <Tabs.Tab value="report" leftSection={<Edit size={18} />} style={{ minWidth: '200px' }}>Factory Report</Tabs.Tab>
+        <Tabs.Tab value="graph" leftSection={<Share2 size={16} />}>Production Graph</Tabs.Tab>
+        <Tabs.Tab value="report" leftSection={<Edit size={16} />}>Factory Report</Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="graph" keepMounted>
         <Card style={{ padding: '0px', marginBottom: '0px', background: 'var(--yafp-container-bg)' }}>
