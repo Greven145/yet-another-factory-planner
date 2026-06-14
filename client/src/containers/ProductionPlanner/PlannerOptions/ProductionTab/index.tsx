@@ -1,18 +1,47 @@
 import React, { useMemo, useRef } from 'react';
 import styled from 'styled-components';
-import { Button, Select, TextInput, Group, Divider, Title, SegmentedControl, Text } from '@mantine/core';
+import { Button, Select, TextInput, Group, SegmentedControl, Text } from '@mantine/core';
 import { useProductionContext } from '../../../../contexts/production';
 import { POINTS_ITEM_KEY } from '../../../../utilities/production-solver/models';
 import { MAX_PRIORITY, MaximizeBalanceMode } from '../../../../contexts/production/consts';
-import { Section, SectionDescription } from '../../../../components/Section';
+import { CollapsibleSection } from '../../../../components/Section';
 import TrashButton from '../../../../components/TrashButton';
-import { ProductionItemOptions } from '../../../../contexts/production/types';
+import LabelWithTooltip from '../../../../components/LabelWithTooltip';
+import { ProductionItemOptions, TransportOptions } from '../../../../contexts/production/types';
 
 
 const baseModeOptions = [
   { value: 'per-minute', label: 'Items Per Min' },
   { value: 'maximize', label: 'Maximize Output' },
 ];
+
+const BELT_TIER_OPTIONS = [
+  { value: 'disabled', label: 'Disabled' },
+  { value: '60', label: 'Mk. 1 (60/min)' },
+  { value: '120', label: 'Mk. 2 (120/min)' },
+  { value: '240', label: 'Mk. 3 (240/min)' },
+  { value: '480', label: 'Mk. 4 (480/min)' },
+  { value: '780', label: 'Mk. 5 (780/min)' },
+  { value: '1200', label: 'Mk. 6 (1200/min)' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const BELT_PRESET_VALUES = new Set(['60', '120', '240', '480', '780', '1200']);
+
+const PIPE_TIER_OPTIONS = [
+  { value: 'disabled', label: 'Disabled' },
+  { value: '300', label: 'Mk. 1 (300 m³/min)' },
+  { value: '600', label: 'Mk. 2 (600 m³/min)' },
+  { value: 'custom', label: 'Custom' },
+];
+
+const PIPE_PRESET_VALUES = new Set(['300', '600']);
+
+function getSelectValue(capacity: string | null, presets: Set<string>): string {
+  if (capacity === null) return 'disabled';
+  if (presets.has(capacity)) return capacity;
+  return 'custom';
+}
 
 const priorityOptions = Array(MAX_PRIORITY)
 .fill('')
@@ -48,10 +77,9 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
 
   return (
     <ItemContainer>
-      <Row>
+      <Row wrap='nowrap' align='center' gap='xs'>
         <Select
           placeholder='Select an item'
-          label='Item'
           clearable
           searchable
           data={itemOptions}
@@ -70,16 +98,13 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
               data: { key: data.key, itemKey: value || '' },
             });
           }}
-          style={{ flex: '1 1 auto' }}
+          style={{ flex: '1 1 0' }}
         />
-        <TrashButton onClick={() => { dispatch({ type: 'DELETE_PRODUCTION_ITEM', key: data.key }); }} style={{ position: 'relative', top: '13px' }} />
-      </Row>
-      <Row>
         {
           data.mode === 'maximize'
             ? (
               <Select
-                label='Priority'
+                placeholder='Priority'
                 data={priorityOptions}
                 value={data.value}
                 onChange={(value) => {
@@ -88,12 +113,12 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
                     data: { key: data.key, amount: (value as any) },
                   });
                 }}
-                style={{ width: '160px' }}
+                style={{ width: '110px' }}
               />
             )
             : (
               <TextInput
-                label='Amount'
+                placeholder='Amount'
                 className='no-spinner'
                 type='number'
                 min='0'
@@ -105,12 +130,12 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
                     data: { key: data.key, amount: e.currentTarget.value },
                   });
                 }}
-                style={{ width: '160px' }}
+                style={{ width: '110px' }}
               />
             )
         }
         <Select
-          label='Mode'
+          placeholder='Mode'
           data={modeOptions}
           value={data.mode}
           onChange={(value) => {
@@ -119,10 +144,10 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
               data: { key: data.key, mode: (value as any) },
             });
           }}
-          style={{ width: '280px' }}
+          style={{ flex: '1 1 0', minWidth: '150px' }}
         />
+        <TrashButton onClick={() => { dispatch({ type: 'DELETE_PRODUCTION_ITEM', key: data.key }); }} />
       </Row>
-      <Divider style={{ marginTop: '10px', marginBottom: '10px' }} />
     </ItemContainer>
   );
 };
@@ -156,13 +181,156 @@ const ProductionTab = () => {
 
   const maximizeCount = ctx.state.productionItems.filter((i) => i.mode === 'maximize').length;
 
+  function renderWeightInputs() {
+    const weightingOptions = ctx.state.weightingOptions;
+    return (
+      <>
+        <Group grow>
+          <TextInput
+            label={<LabelWithTooltip label='Resource Efficiency' tooltip='This weighting prioritizes using as few resources as possible.' />}
+            className='no-spinner'
+            type='number'
+            min='0'
+            step='1'
+            value={weightingOptions.resources}
+            onChange={(e) => {
+              ctx.dispatch({
+                type: 'UPDATE_WEIGHTING_OPTIONS',
+                data: { ...weightingOptions, resources: e.currentTarget.value },
+              });
+            }}
+          />
+          <TextInput
+            label={<LabelWithTooltip label='Power Efficiency' tooltip='This weighting prioritizes using as little power as possible.' />}
+            className='no-spinner'
+            type='number'
+            min='0'
+            step='1'
+            value={weightingOptions.power}
+            onChange={(e) => {
+              ctx.dispatch({
+                type: 'UPDATE_WEIGHTING_OPTIONS',
+                data: { ...weightingOptions, power: e.currentTarget.value },
+              });
+            }}
+          />
+        </Group>
+        <Group grow style={{ marginTop: '10px' }}>
+          <TextInput
+            label={<LabelWithTooltip label='Complexity' tooltip='This weighting prioritizes reducing the number of item types used in the factory. Very slow to optimize for larger factories (WIP).' />}
+            className='no-spinner'
+            type='number'
+            min='0'
+            step='1'
+            value={weightingOptions.complexity}
+            onChange={(e) => {
+              ctx.dispatch({
+                type: 'UPDATE_WEIGHTING_OPTIONS',
+                data: { ...weightingOptions, complexity: e.currentTarget.value },
+              });
+            }}
+          />
+          <TextInput
+            label={<LabelWithTooltip label='Buildings' tooltip='This weighting prioritizes using as few buildings as possible, discounting overclocking. May not be perfectly optimal, especially for smaller factories (WIP).' />}
+            type='number'
+            min='0'
+            step='1'
+            value={weightingOptions.buildings}
+            onChange={(e) => {
+              ctx.dispatch({
+                type: 'UPDATE_WEIGHTING_OPTIONS',
+                data: { ...weightingOptions, buildings: e.currentTarget.value },
+              });
+            }}
+          />
+        </Group>
+      </>
+    )
+  }
+
+  function renderTransportOptions() {
+    const opts: TransportOptions = ctx.state.transportOptions;
+    const beltSelectValue = getSelectValue(opts.beltCapacity, BELT_PRESET_VALUES);
+    const pipeSelectValue = getSelectValue(opts.pipeCapacity, PIPE_PRESET_VALUES);
+
+    function dispatchBelt(value: string | null) {
+      ctx.dispatch({ type: 'UPDATE_TRANSPORT_OPTIONS', data: { ...opts, beltCapacity: value } });
+    }
+
+    function dispatchPipe(value: string | null) {
+      ctx.dispatch({ type: 'UPDATE_TRANSPORT_OPTIONS', data: { ...opts, pipeCapacity: value } });
+    }
+
+    return (
+      <>
+        <Group style={{ alignItems: 'flex-end', marginBottom: '10px' }}>
+          <Select
+            label={<LabelWithTooltip label='Belt Capacity' tooltip='Maximum items per minute any single conveyor belt can carry. When set, the solver will only produce solutions where each recipe node outputs no more than this amount per item type.' />}
+            data={BELT_TIER_OPTIONS}
+            value={beltSelectValue}
+            style={{ flex: '1 1 auto' }}
+            onChange={(value) => {
+              if (!value || value === 'disabled') {
+                dispatchBelt(null);
+              } else if (value === 'custom') {
+                dispatchBelt(opts.beltCapacity && !BELT_PRESET_VALUES.has(opts.beltCapacity) ? opts.beltCapacity : '60');
+              } else {
+                dispatchBelt(value);
+              }
+            }}
+          />
+          {beltSelectValue === 'custom' && (
+            <TextInput
+              label='Custom (items/min)'
+              className='no-spinner'
+              type='number'
+              min='1'
+              step='1'
+              value={opts.beltCapacity ?? ''}
+              style={{ flex: '1 1 auto' }}
+              onChange={(e) => dispatchBelt(e.currentTarget.value)}
+            />
+          )}
+        </Group>
+        <Group style={{ alignItems: 'flex-end' }}>
+          <Select
+            label={<LabelWithTooltip label='Pipe Capacity' tooltip='Maximum m³ per minute any single pipe can carry. When set, the solver will only produce solutions where each recipe node outputs no more than this amount per fluid type.' />}
+            data={PIPE_TIER_OPTIONS}
+            value={pipeSelectValue}
+            style={{ flex: '1 1 auto' }}
+            onChange={(value) => {
+              if (!value || value === 'disabled') {
+                dispatchPipe(null);
+              } else if (value === 'custom') {
+                dispatchPipe(opts.pipeCapacity && !PIPE_PRESET_VALUES.has(opts.pipeCapacity) ? opts.pipeCapacity : '300');
+              } else {
+                dispatchPipe(value);
+              }
+            }}
+          />
+          {pipeSelectValue === 'custom' && (
+            <TextInput
+              label='Custom (m³/min)'
+              className='no-spinner'
+              type='number'
+              min='1'
+              step='1'
+              value={opts.pipeCapacity ?? ''}
+              style={{ flex: '1 1 auto' }}
+              onChange={(e) => dispatchPipe(e.currentTarget.value)}
+            />
+          )}
+        </Group>
+      </>
+    );
+  }
+
   return (
     <>
-      <Section>
-        <Title order={3}>Production Goals</Title>
-        <SectionDescription>
-          Select the items you want to produce. When maximizing multiple outputs, higher priority items will be maximized first. When selecting a recipe as a target, the factory will be forced to use that recipe for the final output.
-        </SectionDescription>
+      <CollapsibleSection
+        title='Production Goals'
+        tooltip='Select the items you want to produce. When maximizing multiple outputs, higher priority items will be maximized first. When selecting a recipe as a target, the factory will be forced to use that recipe for the final output.'
+      >
         {maximizeCount >= 2 && (
           <BalanceModeRow>
             <Text size='sm' fw={500}>Balance mode</Text>
@@ -188,7 +356,16 @@ const ProductionTab = () => {
         <Button onClick={() => { ctx.dispatch({ type: 'ADD_PRODUCTION_ITEM' }) }}>
           + Add Product
         </Button>
-      </Section>
+      </CollapsibleSection>
+      <CollapsibleSection title='Weighting Options' tooltip='Tune how the solver trades off resources, power, complexity, and building count when optimizing.'>
+        {renderWeightInputs()}
+        <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
+          Reset All Weights
+        </Button>
+      </CollapsibleSection>
+      <CollapsibleSection title='Transport Capacity' tooltip='Cap the per-minute throughput of belts and pipes so the solver only produces solutions that fit your logistics tier.'>
+        {renderTransportOptions()}
+      </CollapsibleSection>
     </>
   );
 };
@@ -200,7 +377,7 @@ const Row = styled(Group)`
 `;
 
 const ItemContainer = styled.div`
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 `;
 
 const BalanceModeRow = styled.div`
