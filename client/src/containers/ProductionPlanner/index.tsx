@@ -7,6 +7,7 @@ import { useGameDataContext } from '../../contexts/gameData';
 import { useGlobalContext } from '../../contexts/global';
 import { ProductionProvider } from '../../contexts/production';
 import Card from '../../components/Card';
+import ExternalLink from '../../components/ExternalLink';
 import Drawer, { TOGGLE_TAB_CLEARANCE } from '../Drawer';
 import PlannerOptions from './PlannerOptions';
 import PlannerResults from './PlannerResults';
@@ -101,6 +102,11 @@ const ProductionPlanner = () => {
                 <Text style={{ fontSize: '13px' }}>{globalCtx.ficsitTip}</Text>
               </WelcomeCard>
               <PlannerResults />
+              <FooterContent>
+                Originally made with ♥ by <ExternalLink href='https://github.com/lydianlights'>LydianLights</ExternalLink>
+                {' '} | Updated by <ExternalLink href='https://github.com/greven145/yet-another-factory-planner'>Greven145</ExternalLink>
+                {' '} - Questions or bugs? File an <ExternalLink href='https://github.com/greven145/yet-another-factory-planner/issues'>issue on github</ExternalLink>
+              </FooterContent>
             </MainContent>
           </PlannerLayout>
         </ProductionProvider>
@@ -116,7 +122,7 @@ export default ProductionPlanner;
 const PlannerLayout = styled.div`
   display: flex;
   align-items: stretch;
-  height: calc(100vh - ${({ theme }) => theme.other.headerHeight});
+  height: calc(100vh - ${({ theme }) => theme.other.headerHeight} - var(--mantine-spacing-md));
   overflow: hidden;
   margin-top: calc(${({ theme }) => theme.other.headerHeight} - 80px);
   margin-left: calc(-${({ theme }) => theme.other.pageLeftMargin} - var(--mantine-spacing-md));
@@ -134,6 +140,12 @@ const MainContent = styled.div`
 const WelcomeCard = styled(Card)`
   flex-shrink: 0;
   margin-top: 12px;
+`;
+
+const FooterContent = styled.div`
+  text-align: center;
+  padding: 20px;
+  color: light-dark(#555555, #eeeeee);
 `;
 
 const LoadingOverlay = motion.create(styled.div<any>`
