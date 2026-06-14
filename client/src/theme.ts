@@ -143,6 +143,7 @@ export const theme: MantineThemeOverride = {
       styles: {
         tooltip: {
           background: 'light-dark(#fff, #3f434a)',
+          color: 'light-dark(#212529, #eee)',
           border: '1px solid light-dark(#ccc, #aaa)',
         },
       },

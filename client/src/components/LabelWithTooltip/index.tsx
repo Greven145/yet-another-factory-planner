@@ -17,7 +17,6 @@ const LabelWithTooltip = (props: Props) => {
       <Tooltip
         label={tooltip}
         withArrow
-        color='dark'
         w={230}
         multiline
         arrowSize={8}
