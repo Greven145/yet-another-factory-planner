@@ -126,6 +126,41 @@ const GlobalStylesheet = createGlobalStyle<any>`
     justify-content: center;
   }
 
+  // HUD-themed Mantine SegmentedControl: same steel track / FICSIT-orange active
+  // segment / monospace uppercase language as the segmented tabs above, but for a
+  // SegmentedControl (which has its own sliding indicator instead of tab buttons).
+  :root .hud-segmented {
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid light-dark(#cfc9bf, #50565e) !important;
+    background-color: light-dark(#e3e1da, #2b2e33) !important;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-indicator {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    background-color: #ec7821 !important;
+  }
+
+  // Hide the divider Mantine draws between inactive segments.
+  :root .hud-segmented .mantine-SegmentedControl-control::before {
+    background-color: transparent !important;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-label {
+    font-family: 'M PLUS 1 Code', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    padding: 5px 16px;
+    color: light-dark(#6b6459, #b0a89c) !important;
+    transition: color 120ms ease;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-label[data-active] {
+    color: #ffffff !important;
+  }
+
   html,
   .custom-scrollbar {
     scrollbar-color: var(--yafp-scrollbar-thumb) var(--yafp-scrollbar-track);

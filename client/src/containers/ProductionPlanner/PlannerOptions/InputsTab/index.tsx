@@ -77,7 +77,7 @@ const InputsTab = () => {
         <ResourceTableHeader>
           <ResourceHeaderCell>Resource</ResourceHeaderCell>
           <ResourceHeaderCell style={{ textAlign: 'right' }}>Amount</ResourceHeaderCell>
-          <ResourceHeaderCell style={{ textAlign: 'center' }}>UL</ResourceHeaderCell>
+          <ResourceHeaderCell style={{ textAlign: 'center' }} title='Unlimited'>∞</ResourceHeaderCell>
           <ResourceHeaderCell style={{ textAlign: 'right' }}>Weight</ResourceHeaderCell>
         </ResourceTableHeader>
         {ctx.state.inputResources.map((data) => (

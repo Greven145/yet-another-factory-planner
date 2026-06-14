@@ -1,6 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import styled from 'styled-components';
-import { Button, Select, TextInput, Group, SegmentedControl, Text } from '@mantine/core';
+import { Button, Select, TextInput, Group, SegmentedControl } from '@mantine/core';
 import { useProductionContext } from '../../../../contexts/production';
 import { POINTS_ITEM_KEY } from '../../../../utilities/production-solver/models';
 import { MAX_PRIORITY, MaximizeBalanceMode } from '../../../../contexts/production/consts';
@@ -333,9 +333,15 @@ const ProductionTab = () => {
       >
         {maximizeCount >= 2 && (
           <BalanceModeRow>
-            <Text size='sm' fw={500}>Balance mode</Text>
+            <BalanceModeLabel>
+              <LabelWithTooltip
+                label='Balance mode'
+                tooltip='How equal-priority Maximize Output items share capacity. Proportional: each runs at the same fraction of its own maximum. Equal output: all run at the same absolute rate, capped by the hardest to produce.'
+              />
+            </BalanceModeLabel>
             <SegmentedControl
               size='xs'
+              className='hud-segmented'
               data={balanceModeOptions}
               value={ctx.state.maximizeBalanceMode}
               onChange={(value) => {
@@ -383,6 +389,16 @@ const ItemContainer = styled.div`
 const BalanceModeRow = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+`;
+
+const BalanceModeLabel = styled.div`
+  font-family: 'M PLUS 1 Code', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: light-dark(#6b6459, #b0a89c);
 `;
