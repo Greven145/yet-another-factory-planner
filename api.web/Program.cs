@@ -29,13 +29,61 @@ builder.Services.AddHttpClient();
 
 builder.AddCosmosDbContext<FactoryDbContext>("cosmos-db", "shared-factory");
 
+// Pre-warms the Cosmos token/connection/EF model during ACA activation to cut cold-start
+// first-request latency. Runs as an IHostedService before "Application started"; safe no-op
+// (logged warning, app still starts) if Cosmos is unavailable (e.g. local dev with no emulator).
+builder.Services.AddHostedService<CosmosWarmupService>();
+
 builder.Services.AddScoped<FactoryClient>();
 
 var app = builder.Build();
 
 app.MapDefaultEndpoints();
 
+// Startup timing: process-start -> ApplicationStarted (lands in ConsoleLogs + OTel for ACA cold-start analysis).
+{
+    var startupLogger = app.Services.GetRequiredService<ILogger<Program>>();
+    var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+    lifetime.ApplicationStarted.Register(() =>
+    {
+        var processStart = System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
+        var startupMs = (DateTime.UtcNow - processStart).TotalMilliseconds;
+        startupLogger.LogInformation(
+            "Startup complete: {StartupMs:F0} ms from process start to ApplicationStarted (ProcessStart={ProcessStart:o})",
+            startupMs, processStart);
+        System.Diagnostics.Activity.Current?.SetTag("app.startup_ms", startupMs);
+    });
+}
+
 app.UseCors("CorsPolicy");
+
+// First-request timing: log the duration of the very first non-probe request after startup.
+// This captures cold-start first-request cost (managed-identity token, Cosmos connect, EF model build).
+var firstRequestSeen = 0;
+app.Use(async (context, next) =>
+{
+    var path = context.Request.Path.Value ?? string.Empty;
+    var isProbe = path.StartsWith("/health") || path.StartsWith("/alive") || path.StartsWith("/ping");
+    if (isProbe || System.Threading.Interlocked.CompareExchange(ref firstRequestSeen, 1, 0) != 0)
+    {
+        await next(context);
+        return;
+    }
+    var sw = System.Diagnostics.Stopwatch.StartNew();
+    try
+    {
+        await next(context);
+    }
+    finally
+    {
+        sw.Stop();
+        var logger = context.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogInformation(
+            "First request after startup: {Path} took {FirstRequestMs:F0} ms (status {StatusCode})",
+            path, sw.Elapsed.TotalMilliseconds, context.Response.StatusCode);
+        System.Diagnostics.Activity.Current?.SetTag("app.first_request_ms", sw.Elapsed.TotalMilliseconds);
+    }
+});
 
 app.MapGet("/ping", () => Results.Ok(new { data = new { message = "pong" } }))
     .WithName("Ping");
