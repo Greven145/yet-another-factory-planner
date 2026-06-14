@@ -8,6 +8,7 @@ import { AlertCircle } from 'react-feather';
 import { GraphNode, GraphEdge, NODE_TYPE, ProductionGraph } from '../../../../utilities/production-solver/models';
 import { graphColors } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
+import GraphContextMenu, { ContextMenuState } from '../../../../components/GraphContextMenu';
 import { truncateFloat } from '../../../../utilities/number';
 import { useProductionContext } from '../../../../contexts/production';
 import { GameData } from '../../../../contexts/gameData/types';
@@ -349,6 +350,7 @@ const ProductionGraphTab = () => {
   const popperRef = useRef<PopperRef | null>(null);
   const prevResultsGraphRef = useRef<ProductionGraph | null>(null);
   const [popupNode, setPopupNode] = useState<NodeData | null>(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const ctx = useProductionContext();
   const resultsGraph = ctx.solverResults?.productionGraph || null;
   const graphError = ctx.solverResults?.error || null;
@@ -428,6 +430,25 @@ const ProductionGraphTab = () => {
       if (popperRef.current?.nodeId === nodeId) {
         deactivatePopper(cy);
       }
+    });
+
+    cy.on('cxttap', 'node', function (e) {
+      const data = e.target.data() as NodeData;
+      if (data.type !== NODE_TYPE.RECIPE && data.type !== NODE_TYPE.RESOURCE) {
+        setContextMenu(null);
+        return;
+      }
+      const originalEvent = e.originalEvent as MouseEvent | undefined;
+      if (!originalEvent) return;
+      originalEvent.preventDefault();
+      deactivatePopper(cy);
+      setContextMenu({ node: data, x: originalEvent.clientX, y: originalEvent.clientY });
+    });
+
+    // Dismiss the context menu on any graph interaction.
+    cy.on('tap cxttap pan zoom', function (e) {
+      if (e.type === 'cxttap' && e.target !== cy && e.target.isNode?.()) return;
+      setContextMenu(null);
     });
   }
 
@@ -630,6 +651,7 @@ const ProductionGraphTab = () => {
         }
       </GraphContainer>
       <GraphTooltip ref={popupRef} currentNode={popupNode} />
+      <GraphContextMenu menu={contextMenu} onClose={() => setContextMenu(null)} />
     </>
   );
 };
