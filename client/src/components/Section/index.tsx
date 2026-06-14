@@ -55,7 +55,7 @@ export const CollapsibleSection = ({ title, tooltip, defaultOpen = true, childre
           </Tooltip>
         )}
       </Header>
-      <Collapse in={open}>
+      <Collapse expanded={open}>
         <Content>{children}</Content>
       </Collapse>
     </Section>

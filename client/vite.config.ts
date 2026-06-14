@@ -5,11 +5,7 @@ import path from 'path';
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        plugins: ['babel-plugin-styled-components'],
-      },
-    }),
+    react(),
   ],
   server: {
     port: parseInt(process.env.PORT || '3000'),
