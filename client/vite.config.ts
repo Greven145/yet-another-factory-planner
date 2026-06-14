@@ -55,6 +55,7 @@ export default defineConfig({
     'process.env.PUBLIC_URL': JSON.stringify(process.env.PUBLIC_URL || ''),
   },
   test: {
+    include: ['src/**/*.{spec,test}.{ts,tsx}'],
     environment: 'jsdom',
     globals: true,
     alias: {
