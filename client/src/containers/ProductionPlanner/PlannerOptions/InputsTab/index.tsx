@@ -179,7 +179,7 @@ const ResourceTableHeader = styled.div`
   grid-template-columns: 1fr 110px 52px 80px;
   gap: 6px;
   padding: 4px 6px 6px;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.background[3]};
+  border-bottom: 1px solid light-dark(#dee2e6, #50565e);
   margin-bottom: 2px;
 `;
 
@@ -201,7 +201,7 @@ const ResourceRow = styled.div`
   border-radius: 3px;
 
   &:hover {
-    background: ${({ theme }) => theme.colors.background[3]};
+    background: light-dark(#e9ecef, #50565e);
   }
 `;
 

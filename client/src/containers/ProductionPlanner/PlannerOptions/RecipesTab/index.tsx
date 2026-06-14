@@ -120,5 +120,5 @@ const VDivider = styled.div`
   bottom: 20px;
   left: 255px;
   width: 1px;
-  background: ${({ theme }) => theme.colors.background[3]};
+  background: light-dark(#dee2e6, #50565e);
 `;

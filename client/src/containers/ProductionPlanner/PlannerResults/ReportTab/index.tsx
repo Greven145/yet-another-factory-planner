@@ -143,7 +143,7 @@ const ReportTab = () => {
       {!report
         ? (
           <Group style={{ height: '150px', justifyContent: 'flex-start' }}>
-            <AlertCircle color="#eee" size={50} />
+            <AlertCircle size={50} style={{ color: 'light-dark(#868e96, #eee)' }} />
             <Text style={{ fontSize: '32px' }}>
               No data available
             </Text>
@@ -189,7 +189,7 @@ const StatGrid = styled.div`
 `;
 
 const StatCard = styled.div<{ $accent?: boolean }>`
-  background: ${({ theme, $accent }) => $accent ? theme.colors.primary[8] : theme.colors.background[2]};
+  background: ${({ theme, $accent }) => $accent ? theme.colors.primary[8] : 'light-dark(#e9ecef, #3f434a)'};
   border-radius: 4px;
   padding: 12px 14px;
 `;
@@ -240,7 +240,7 @@ const ItemsGrid = styled.div`
 `;
 
 const ItemCell = styled.div`
-  background: ${({ theme }) => theme.colors.background[2]};
+  background: light-dark(#e9ecef, #3f434a);
   border-radius: 4px;
   padding: 8px 10px;
   min-width: 0;
@@ -278,7 +278,7 @@ const BuildingsGrid = styled.div`
 `;
 
 const BuildingCard = styled.div<{ $total?: boolean }>`
-  background: ${({ theme, $total }) => $total ? theme.colors.background[3] : theme.colors.background[2]};
+  background: ${({ $total }) => $total ? 'light-dark(#dee2e6, #50565e)' : 'light-dark(#e9ecef, #3f434a)'};
   border-radius: 4px;
   padding: 10px 12px;
 `;
