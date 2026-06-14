@@ -74,11 +74,12 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background: #f0f2f5 !important;
   }
 
-  // Results view switcher (Production Graph / Factory Report): a segmented HUD
-  // toggle styled like a machine view-mode selector. Scoped to .results-view-tabs
-  // and placed after the generic tab rules above so it overrides them for this
-  // one strip only; the drawer tabs keep the rules above.
-  :root .results-view-tabs [role="tablist"] {
+  // Segmented HUD toggle: a tab strip styled like a machine view-mode selector
+  // (steel track, active segment filled FICSIT orange, monospace uppercase).
+  // Scoped to .segmented-tabs and placed after the generic tab rules above so it
+  // overrides them for opted-in strips only; other tabs keep the rules above.
+  // Add .segmented-tabs-grow for a full-width strip with equal segments.
+  :root .segmented-tabs [role="tablist"] {
     display: inline-flex;
     gap: 4px;
     padding: 4px;
@@ -88,7 +89,7 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background-color: light-dark(#e3e1da, #2b2e33) !important;
   }
 
-  :root .results-view-tabs button[role="tab"] {
+  :root .segmented-tabs button[role="tab"] {
     font-family: 'M PLUS 1 Code', monospace !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -104,15 +105,25 @@ const GlobalStylesheet = createGlobalStyle<any>`
     transition: background-color 120ms ease, color 120ms ease;
   }
 
-  :root .results-view-tabs button[role="tab"]:hover {
+  :root .segmented-tabs button[role="tab"]:hover {
     background-color: light-dark(#d8d4cb, #3a3e44) !important;
     color: light-dark(#3f3a32, #ece6dc) !important;
   }
 
-  :root .results-view-tabs button[role="tab"][data-active],
-  :root .results-view-tabs button[role="tab"][data-active]:hover {
+  :root .segmented-tabs button[role="tab"][data-active],
+  :root .segmented-tabs button[role="tab"][data-active]:hover {
     background-color: #ec7821 !important;
     color: #ffffff !important;
+  }
+
+  // Full-width variant: the track fills its container and segments share it equally.
+  :root .segmented-tabs-grow [role="tablist"] {
+    display: flex;
+  }
+
+  :root .segmented-tabs-grow button[role="tab"] {
+    flex: 1 1 0;
+    justify-content: center;
   }
 
   html,

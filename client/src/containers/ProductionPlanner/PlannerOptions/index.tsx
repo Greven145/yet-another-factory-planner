@@ -111,11 +111,11 @@ const PlannerOptions = () => {
           </Button>
         </Group>
       </Modal>
-      <Tabs defaultValue="production" variant='outline'>
+      <Tabs defaultValue="production" variant='pills' className='segmented-tabs segmented-tabs-grow'>
         <Tabs.List grow>
-          <Tabs.Tab value="production" leftSection={<TrendingUp size={18} />}>Production</Tabs.Tab>
-          <Tabs.Tab value="inputs" leftSection={<Shuffle size={18} />}>Inputs</Tabs.Tab>
-          <Tabs.Tab value="recipes" leftSection={<Box size={18} />}>Recipes</Tabs.Tab>
+          <Tabs.Tab value="production" leftSection={<TrendingUp size={16} />}>Production</Tabs.Tab>
+          <Tabs.Tab value="inputs" leftSection={<Shuffle size={16} />}>Inputs</Tabs.Tab>
+          <Tabs.Tab value="recipes" leftSection={<Box size={16} />}>Recipes</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="production">
           <TabContainer fluid>

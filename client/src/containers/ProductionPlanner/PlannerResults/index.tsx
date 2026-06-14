@@ -14,7 +14,7 @@ const TabLoader = () => (
 
 const PlannerResults = () => {
   return (
-    <Tabs defaultValue="graph" variant='pills' className='results-view-tabs'>
+    <Tabs defaultValue="graph" variant='pills' className='segmented-tabs'>
       <Tabs.List>
         <Tabs.Tab value="graph" leftSection={<Share2 size={16} />}>Production Graph</Tabs.Tab>
         <Tabs.Tab value="report" leftSection={<Edit size={16} />}>Factory Report</Tabs.Tab>
