@@ -42,7 +42,7 @@ function getSelectValue(capacity: string | null, presets: Set<string>): string {
 
 const priorityOptions = Array(MAX_PRIORITY)
 .fill('')
-  .map((_, i) => ({ value: `${i + 1}`, label: `Priority: ${i + 1}` }))
+  .map((_, i) => ({ value: `${i + 1}`, label: `Rank: ${i + 1}` }))
   .reverse();
 
 interface ItemRowProps {
@@ -101,7 +101,7 @@ const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowPro
           data.mode === 'maximize'
             ? (
               <Select
-                placeholder='Priority'
+                placeholder='Rank'
                 data={priorityOptions}
                 value={data.value}
                 onChange={(value) => {
