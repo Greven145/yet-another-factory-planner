@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { Center, Container, Loader, Tabs } from '@mantine/core';
+import { Center, Loader, Tabs } from '@mantine/core';
 import { Share2, Edit } from 'react-feather';
 import Card from '../../../components/Card';
 
@@ -14,17 +14,17 @@ const TabLoader = () => (
 
 const PlannerResults = () => {
   return (
-    <Tabs defaultValue="graph" variant='outline'>
+    <Tabs defaultValue="graph" variant='pills' className='segmented-tabs'>
       <Tabs.List>
-        <Tabs.Tab value="graph" leftSection={<Share2 size={18} />} style={{ minWidth: '200px' }}>Production Graph</Tabs.Tab>
-        <Tabs.Tab value="report" leftSection={<Edit size={18} />} style={{ minWidth: '200px' }}>Factory Report</Tabs.Tab>
+        <Tabs.Tab value="graph" leftSection={<Share2 size={16} />}>Production Graph</Tabs.Tab>
+        <Tabs.Tab value="report" leftSection={<Edit size={16} />}>Factory Report</Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="graph" keepMounted>
-        <Container fluid style={{ padding: '0px' }}>
+        <Card style={{ padding: '0px', marginBottom: '0px', background: 'var(--yafp-container-bg)' }}>
           <Suspense fallback={<TabLoader />}>
             <ProductionGraphTab />
           </Suspense>
-        </Container>
+        </Card>
       </Tabs.Panel>
       <Tabs.Panel value="report">
         <Card style={{ paddingLeft: '10px', background: 'var(--yafp-container-bg)' }}>

@@ -254,8 +254,8 @@ const GraphButtonGroup = styled(Group)`
 
 //Extend the mantine/core button component to add a custom style
 const GraphButton = styled(Button)<ButtonProps & React.ComponentPropsWithoutRef<'button'>>`
-  opacity: 0.1;
-  border: 1px solid rgba(255,255,255,0.1);
+  opacity: 0.25;
+  border: 1px solid light-dark(rgba(0,0,0,0.15), rgba(255,255,255,0.1));
   border-radius: 5px;
   padding: 5px;
   &:hover {
@@ -309,10 +309,16 @@ function getEdgeLabel(edge: GraphEdge, gameData: GameData) {
   return `${label}\n${amountText}`;
 }
 
+// Room left below the graph for the planner footer (FooterContent in
+// ProductionPlanner/index.tsx, min-height 64px) so MainContent doesn't scroll.
+// Sized to fit the credits even when they wrap to two lines on a narrow
+// (drawer-open) layout. Keep in sync with FooterContent's min-height.
+const GRAPH_BOTTOM_RESERVE = 64;
+
 function _resizeListener(graphRef: React.RefObject<HTMLDivElement | null>) {
   if (graphRef?.current) {
     const bounds = graphRef.current.getBoundingClientRect();
-    graphRef.current.style.height = `${window.innerHeight - bounds.top - 40}px`;
+    graphRef.current.style.height = `${window.innerHeight - bounds.top - GRAPH_BOTTOM_RESERVE}px`;
   }
 }
 
@@ -504,8 +510,12 @@ const ProductionGraphTab = () => {
   useEffect(() => {
     function resizeListener() {
       _resizeListener(graphRef);
+      cyRef.current?.resize();
     }
     window.addEventListener('resize', resizeListener);
+    // Recompute once custom fonts load: they change the height of the content
+    // above the graph (e.g. the welcome card), shifting the graph's top offset.
+    document.fonts?.ready.then(resizeListener);
     return () => {
       window.removeEventListener('resize', resizeListener);
     }
@@ -628,8 +638,8 @@ export default ProductionGraphTab;
 
 const GraphContainer = styled(Container)`
   position: relative;
-  min-height: 600px;
-  min-width: 800px;
+  min-height: 300px;
+  min-width: 0;
   border: 1px solid var(--yafp-graph-border);
   border-top-width: 0px;
   margin: 0px;

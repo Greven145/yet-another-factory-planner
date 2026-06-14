@@ -64,12 +64,101 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background-color: #ffffff !important;
   }
 
+  // Tabs supply their own backgrounds (above); keep the list strip transparent
+  // so it doesn't paint a block to the right of the tabs.
   :root[data-mantine-color-scheme="light"] [role="tablist"] {
-    background-color: #f8f9fa !important;
+    background-color: transparent !important;
   }
 
   :root[data-mantine-color-scheme="light"] [role="tabpanel"] {
     background: #f0f2f5 !important;
+  }
+
+  // Segmented HUD toggle: a tab strip styled like a machine view-mode selector
+  // (steel track, active segment filled FICSIT orange, monospace uppercase).
+  // Scoped to .segmented-tabs and placed after the generic tab rules above so it
+  // overrides them for opted-in strips only; other tabs keep the rules above.
+  // Add .segmented-tabs-grow for a full-width strip with equal segments.
+  :root .segmented-tabs [role="tablist"] {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 16px;
+    border-radius: 6px;
+    border: 1px solid light-dark(#cfc9bf, #50565e) !important;
+    background-color: light-dark(#e3e1da, #2b2e33) !important;
+  }
+
+  :root .segmented-tabs button[role="tab"] {
+    font-family: 'M PLUS 1 Code', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 13px !important;
+    font-weight: 600;
+    min-width: 0 !important;
+    margin: 0 !important;
+    padding: 7px 18px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    color: light-dark(#6b6459, #b0a89c) !important;
+    background-color: transparent !important;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  :root .segmented-tabs button[role="tab"]:hover {
+    background-color: light-dark(#d8d4cb, #3a3e44) !important;
+    color: light-dark(#3f3a32, #ece6dc) !important;
+  }
+
+  :root .segmented-tabs button[role="tab"][data-active],
+  :root .segmented-tabs button[role="tab"][data-active]:hover {
+    background-color: #ec7821 !important;
+    color: #ffffff !important;
+  }
+
+  // Full-width variant: the track fills its container and segments share it equally.
+  :root .segmented-tabs-grow [role="tablist"] {
+    display: flex;
+  }
+
+  :root .segmented-tabs-grow button[role="tab"] {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+
+  // HUD-themed Mantine SegmentedControl: same steel track / FICSIT-orange active
+  // segment / monospace uppercase language as the segmented tabs above, but for a
+  // SegmentedControl (which has its own sliding indicator instead of tab buttons).
+  :root .hud-segmented {
+    padding: 4px;
+    border-radius: 6px;
+    border: 1px solid light-dark(#cfc9bf, #50565e) !important;
+    background-color: light-dark(#e3e1da, #2b2e33) !important;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-indicator {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    background-color: #ec7821 !important;
+  }
+
+  // Hide the divider Mantine draws between inactive segments.
+  :root .hud-segmented .mantine-SegmentedControl-control::before {
+    background-color: transparent !important;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-label {
+    font-family: 'M PLUS 1 Code', monospace !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+    padding: 5px 16px;
+    color: light-dark(#6b6459, #b0a89c) !important;
+    transition: color 120ms ease;
+  }
+
+  :root .hud-segmented .mantine-SegmentedControl-label[data-active] {
+    color: #ffffff !important;
   }
 
   html,

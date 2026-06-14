@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { List, Checkbox, TextInput, Button, Group, Title, Grid } from '@mantine/core';
 import { Search } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
-import { Section, SectionDescription } from '../../../../components/Section';
+import { CollapsibleSection } from '../../../../components/Section';
 
 const cleanAltNameRegex = /^Alternate: /;
 
@@ -87,11 +87,7 @@ const RecipesTab = () => {
 
   return (
     <>
-      <Section>
-        <Title order={3}>Recipes</Title>
-        <SectionDescription>
-          Select the recipes that you want to be considered in this factory.
-        </SectionDescription>
+      <CollapsibleSection title='Recipes' tooltip='Select the recipes that you want to be considered in this factory.'>
         <TextInput
           placeholder='Search...'
           aria-label='search recipes'
@@ -111,7 +107,7 @@ const RecipesTab = () => {
           </Grid.Col>
           <VDivider />
         </Grid>
-      </Section>
+      </CollapsibleSection>
     </>
   );
 };
@@ -124,5 +120,5 @@ const VDivider = styled.div`
   bottom: 20px;
   left: 255px;
   width: 1px;
-  background: ${({ theme }) => theme.colors.background[3]};
+  background: light-dark(#dee2e6, #50565e);
 `;

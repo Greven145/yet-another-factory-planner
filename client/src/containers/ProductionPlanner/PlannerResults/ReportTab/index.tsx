@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Title, List, Divider, Text, Container, Group } from '@mantine/core';
+import { Title, Text, Container, Group } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { ProducedItemInformation } from '../../../../utilities/production-solver/models';
@@ -16,139 +16,134 @@ const ReportTab = () => {
   function renderReport() {
     return (
       <>
-        <Title order={2}>Statistics</Title>
-        <SDivider />
-        <SmallerTitle order={3}>Points Produced</SmallerTitle>
-        <Text>{formatFloat(report!.pointsProduced)} per min</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Resource Usage Score</SmallerTitle>
-        <Text>{formatFloat(report!.resourceEfficiencyScore)}</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Total Build Area</SmallerTitle>
-        <Text>{formatFloat(report!.totalBuildArea)} m²</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Estimated Minimal Foundations</SmallerTitle>
-        <Text>{formatFloat(report!.estimatedFoundations)} foundations ({formatFloat(report!.estimatedFoundations * 8)} Concrete)</Text>
-        <SDivider />
+        <SectionTitle order={2}>Statistics</SectionTitle>
+        <StatGrid>
+          <StatCard>
+            <StatLabel>Points Produced</StatLabel>
+            <StatValue>{formatFloat(report!.pointsProduced)}<StatUnit>/min</StatUnit></StatValue>
+          </StatCard>
+          <StatCard>
+            <StatLabel>Resource Usage Score</StatLabel>
+            <StatValue>{formatFloat(report!.resourceEfficiencyScore)}</StatValue>
+          </StatCard>
+          <StatCard>
+            <StatLabel>Total Build Area</StatLabel>
+            <StatValue>{formatFloat(report!.totalBuildArea)}<StatUnit> m²</StatUnit></StatValue>
+          </StatCard>
+          <StatCard>
+            <StatLabel>Est. Foundations</StatLabel>
+            <StatValue>{formatFloat(report!.estimatedFoundations)}</StatValue>
+            <StatSub>{formatFloat(report!.estimatedFoundations * 8)} Concrete</StatSub>
+          </StatCard>
+        </StatGrid>
 
-        <Title order={2} style={{ marginTop: '30px' }}>Power</Title>
-        <SDivider />
-        <SmallerTitle order={3}>Manufacturing</SmallerTitle>
-        <Text>{formatFloat(report!.powerUsageEstimate.production)} MW</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Resource Extraction</SmallerTitle>
-        <Text>{formatFloat(report!.powerUsageEstimate.extraction)} MW</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Generation</SmallerTitle>
-        <Text>{formatFloat(report!.powerUsageEstimate.generators)} MW</Text>
-        <SDivider />
-        <SmallerTitle order={3}>Total {report!.powerUsageEstimate.total < 0 ? 'Production' : 'Usage'}</SmallerTitle>
-        <Text>{formatFloat(Math.abs(report!.powerUsageEstimate.total))} MW</Text>
-        <SDivider />
+        <SectionTitle order={2}>Power</SectionTitle>
+        <StatGrid>
+          <StatCard>
+            <StatLabel>Manufacturing</StatLabel>
+            <StatValue>{formatFloat(report!.powerUsageEstimate.production)}<StatUnit> MW</StatUnit></StatValue>
+          </StatCard>
+          <StatCard>
+            <StatLabel>Extraction</StatLabel>
+            <StatValue>{formatFloat(report!.powerUsageEstimate.extraction)}<StatUnit> MW</StatUnit></StatValue>
+          </StatCard>
+          <StatCard>
+            <StatLabel>Generation</StatLabel>
+            <StatValue>{formatFloat(report!.powerUsageEstimate.generators)}<StatUnit> MW</StatUnit></StatValue>
+          </StatCard>
+          <StatCard $accent>
+            <StatLabel>Total {report!.powerUsageEstimate.total < 0 ? 'Production' : 'Usage'}</StatLabel>
+            <StatValue>{formatFloat(Math.abs(report!.powerUsageEstimate.total))}<StatUnit> MW</StatUnit></StatValue>
+          </StatCard>
+        </StatGrid>
 
-        <Title order={2} style={{ marginTop: '30px' }}>Summary of produced items</Title>
-          {renderLoopWarning()}
-        <SDivider />
-        <List listStyleType='none'>
-          {renderSteps()}
-        </List>
-        <SDivider />
+        <SectionTitle order={2}>Summary of Produced Items</SectionTitle>
+        {renderLoopWarning()}
+        {renderSteps()}
 
-        <Title order={2} style={{ marginTop: '30px' }}>Buildings</Title>
-        <SDivider />
-        <List listStyleType='none'>
-          {renderBuildingsUsed()}
-          <List.Item>
-            <Title order={3} style={{ marginBottom: '8px' }}>Total</Title>
-            <ListWithLine withPadding listStyleType='none'>
-              {
-                Object.entries(report!.totalMaterialCost)
-                  .sort((a, b) => {
-                    if (a[1] > b[1]) return -1;
-                    if (a[1] < b[1]) return 1;
-                    return 0;
-                  })
-                  .map(([itemKey, count]) => (
-                    <List.Item key={itemKey}>
-                      <ItemLabel>{ctx.gameData.items[itemKey].name}</ItemLabel> <Count>x{formatFloat(count)}</Count>
-                    </List.Item>
-                  ))
-              }
-            </ListWithLine>
-          </List.Item>
-        </List>
+        <SectionTitle order={2}>Buildings</SectionTitle>
+        {renderBuildingsUsed()}
       </>
     );
   }
 
-  function renderSteps(){
-    return Object.entries(groupBy(report!.totalItemsRecap, i=> i.step)).map((value, index) => (
-      <List.Item key={value[0]} style={{ paddingBottom: '10px' }}>
-        <Title order={3} style={{ marginBottom: '8px' }}>
-          Step {value[0]}
-        </Title>
-        <ListWithLine withPadding listStyleType='none' style={{ marginBottom: '10px' }}>
-          {
-            renderItems(value[1])
-          }
-        </ListWithLine>
-      </List.Item>
+  function renderSteps() {
+    return Object.entries(groupBy(report!.totalItemsRecap, i => i.step)).map((value) => (
+      <StepBlock key={value[0]}>
+        <StepTitle order={3}>Step {value[0]}</StepTitle>
+        <ItemsGrid>
+          {renderItems(value[1])}
+        </ItemsGrid>
+      </StepBlock>
     ));
   }
 
   function renderItems(itemsList: ProducedItemInformation[]) {
     return Object.entries(itemsList).map(([key, itemInfo]) => (
-      <List.Item key={itemInfo.key}>
-        <ItemLabel>{itemInfo.name}</ItemLabel>  <Count>x{formatFloat(itemInfo.amount)}/min</Count>
-      </List.Item>
+      <ItemCell key={itemInfo.key}>
+        <ItemCellName>{itemInfo.name}</ItemCellName>
+        <ItemCellRate>{formatFloat(itemInfo.amount)}/min</ItemCellRate>
+      </ItemCell>
     ));
   }
 
-  function renderLoopWarning(){
-    if (report!.loopWarning ) {
-      return <SmallerTitle order={3} >⚠️Warning⚠️: A loop was detected, these values may not be reliable</SmallerTitle>
+  function renderLoopWarning() {
+    if (report!.loopWarning) {
+      return (
+        <LoopWarning>
+          ⚠️ Warning: A loop was detected — these values may not be reliable
+        </LoopWarning>
+      );
     }
     return null;
   }
 
   function renderBuildingsUsed() {
-    return Object.entries(report!.buildingsUsed)
-      .sort((a, b) => {
-        if (a[1].count > b[1].count) return -1;
-        if (a[1].count < b[1].count) return 1;
-        return 0;
-      })
-      .map(([buildingKey, usageInfo]) => (
-      <List.Item key={buildingKey} style={{ paddingBottom: '10px' }}>
-        <Title order={3} style={{ marginBottom: '8px' }}>
-          {ctx.gameData.buildings[buildingKey].name} <Count>x{formatFloat(usageInfo.count)}</Count>
-        </Title>
-        <ListWithLine withPadding listStyleType='none' style={{ marginBottom: '10px' }}>
-          {
-            Object.entries(usageInfo.materialCost)
-              .sort((a, b) => {
-                if (a[1] > b[1]) return -1;
-                if (a[1] < b[1]) return 1;
-                return 0;
-              })
+    return (
+      <BuildingsGrid>
+        {Object.entries(report!.buildingsUsed)
+          .sort((a, b) => b[1].count - a[1].count)
+          .map(([buildingKey, usageInfo]) => (
+            <BuildingCard key={buildingKey}>
+              <BuildingName>
+                {ctx.gameData.buildings[buildingKey].name}
+                <BuildingCount> ×{formatFloat(usageInfo.count)}</BuildingCount>
+              </BuildingName>
+              <BuildingMaterials>
+                {Object.entries(usageInfo.materialCost)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([itemKey, count]) => (
+                    <MaterialRow key={itemKey}>
+                      <span>{ctx.gameData.items[itemKey].name}</span>
+                      <MaterialCount>×{formatFloat(count)}</MaterialCount>
+                    </MaterialRow>
+                  ))}
+              </BuildingMaterials>
+            </BuildingCard>
+          ))}
+        <BuildingCard $total>
+          <BuildingName>Total Materials</BuildingName>
+          <BuildingMaterials>
+            {Object.entries(report!.totalMaterialCost)
+              .sort((a, b) => b[1] - a[1])
               .map(([itemKey, count]) => (
-                <List.Item key={itemKey}>
-                  <ItemLabel>{ctx.gameData.items[itemKey].name}</ItemLabel>  <Count>x{formatFloat(count)}</Count>
-                </List.Item>
-              ))
-          }
-        </ListWithLine>
-      </List.Item>
-    ))
+                <MaterialRow key={itemKey}>
+                  <span>{ctx.gameData.items[itemKey].name}</span>
+                  <MaterialCount>×{formatFloat(count)}</MaterialCount>
+                </MaterialRow>
+              ))}
+          </BuildingMaterials>
+        </BuildingCard>
+      </BuildingsGrid>
+    );
   }
 
   return (
     <ReportContainer fluid>
-      {
-      !report
+      {!report
         ? (
           <Group style={{ height: '150px', justifyContent: 'flex-start' }}>
-            <AlertCircle color="#eee" size={50} />
+            <AlertCircle size={50} style={{ color: 'light-dark(#868e96, #eee)' }} />
             <Text style={{ fontSize: '32px' }}>
               No data available
             </Text>
@@ -170,39 +165,151 @@ export default ReportTab;
 
 const ReportContainer = styled(Container)`
   padding: 10px;
-  padding-bottom: 15px;
+  padding-bottom: 20px;
 `;
 
-const SDivider = styled(Divider)`
-  margin: 10px 0px;
+const SectionTitle = styled(Title)`
+  margin-top: 20px;
+  margin-bottom: 10px;
+  font-size: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.8;
+
+  &:first-child {
+    margin-top: 0;
+  }
 `;
 
-const SmallerTitle = styled(Title)`
-  font-size: 19px;
+const StatGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 4px;
 `;
 
-const ItemLabel = styled.span`
-  font-size: 17px;
-  font-weight: bold;
+const StatCard = styled.div<{ $accent?: boolean }>`
+  background: ${({ theme, $accent }) => $accent ? theme.colors.primary[8] : 'light-dark(#e9ecef, #3f434a)'};
+  border-radius: 4px;
+  padding: 12px 14px;
 `;
 
-const Count = styled.span`
+const StatLabel = styled.div`
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: light-dark(#666, #aaa);
+  margin-bottom: 4px;
+`;
+
+const StatValue = styled.div`
+  font-size: 22px;
+  font-weight: 700;
+  color: light-dark(#212529, #eee);
+  line-height: 1.1;
+`;
+
+const StatUnit = styled.span`
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.7;
+`;
+
+const StatSub = styled.div`
+  font-size: 12px;
+  opacity: 0.6;
+  margin-top: 2px;
+`;
+
+const StepBlock = styled.div`
+  margin-bottom: 12px;
+`;
+
+const StepTitle = styled(Title)`
   font-size: 15px;
-  margin-left: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.6;
+  margin-bottom: 6px;
 `;
 
-const ListWithLine = styled(List)`
-  position: relative;
-  & li {
-    padding-left: 20px;
-  }
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0px;
-    bottom: 0px;
-    left: 12px;
-    width: 3px;
-    background: ${({ theme }) => theme.colors.background[3]};
-  }
+const ItemsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+`;
+
+const ItemCell = styled.div`
+  background: light-dark(#e9ecef, #3f434a);
+  border-radius: 4px;
+  padding: 8px 10px;
+  min-width: 0;
+`;
+
+const ItemCellName = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: light-dark(#212529, #eee);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 2px;
+`;
+
+const ItemCellRate = styled.div`
+  font-size: 12px;
+  color: light-dark(#555, #aaa);
+`;
+
+const LoopWarning = styled.div`
+  background: ${({ theme }) => theme.colors.danger[6]};
+  color: #fff;
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+`;
+
+const BuildingsGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+`;
+
+const BuildingCard = styled.div<{ $total?: boolean }>`
+  background: ${({ $total }) => $total ? 'light-dark(#dee2e6, #50565e)' : 'light-dark(#e9ecef, #3f434a)'};
+  border-radius: 4px;
+  padding: 10px 12px;
+`;
+
+const BuildingName = styled.div`
+  font-size: 14px;
+  font-weight: 700;
+  color: light-dark(#212529, #eee);
+  margin-bottom: 8px;
+`;
+
+const BuildingCount = styled.span`
+  font-weight: 400;
+  opacity: 0.7;
+  font-size: 13px;
+`;
+
+const BuildingMaterials = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+`;
+
+const MaterialRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: light-dark(#555, #bbb);
+`;
+
+const MaterialCount = styled.span`
+  font-weight: 600;
+  color: light-dark(#212529, #eee);
 `;
