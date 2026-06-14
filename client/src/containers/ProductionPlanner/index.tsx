@@ -103,9 +103,11 @@ const ProductionPlanner = () => {
               </WelcomeCard>
               <PlannerResults />
               <FooterContent>
-                Originally made with ♥ by <ExternalLink href='https://github.com/lydianlights'>LydianLights</ExternalLink>
-                {' '} | Updated by <ExternalLink href='https://github.com/greven145/yet-another-factory-planner'>Greven145</ExternalLink>
-                {' '} - Questions or bugs? File an <ExternalLink href='https://github.com/greven145/yet-another-factory-planner/issues'>issue on github</ExternalLink>
+                <FooterText>
+                  Originally made with ♥ by <ExternalLink href='https://github.com/lydianlights'>LydianLights</ExternalLink>
+                  {' | '} Updated by <ExternalLink href='https://github.com/greven145/yet-another-factory-planner'>Greven145</ExternalLink>
+                  {' '} - Questions or bugs? File an <ExternalLink href='https://github.com/greven145/yet-another-factory-planner/issues'>issue on github</ExternalLink>
+                </FooterText>
               </FooterContent>
             </MainContent>
           </PlannerLayout>
@@ -150,8 +152,11 @@ const FooterContent = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
   padding: 6px 20px;
+`;
+
+const FooterText = styled.div`
+  text-align: center;
   font-size: 12px;
   line-height: 1.4;
   color: light-dark(#555555, #eeeeee);
