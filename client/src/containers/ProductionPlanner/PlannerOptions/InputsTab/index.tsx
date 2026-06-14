@@ -137,7 +137,7 @@ const InputsTab = () => {
           + Add Input
         </Button>
       </CollapsibleSection>
-      <CollapsibleSection title='Raw Resources' tooltip='Set the available amount and weighting for each raw resource extracted from the world.'>
+      <CollapsibleSection title='Raw Resources' tooltip='Set how much of each raw resource is available and its weight. Weight is a relative cost the solver pays per unit consumed: raise it to make a resource "precious" so the solver avoids it and favours recipes that lean on cheaper resources; lower it (or set 0) to use it freely. Weights are relative to each other and only take effect when Resource Efficiency (under Weighting Options) is above 0.'>
         <Group style={{ marginBottom: '12px' }}>
           <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
             Set All To Maximum

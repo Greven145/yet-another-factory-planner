@@ -23,7 +23,6 @@ const BELT_TIER_OPTIONS = [
   { value: '480', label: 'Mk. 4 (480/min)' },
   { value: '780', label: 'Mk. 5 (780/min)' },
   { value: '1200', label: 'Mk. 6 (1200/min)' },
-  { value: 'custom', label: 'Custom' },
 ];
 
 const BELT_PRESET_VALUES = new Set(['60', '120', '240', '480', '780', '1200']);
@@ -32,15 +31,13 @@ const PIPE_TIER_OPTIONS = [
   { value: 'disabled', label: 'Disabled' },
   { value: '300', label: 'Mk. 1 (300 m³/min)' },
   { value: '600', label: 'Mk. 2 (600 m³/min)' },
-  { value: 'custom', label: 'Custom' },
 ];
 
 const PIPE_PRESET_VALUES = new Set(['300', '600']);
 
 function getSelectValue(capacity: string | null, presets: Set<string>): string {
-  if (capacity === null) return 'disabled';
-  if (presets.has(capacity)) return capacity;
-  return 'custom';
+  if (capacity !== null && presets.has(capacity)) return capacity;
+  return 'disabled';
 }
 
 const priorityOptions = Array(MAX_PRIORITY)
@@ -270,27 +267,9 @@ const ProductionTab = () => {
             value={beltSelectValue}
             style={{ flex: '1 1 auto' }}
             onChange={(value) => {
-              if (!value || value === 'disabled') {
-                dispatchBelt(null);
-              } else if (value === 'custom') {
-                dispatchBelt(opts.beltCapacity && !BELT_PRESET_VALUES.has(opts.beltCapacity) ? opts.beltCapacity : '60');
-              } else {
-                dispatchBelt(value);
-              }
+              dispatchBelt(!value || value === 'disabled' ? null : value);
             }}
           />
-          {beltSelectValue === 'custom' && (
-            <TextInput
-              label='Custom (items/min)'
-              className='no-spinner'
-              type='number'
-              min='1'
-              step='1'
-              value={opts.beltCapacity ?? ''}
-              style={{ flex: '1 1 auto' }}
-              onChange={(e) => dispatchBelt(e.currentTarget.value)}
-            />
-          )}
         </Group>
         <Group style={{ alignItems: 'flex-end' }}>
           <Select
@@ -299,27 +278,9 @@ const ProductionTab = () => {
             value={pipeSelectValue}
             style={{ flex: '1 1 auto' }}
             onChange={(value) => {
-              if (!value || value === 'disabled') {
-                dispatchPipe(null);
-              } else if (value === 'custom') {
-                dispatchPipe(opts.pipeCapacity && !PIPE_PRESET_VALUES.has(opts.pipeCapacity) ? opts.pipeCapacity : '300');
-              } else {
-                dispatchPipe(value);
-              }
+              dispatchPipe(!value || value === 'disabled' ? null : value);
             }}
           />
-          {pipeSelectValue === 'custom' && (
-            <TextInput
-              label='Custom (m³/min)'
-              className='no-spinner'
-              type='number'
-              min='1'
-              step='1'
-              value={opts.pipeCapacity ?? ''}
-              style={{ flex: '1 1 auto' }}
-              onChange={(e) => dispatchPipe(e.currentTarget.value)}
-            />
-          )}
         </Group>
       </>
     );
