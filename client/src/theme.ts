@@ -61,7 +61,7 @@ export const theme: MantineThemeOverride = {
       styles: {
         root: { minHeight: '100vh' },
         header: { background: '#ec7821', borderBottom: 'none', padding: '10px', overflow: 'hidden' },
-        main: { background: 'transparent', paddingTop: '80px' },
+        main: { background: 'transparent', paddingTop: '80px', paddingBottom: '0px' },
       },
     },
     Paper: {
@@ -129,6 +129,7 @@ export const theme: MantineThemeOverride = {
           flex: '0 1 auto',
         },
         list: {
+          background: 'transparent',
           borderBottom: 'calc(0.0625rem * var(--mantine-scale)) solid light-dark(#aaa, #fff)',
         },
         panel: {

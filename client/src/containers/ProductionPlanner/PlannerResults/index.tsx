@@ -20,7 +20,7 @@ const PlannerResults = () => {
         <Tabs.Tab value="report" leftSection={<Edit size={18} />} style={{ minWidth: '200px' }}>Factory Report</Tabs.Tab>
       </Tabs.List>
       <Tabs.Panel value="graph" keepMounted>
-        <Card style={{ padding: '0px', background: 'var(--yafp-container-bg)' }}>
+        <Card style={{ padding: '0px', marginBottom: '0px', background: 'var(--yafp-container-bg)' }}>
           <Suspense fallback={<TabLoader />}>
             <ProductionGraphTab />
           </Suspense>

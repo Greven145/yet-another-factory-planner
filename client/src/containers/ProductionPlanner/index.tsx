@@ -122,7 +122,7 @@ export default ProductionPlanner;
 const PlannerLayout = styled.div`
   display: flex;
   align-items: stretch;
-  height: calc(100vh - ${({ theme }) => theme.other.headerHeight} - var(--mantine-spacing-md));
+  height: calc(100vh - ${({ theme }) => theme.other.headerHeight});
   overflow: hidden;
   margin-top: calc(${({ theme }) => theme.other.headerHeight} - 80px);
   margin-left: calc(-${({ theme }) => theme.other.pageLeftMargin} - var(--mantine-spacing-md));
@@ -142,9 +142,18 @@ const WelcomeCard = styled(Card)`
   margin-top: 12px;
 `;
 
+// Fills exactly the space the graph reserves below itself (GRAPH_BOTTOM_RESERVE
+// in ProductionGraphTab) and centers the credits, so MainContent never scrolls
+// and there's no dead gap on wide screens. Keep min-height in sync with it.
 const FooterContent = styled.div`
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
-  padding: 20px;
+  padding: 6px 20px;
+  font-size: 12px;
+  line-height: 1.4;
   color: light-dark(#555555, #eeeeee);
 `;
 
