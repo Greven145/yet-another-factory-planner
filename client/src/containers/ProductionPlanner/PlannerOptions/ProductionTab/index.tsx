@@ -2,6 +2,8 @@ import React, { useMemo, useRef } from 'react';
 import styled from 'styled-components';
 import { Button, Select, TextInput, Group, SegmentedControl } from '@mantine/core';
 import { useProductionContext } from '../../../../contexts/production';
+import { useGameDataContext } from '../../../../contexts/gameData';
+import { GV_1_2 } from '../../../../contexts/gameData/consts';
 import { POINTS_ITEM_KEY } from '../../../../utilities/production-solver/models';
 import { MAX_PRIORITY, MaximizeBalanceMode } from '../../../../contexts/production/consts';
 import { CollapsibleSection } from '../../../../components/Section';
@@ -34,6 +36,27 @@ const PIPE_TIER_OPTIONS = [
 ];
 
 const PIPE_PRESET_VALUES = new Set(['300', '600']);
+
+// 1.2 Game Mode cost multipliers — discrete preset values offered by the game.
+const RECIPE_COST_MULTIPLIER_OPTIONS = [
+  { value: '0.25', label: '0.25x' },
+  { value: '0.5', label: '0.5x' },
+  { value: '0.75', label: '0.75x' },
+  { value: '1', label: '1x (Default)' },
+  { value: '1.25', label: '1.25x' },
+  { value: '1.5', label: '1.5x' },
+  { value: '1.75', label: '1.75x' },
+  { value: '2', label: '2x' },
+];
+
+const POWER_CONSUMPTION_MULTIPLIER_OPTIONS = [
+  { value: '0.25', label: '0.25x' },
+  { value: '0.5', label: '0.5x' },
+  { value: '0.75', label: '0.75x' },
+  { value: '1', label: '1x (Default)' },
+  { value: '2', label: '2x' },
+  { value: '5', label: '5x' },
+];
 
 function getSelectValue(capacity: string | null, presets: Set<string>): string {
   if (capacity !== null && presets.has(capacity)) return capacity;
@@ -156,6 +179,7 @@ const balanceModeOptions = [
 
 const ProductionTab = () => {
   const ctx = useProductionContext();
+  const { gameVersion } = useGameDataContext();
 
   const itemOptions = useMemo(() => {
     const opts = Object.keys(ctx.gameData.items)
@@ -245,6 +269,38 @@ const ProductionTab = () => {
     )
   }
 
+  function renderGameModeInputs() {
+    const gameModeOptions = ctx.state.gameModeOptions;
+    return (
+      <Group grow>
+        <Select
+          label={<LabelWithTooltip label='Recipe Cost Multiplier' tooltip='Matches the Recipe Parts Cost multiplier from your save&apos;s Game Mode. Scales crafting ingredient costs (1 = default). Lower values reduce the resources each recipe consumes.' />}
+          data={RECIPE_COST_MULTIPLIER_OPTIONS}
+          value={gameModeOptions.recipePartsCost}
+          onChange={(value) => {
+            if (!value) return;
+            ctx.dispatch({
+              type: 'UPDATE_GAME_MODE_OPTIONS',
+              data: { ...gameModeOptions, recipePartsCost: value },
+            });
+          }}
+        />
+        <Select
+          label={<LabelWithTooltip label='Power Multiplier' tooltip='Matches the Power Consumption multiplier from your save&apos;s Game Mode. Scales building power draw (1 = default).' />}
+          data={POWER_CONSUMPTION_MULTIPLIER_OPTIONS}
+          value={gameModeOptions.powerConsumption}
+          onChange={(value) => {
+            if (!value) return;
+            ctx.dispatch({
+              type: 'UPDATE_GAME_MODE_OPTIONS',
+              data: { ...gameModeOptions, powerConsumption: value },
+            });
+          }}
+        />
+      </Group>
+    )
+  }
+
   function renderTransportOptions() {
     const opts: TransportOptions = ctx.state.transportOptions;
     const beltSelectValue = getSelectValue(opts.beltCapacity, BELT_PRESET_VALUES);
@@ -330,6 +386,14 @@ const ProductionTab = () => {
           Reset All Weights
         </Button>
       </CollapsibleSection>
+      {gameVersion === GV_1_2 && (
+        <CollapsibleSection title='Game Mode' tooltip='Match the cost multipliers from your save&apos;s Game Mode so the plan reflects your in-game resource and power costs.'>
+          {renderGameModeInputs()}
+          <Button color='red' onClick={() => { ctx.dispatch({ type: 'UPDATE_GAME_MODE_OPTIONS', data: { recipePartsCost: '1', powerConsumption: '1' } }) }} style={{ marginTop: '15px' }}>
+            Reset Game Mode
+          </Button>
+        </CollapsibleSection>
+      )}
       <CollapsibleSection title='Transport Capacity' tooltip='Cap the per-minute throughput of belts and pipes so the solver only produces solutions that fit your logistics tier.'>
         {renderTransportOptions()}
       </CollapsibleSection>

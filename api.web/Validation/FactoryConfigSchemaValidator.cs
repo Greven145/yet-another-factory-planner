@@ -10,6 +10,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
     [
         .. Enum.GetNames<GameVersion>(),
         "1.1",
+        "1.2",
     ];
 
     private static readonly HashSet<string> ValidModes = ["per-minute", "maximize", "rate"];
@@ -29,6 +30,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
             .Must(x => x.Count <= 500).WithMessage("InputResources must not exceed 500 items.");
         RuleForEach(x => x.InputResources).SetValidator(new InputValidator());
         RuleFor(x => x.WeightingOptions).NotNull().SetValidator(new WeightingOptionsValidator());
+        RuleFor(x => x.GameModeOptions).NotNull().SetValidator(new GameModeOptionsValidator());
         // AllowedRecipes may be empty (means all recipes are allowed)
         RuleFor(x => x.AllowedRecipes)
             .Must(x => x.Count <= 500).WithMessage("AllowedRecipes must not exceed 500 items.");
@@ -69,6 +71,15 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
             RuleFor(x => x.Power).NotNull();
             RuleFor(x => x.Complexity).NotNull();
             RuleFor(x => x.Buildings).NotNull();
+        }
+    }
+
+    private sealed class GameModeOptionsValidator : AbstractValidator<GameModeOptions>
+    {
+        public GameModeOptionsValidator()
+        {
+            RuleFor(x => x.RecipePartsCost).GreaterThan(0);
+            RuleFor(x => x.PowerConsumption).GreaterThan(0);
         }
     }
 

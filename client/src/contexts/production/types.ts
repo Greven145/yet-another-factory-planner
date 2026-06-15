@@ -14,6 +14,11 @@ export type WeightingOptions = {
   buildings: string,
 };
 
+export type GameModeOptions = {
+  recipePartsCost: string,
+  powerConsumption: string,
+};
+
 export type InputItemOptions = {
   key: string,
   itemKey: string,
@@ -44,6 +49,7 @@ export type FactoryOptions = {
   inputResources: InputItemOptions[],
   allowHandGatheredItems: boolean,
   weightingOptions: WeightingOptions,
+  gameModeOptions: GameModeOptions,
   allowedRecipes: RecipeSelectionMap,
   nodesPositions: NodeInfo[],
   maximizeBalanceMode: MaximizeBalanceMode,

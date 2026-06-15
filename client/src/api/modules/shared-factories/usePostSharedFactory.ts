@@ -15,7 +15,8 @@ export function usePostSharedFactory() {
   return useApi<PostSharedFactoryResponse, PostSharedFactoryRequest>(async (req) => {
     // Convert game version from "1.1" format to "V1_1" enum name
     const gameVersionToEnumName: { [key: string]: string } = {
-      "1.1": "V1_1"
+      "1.1": "V1_1",
+      "1.2": "V1_2"
     };
     
     const body = {
@@ -44,6 +45,10 @@ export function usePostSharedFactory() {
           power: Number(req.factoryConfig.weightingOptions.power),
           complexity: Number(req.factoryConfig.weightingOptions.complexity),
           buildings: Number(req.factoryConfig.weightingOptions.buildings),
+        },
+        gameModeOptions: {
+          recipePartsCost: Number(req.factoryConfig.gameModeOptions.recipePartsCost),
+          powerConsumption: Number(req.factoryConfig.gameModeOptions.powerConsumption),
         },
         allowedRecipes: Object.keys(req.factoryConfig.allowedRecipes).filter((key) => req.factoryConfig.allowedRecipes[key]),
         nodesPositions: req.factoryConfig.nodesPositions,

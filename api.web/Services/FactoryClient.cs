@@ -77,6 +77,8 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
     {
         "1.1" => "V1_1",
         "V1_1" => "V1_1",
+        "1.2" => "V1_2",
+        "V1_2" => "V1_2",
         _ => gameVersion,
     };
 }

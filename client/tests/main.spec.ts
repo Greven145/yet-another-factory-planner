@@ -22,9 +22,9 @@ test.describe('Factory Planner Application', () => {
     });
   });
 
-  test('should load application with default 1.1 game version', async ({ page }) => {
+  test('should load application with default 1.2 game version', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/\[1\.1\]/);
+    await expect(page).toHaveTitle(/\[1\.2\]/);
   });
 
   test('should display game version selector', async ({ page }) => {
@@ -295,5 +295,68 @@ test.describe('Factory Planner Application', () => {
     const saveShareBtn = page.getByRole('button', { name: 'Save & Share' });
     await expect(saveShareBtn).toBeVisible();
     await expect(saveShareBtn).toBeEnabled();
+  });
+
+  test('should send game mode multipliers in the save & share request', async ({ page }) => {
+    // Capture the outgoing /share-factory body and return a stub key.
+    let sharedBody: any = null;
+    await page.route(/\/share-factory$/, async (route) => {
+      sharedBody = route.request().postDataJSON();
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { key: 'e2ekey0000000000' } }),
+      });
+    });
+
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+
+    // A production goal is required before sharing.
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    await page.getByPlaceholder('Select an item').click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+
+    // Set the 1.2 Game Mode multipliers (section is gated to the 1.2 version, which is the default).
+    await page.getByRole('combobox', { name: 'Recipe Cost Multiplier' }).click();
+    await page.getByRole('option', { name: '0.5x', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Power Multiplier' }).click();
+    await page.getByRole('option', { name: '2x', exact: true }).click();
+
+    await page.getByRole('button', { name: 'Save & Share' }).click();
+
+    await expect.poll(() => sharedBody).not.toBeNull();
+    expect(sharedBody.factoryConfig.gameModeOptions).toEqual({
+      recipePartsCost: 0.5,
+      powerConsumption: 2,
+    });
+  });
+
+  test('should restore game mode multipliers from a shared link', async ({ page }) => {
+    // When a factoryKey is present, return a saved config carrying non-default multipliers.
+    await page.route(/\/initialize(\?.*)?$/, async (route) => {
+      const body = JSON.parse(fixtureResponse);
+      if (route.request().url().includes('factoryKey=')) {
+        body.data.factory_config = {
+          gameVersion: 'V1_2',
+          productionItems: [{ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 10 }],
+          inputItems: [],
+          inputResources: [],
+          allowHandGatheredItems: false,
+          weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
+          gameModeOptions: { recipePartsCost: 0.5, powerConsumption: 2 },
+          allowedRecipes: [],
+          nodesPositions: [],
+        };
+      }
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    });
+
+    await page.goto('/?factory=e2ekey0000000000');
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+
+    // The dropdowns should reflect the saved multipliers, not the defaults.
+    await expect(page.getByRole('combobox', { name: 'Recipe Cost Multiplier' })).toHaveValue('0.5x');
+    await expect(page.getByRole('combobox', { name: 'Power Multiplier' })).toHaveValue('2x');
   });
 });

@@ -130,6 +130,10 @@ function createValidOptions(overrides?: Partial<FactoryOptions>): FactoryOptions
       complexity: '0',
       buildings: '0',
     },
+    gameModeOptions: {
+      recipePartsCost: '1',
+      powerConsumption: '1',
+    },
     allowedRecipes: {
       'Recipe_IronIngot_C': true,
       'Recipe_IronPlate_C': true,

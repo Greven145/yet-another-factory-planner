@@ -96,7 +96,12 @@ export class ProductionSolver {
   private pipeCapacity: number | null;
 
   public constructor(options: FactoryOptions, gameData: GameData) {
-    this.gameData = gameData;
+    // Apply 1.2 Game Mode cost multipliers (default 1 = no scaling, e.g. for 1.1 or default mode).
+    const recipeCostMultiplier = options.gameModeOptions ? Number(options.gameModeOptions.recipePartsCost) : 1;
+    const powerMultiplier = options.gameModeOptions ? Number(options.gameModeOptions.powerConsumption) : 1;
+    this.validateNumber(recipeCostMultiplier);
+    this.validateNumber(powerMultiplier);
+    this.gameData = ProductionSolver.applyGameModeMultipliers(gameData, recipeCostMultiplier, powerMultiplier);
     this.maximizeBalanceMode = options.maximizeBalanceMode;
 
     const rawBelt = options.transportOptions?.beltCapacity;
@@ -294,6 +299,33 @@ export class ProductionSolver {
     } else if (num < 0) {
       throw new GraphError('INVALID VALUE: NEGATIVE NUMBER', 'Double check your factory settings.');
     }
+  }
+
+  // Returns a copy of gameData with 1.2 Game Mode multipliers baked in: recipe ingredient costs
+  // scaled by recipeCostMultiplier (outputs untouched) and consumer power scaled by powerMultiplier
+  // (generators, power < 0, left alone). All downstream solver/report logic then reads scaled values.
+  private static applyGameModeMultipliers(gameData: GameData, recipeCostMultiplier: number, powerMultiplier: number): GameData {
+    if (recipeCostMultiplier === 1 && powerMultiplier === 1) {
+      return gameData;
+    }
+
+    const recipes: GameData['recipes'] = {};
+    for (const [key, recipe] of Object.entries(gameData.recipes)) {
+      recipes[key] = recipeCostMultiplier === 1 ? recipe : {
+        ...recipe,
+        ingredients: recipe.ingredients.map((i) => ({ ...i, perMinute: i.perMinute * recipeCostMultiplier })),
+      };
+    }
+
+    const buildings: GameData['buildings'] = {};
+    for (const [key, building] of Object.entries(gameData.buildings)) {
+      buildings[key] = (powerMultiplier === 1 || building.power <= 0) ? building : {
+        ...building,
+        power: building.power * powerMultiplier,
+      };
+    }
+
+    return { ...gameData, recipes, buildings };
   }
 
   public async exec(): Promise<SolverResults> {

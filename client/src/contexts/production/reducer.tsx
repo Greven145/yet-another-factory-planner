@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { decodeState_v1_U5 } from './legacy-state-decoders/v1_U5';
 import { decodeState_v2_U5 } from './legacy-state-decoders/v2_U5';
 import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
-import { ProductionItemOptions, InputItemOptions, WeightingOptions, RecipeSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
+import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, RecipeSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
 import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 
@@ -77,6 +77,13 @@ function getInitialWeightingOptions(): WeightingOptions {
   };
 }
 
+function getInitialGameModeOptions(): GameModeOptions {
+  return {
+    recipePartsCost: '1',
+    powerConsumption: '1',
+  };
+}
+
 function getInitialTransportOptions(): TransportOptions {
   return {
     beltCapacity: null,
@@ -100,6 +107,7 @@ export function getInitialState(gameData: GameData): FactoryOptions {
     inputResources: getInitialInputResources(gameData.resources),
     allowHandGatheredItems: false,
     weightingOptions: getInitialWeightingOptions(),
+    gameModeOptions: getInitialGameModeOptions(),
     allowedRecipes: getInitialAllowedRecipes(gameData.recipes),
     nodesPositions: [],
     maximizeBalanceMode: DEFAULT_MAXIMIZE_BALANCE_MODE,
@@ -124,6 +132,7 @@ export type FactoryAction =
   | { type: 'SET_RESOURCES_TO_0' }
   | { type: 'SET_ALLOW_HAND_GATHERED_ITEMS', active: boolean }
   | { type: 'UPDATE_WEIGHTING_OPTIONS', data: WeightingOptions }
+  | { type: 'UPDATE_GAME_MODE_OPTIONS', data: GameModeOptions }
   | { type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: GameData }
   | { type: 'SET_RECIPE_ACTIVE', key: string, active: boolean }
   | { type: 'MASS_SET_RECIPES_ACTIVE', recipes: string[], active: boolean }
@@ -252,6 +261,10 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
       const newWeightingOptions = { ...action.data };
       return { ...state, weightingOptions: newWeightingOptions };
     }
+    case 'UPDATE_GAME_MODE_OPTIONS': {
+      const newGameModeOptions = { ...action.data };
+      return { ...state, gameModeOptions: newGameModeOptions };
+    }
     case 'SET_ALL_WEIGHTS_DEFAULT': {
       const newWeightingOptions = getInitialWeightingOptions();
       const newInputResources = state.inputResources
@@ -299,6 +312,11 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
         newState.weightingOptions.power = String(action.config.weightingOptions.power);
         newState.weightingOptions.complexity = String(action.config.weightingOptions.complexity);
         newState.weightingOptions.buildings = String(action.config.weightingOptions.buildings);
+        // gameModeOptions added in 1.2; default to 1x for pre-1.2 shared factories that lack it.
+        if (action.config.gameModeOptions) {
+          newState.gameModeOptions.recipePartsCost = String(action.config.gameModeOptions.recipePartsCost);
+          newState.gameModeOptions.powerConsumption = String(action.config.gameModeOptions.powerConsumption);
+        }
         (action.config.allowedRecipes as any[]).forEach((key) => {
           if (newState.allowedRecipes[key] != null) {
             newState.allowedRecipes[key] = true;
@@ -328,6 +346,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
           ...action.sessionState,
           maximizeBalanceMode: action.sessionState.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
           transportOptions: action.sessionState.transportOptions ?? getInitialTransportOptions(),
+          gameModeOptions: action.sessionState.gameModeOptions ?? getInitialGameModeOptions(),
         };
       } catch (e) {
         console.error(e);

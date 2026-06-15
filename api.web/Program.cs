@@ -3,7 +3,6 @@ using api.Models;
 using api.Validation;
 using api.web.Services;
 using api.web.Data;
-using api.web.Resources;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -97,15 +96,25 @@ app.MapGet("/initialize", async (
 {
     try
     {
-        gameVersion ??= "1.1";
+        gameVersion ??= "1.2";
+
+        var gameData = gameVersion switch
+        {
+            "1.1" or "V1_1" => GameData.V1_1Data,
+            "1.2" or "V1_2" => GameData.V1_2Data,
+            _ => null,
+        };
+
+        if (gameData is null)
+            return Results.BadRequest(new { message = $"Invalid game version: {gameVersion}" });
 
         var gameDataDict = new Dictionary<string, object>();
 
-        var buildings = V1_1.buildings;
-        var recipes = V1_1.recipes;
-        var resources = V1_1.resources;
-        var items = V1_1.items;
-        var handGatheredItems = V1_1.handGatheredItems;
+        var buildings = gameData.Buildings;
+        var recipes = gameData.Recipes;
+        var resources = gameData.Resources;
+        var items = gameData.Items;
+        var handGatheredItems = gameData.HandGatheredItems;
 
         if (!string.IsNullOrEmpty(buildings))
             gameDataDict["buildings"] = System.Text.Json.JsonSerializer.Deserialize<object>(buildings)!;
@@ -173,6 +182,7 @@ app.MapPost("/share-factory", async (
             inputResources = config.InputResources.OrderBy(x => x.ItemKey),
             allowedRecipes = config.AllowedRecipes.OrderBy(x => x),
             weightingOptions = config.WeightingOptions,
+            gameModeOptions = config.GameModeOptions,
             allowHandGatheredItems = config.AllowHandGatheredItems,
         });
         var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
