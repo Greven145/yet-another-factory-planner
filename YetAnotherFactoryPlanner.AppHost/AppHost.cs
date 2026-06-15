@@ -42,7 +42,7 @@ var api = builder.AddProject<Projects.api_web>("api")
 
 api.PublishAsAzureContainerApp((infra, containerApp) =>
 {
-    containerApp.Template.Scale.MinReplicas = 0; // scale to zero when idle
+    containerApp.Template.Scale.MinReplicas = 1; // keep one warm replica: scale-to-zero measured ~27s cold starts
     containerApp.Template.Scale.MaxReplicas = 3;
 });
 
