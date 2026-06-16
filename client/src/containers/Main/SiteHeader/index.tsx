@@ -52,7 +52,7 @@ const SiteHeader = () => {
         >
           {computedColorScheme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </ActionIcon>
-        <SocialIcon href='https://github.com/greven145/yet-another-factory-planner' icon={<FontAwesomeIcon icon={faGithub} fontSize={32} />} />
+        <SocialIcon href='https://github.com/greven145/yet-another-factory-planner' label='View source on GitHub' icon={<FontAwesomeIcon icon={faGithub} fontSize={32} />} />
       </RightAlign>
     </HeaderContainer>
   );

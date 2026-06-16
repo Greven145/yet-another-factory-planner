@@ -55,7 +55,7 @@ const PlannerOptions = () => {
         </Group>
         <Group style={{ marginBottom: '15px' }}>
           <Button
-            color='green'
+            color='positive.8'
             onClick={() => { ctx.generateShareLink(); }}
             loading={ctx.shareLink.loading}
             style={{ width: '125px' }}
@@ -67,6 +67,7 @@ const PlannerOptions = () => {
             onClose={() => setPopoverOpened(false)}
             position='right'
             withArrow
+            withRoles={false}
           >
             <Popover.Target>
               <TextInput
@@ -85,7 +86,7 @@ const PlannerOptions = () => {
         <Space />
         <Group style={{ marginBottom: '15px' }} justify='flex-end'>
           <Button
-            color='red'
+            color='danger.8'
             onClick={() => { setResetConfirmOpen(true); }}
           >
             Reset ALL Factory Options

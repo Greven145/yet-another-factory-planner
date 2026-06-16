@@ -254,17 +254,14 @@ const GraphButtonGroup = styled(Group)`
 `;
 
 //Extend the mantine/core button component to add a custom style
+// The button overlays the (transparent) graph, so any resting transparency
+// composites the label against an unknown backdrop and tanks contrast — a faded
+// rest state measured ~1:1 (and even 0.92 fell to 3.95:1). Keep it fully opaque
+// so the white label always meets WCAG AA against the solid button background.
 const GraphButton = styled(Button)<ButtonProps & React.ComponentPropsWithoutRef<'button'>>`
-  opacity: 0.25;
   border: 1px solid light-dark(rgba(0,0,0,0.15), rgba(255,255,255,0.1));
   border-radius: 5px;
   padding: 5px;
-  &:hover {
-    opacity: 0.8;
-  }
-  &:active {
-    opacity: 1;
-  }
 `;
 
 function getNodeLabel(node: GraphNode, gameData: GameData) {

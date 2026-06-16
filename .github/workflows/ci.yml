@@ -80,13 +80,12 @@ jobs:
         working-directory: client
         run: npx playwright install --with-deps chromium
 
-      # Report-only baseline: the app currently has known WCAG A/AA violations.
-      # This step surfaces them (artifact below) without failing the build.
-      # Promote to a blocking gate once the violations are resolved.
-      - name: Accessibility e2e (axe) — report-only baseline
+      # Blocking gate: the scanned surfaces must report zero WCAG 2.0 A/AA
+      # violations (axe-core via Playwright). The graph canvas is excluded as a
+      # separate tracked follow-up; see client/tests/a11y.spec.ts.
+      - name: Accessibility e2e (axe)
         working-directory: client
         run: npm run test:e2e
-        continue-on-error: true
 
       - name: Upload accessibility reports
         if: always()
