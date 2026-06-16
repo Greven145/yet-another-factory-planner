@@ -100,7 +100,7 @@ const GlobalStylesheet = createGlobalStyle<any>`
     padding: 7px 18px !important;
     border: none !important;
     border-radius: 4px !important;
-    color: light-dark(#6b6459, #b0a89c) !important;
+    color: light-dark(#666058, #b0a89c) !important;
     background-color: transparent !important;
     transition: background-color 120ms ease, color 120ms ease;
   }
@@ -112,7 +112,7 @@ const GlobalStylesheet = createGlobalStyle<any>`
 
   :root .segmented-tabs button[role="tab"][data-active],
   :root .segmented-tabs button[role="tab"][data-active]:hover {
-    background-color: #ec7821 !important;
+    background-color: #b0581a !important;
     color: #ffffff !important;
   }
 
@@ -139,7 +139,7 @@ const GlobalStylesheet = createGlobalStyle<any>`
   :root .hud-segmented .mantine-SegmentedControl-indicator {
     border-radius: 4px !important;
     box-shadow: none !important;
-    background-color: #ec7821 !important;
+    background-color: #b0581a !important;
   }
 
   // Hide the divider Mantine draws between inactive segments.
@@ -153,7 +153,7 @@ const GlobalStylesheet = createGlobalStyle<any>`
     letter-spacing: 0.5px;
     font-weight: 600;
     padding: 5px 16px;
-    color: light-dark(#6b6459, #b0a89c) !important;
+    color: light-dark(#666058, #b0a89c) !important;
     transition: color 120ms ease;
   }
 

@@ -5,12 +5,13 @@ import { Anchor } from '@mantine/core';
 interface Props {
   href: string;
   icon: React.ReactNode;
+  label: string;
 }
 
 const SocialIcon = (props: Props) => {
-  const { href, icon } = props;
+  const { href, icon, label } = props;
   return (
-    <SAnchor href={href} target='_blank' rel='noopener noreferrer'>
+    <SAnchor href={href} target='_blank' rel='noopener noreferrer' aria-label={label} title={label}>
       {icon || null}
     </SAnchor>
   );

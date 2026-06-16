@@ -28,7 +28,7 @@ export const graphColors = {
 export const theme: MantineThemeOverride = {
   primaryColor: 'primary',
   colors: {
-    'primary': ["#fcebde", "#f9d8be", "#f7c59f", "#f4b17f", "#f19e60", "#ef8b40", "#ec7821", "#c4631c", "#94501e", "#673c1c"],
+    'primary': ["#fcebde", "#f9d8be", "#f7c59f", "#f4b17f", "#f19e60", "#ef8b40", "#b0581a", "#a4521a", "#94501e", "#673c1c"],
     'positive': ["#e9f3ea", "#d5e8d6", "#c1ddc2", "#acd2ae", "#98c69a", "#83bb86", "#6fb072", "#58965c", "#49744b", "#39543a"],
     'danger': ["#fdb5b5", "#fda3a3", "#fc9191", "#fc7e7e", "#fb6c6c", "#fa5959", "#fa4747", "#f12929", "#dc1818", "#b21b1b"],
     'background': ["#26282b", "#373b40", "#3f434a", "#50565e", "#6c7582", "#ffffff", "#ffffff", "#ffffff", "#b3b6ba", "#ffffff"],
@@ -60,7 +60,7 @@ export const theme: MantineThemeOverride = {
     AppShell: {
       styles: {
         root: { minHeight: '100vh' },
-        header: { background: '#ec7821', borderBottom: 'none', padding: '10px', overflow: 'hidden' },
+        header: { background: '#b0581a', borderBottom: 'none', padding: '10px', overflow: 'hidden' },
         main: { background: 'transparent', paddingTop: '80px', paddingBottom: '0px' },
       },
     },
