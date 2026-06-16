@@ -1,0 +1,23 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "npm run preview",
+      "startServerReadyPattern": "Local",
+      "startServerReadyTimeout": 30000,
+      "url": ["http://localhost:4173/"],
+      "numberOfRuns": 1,
+      "settings": {
+        "onlyCategories": ["accessibility"]
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:accessibility": ["error", { "minScore": 0.9 }]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}

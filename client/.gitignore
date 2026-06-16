@@ -9,6 +9,9 @@
 
 # testing
 /coverage
+/.lighthouseci
+/playwright-report
+/test-results
 
 # production
 /build

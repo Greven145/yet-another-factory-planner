@@ -53,11 +53,47 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
         working-directory: client
         run: npm ci
 
+      - name: Lint (ESLint + jsx-a11y)
+        working-directory: client
+        run: npm run lint
+
+      - name: Unit tests (Vitest + jest-axe)
+        working-directory: client
+        run: npm run test
+
       - name: Build
         working-directory: client
         run: npm run build
+
+      - name: Lighthouse accessibility score
+        working-directory: client
+        run: npm run a11y:lhci
+
+      - name: Install Playwright browsers
+        working-directory: client
+        run: npx playwright install --with-deps chromium
+
+      # Report-only baseline: the app currently has known WCAG A/AA violations.
+      # This step surfaces them (artifact below) without failing the build.
+      # Promote to a blocking gate once the violations are resolved.
+      - name: Accessibility e2e (axe) — report-only baseline
+        working-directory: client
+        run: npm run test:e2e
+        continue-on-error: true
+
+      - name: Upload accessibility reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-a11y-reports
+          path: |
+            client/playwright-report
+            client/.lighthouseci
+          if-no-files-found: ignore

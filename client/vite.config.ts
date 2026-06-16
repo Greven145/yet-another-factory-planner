@@ -58,6 +58,7 @@ export default defineConfig({
     include: ['src/**/*.{spec,test}.{ts,tsx}'],
     environment: 'jsdom',
     globals: true,
+    setupFiles: ['./src/setupTests.ts'],
     alias: {
       'glpk.js': 'glpk.js/node',
     },
