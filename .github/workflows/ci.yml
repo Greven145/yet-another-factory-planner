@@ -1,10 +1,11 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 env:
   DOTNET_NOLOGO: true
@@ -78,15 +79,14 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: client
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
-      # Report-only baseline: the app currently has known WCAG A/AA violations.
-      # This step surfaces them (artifact below) without failing the build.
-      # Promote to a blocking gate once the violations are resolved.
-      - name: Accessibility e2e (axe) — report-only baseline
+      # Blocking gate: the scanned surfaces must report zero WCAG 2.0 A/AA
+      # violations (axe-core via Playwright). The graph canvas is excluded as a
+      # separate tracked follow-up; see client/tests/a11y.spec.ts.
+      - name: Accessibility e2e (axe)
         working-directory: client
         run: npm run test:e2e
-        continue-on-error: true
 
       - name: Upload accessibility reports
         if: always()
@@ -97,3 +97,87 @@ jobs:
             client/playwright-report
             client/.lighthouseci
           if-no-files-found: ignore
+
+  # Production deploy gate: this job only runs after both build jobs above
+  # succeed, and only on a push to main or a manual run. A red CI therefore
+  # blocks the deploy. Manual runs (workflow_dispatch) still run CI first.
+  deploy:
+    name: Deploy to Azure
+    needs: [build-and-test, build-frontend]
+    # Only ever deploy main: a push to main, or a manual run targeting main.
+    # workflow_dispatch can be launched from any branch, so guard the ref too.
+    if: >-
+      github.ref == 'refs/heads/main'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # Serialize production deploys so overlapping merges to main don't run
+    # concurrent azd provision/deploy against the same environment.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          # Match the Node version CI validates the client under (build-frontend
+          # uses 20) so the shipped artifact is built on the same runtime.
+          node-version: '20'
+
+      - name: Log in with Azure (Federated Credentials)
+        run: |
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider "github" \
+            --tenant-id "$AZURE_TENANT_ID"
+
+      - name: Provision Infrastructure
+        run: azd provision --no-prompt
+
+      - name: Deploy API
+        run: azd deploy api --no-prompt
+
+      - name: Build web client
+        run: |
+          caDomain=$(azd env get-value AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)
+          if [ -z "$caDomain" ]; then
+            echo "ERROR: AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN is empty — provision must run first" >&2
+            exit 1
+          fi
+          apiUrl="https://api.$caDomain"
+          echo "VITE_REACT_APP_API_BASE_URL=$apiUrl" > client/.env.production
+          npm ci --prefix client
+          npm run build --prefix client
+
+      - name: Deploy web to Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: client/dist
+          skip_app_build: true
+          skip_api_build: true

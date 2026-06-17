@@ -33,8 +33,8 @@ export default [
       'react-hooks': reactHooks,
     },
     rules: {
-      // Primary purpose: jsx-a11y recommended accessibility rules.
-      ...jsxA11y.configs.recommended.rules,
+      // Primary purpose: jsx-a11y strict accessibility rules.
+      ...jsxA11y.configs.strict.rules,
 
       // Register react-hooks so the inline `// eslint-disable-next-line
       // react-hooks/exhaustive-deps` comments in src/ don't error as unknown

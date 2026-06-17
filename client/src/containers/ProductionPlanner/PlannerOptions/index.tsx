@@ -55,7 +55,7 @@ const PlannerOptions = () => {
         </Group>
         <Group style={{ marginBottom: '15px' }}>
           <Button
-            color='green'
+            color='positive.8'
             onClick={() => { ctx.generateShareLink(); }}
             loading={ctx.shareLink.loading}
             style={{ width: '125px' }}
@@ -67,6 +67,7 @@ const PlannerOptions = () => {
             onClose={() => setPopoverOpened(false)}
             position='right'
             withArrow
+            withRoles={false}
           >
             <Popover.Target>
               <TextInput
@@ -85,7 +86,7 @@ const PlannerOptions = () => {
         <Space />
         <Group style={{ marginBottom: '15px' }} justify='flex-end'>
           <Button
-            color='red'
+            color='danger.8'
             onClick={() => { setResetConfirmOpen(true); }}
           >
             Reset ALL Factory Options
@@ -96,12 +97,22 @@ const PlannerOptions = () => {
         opened={resetConfirmOpen}
         onClose={() => setResetConfirmOpen(false)}
         title="Reset ALL Factory Options"
+        closeButtonProps={{ 'aria-label': 'Close' }}
       >
         <Text>Are you sure? This will clear all production goals, inputs, and recipe settings.</Text>
         <Group justify='flex-end' style={{ marginTop: '20px' }}>
-          <Button variant='default' onClick={() => setResetConfirmOpen(false)}>Cancel</Button>
           <Button
-            color='red'
+            variant='default'
+            onClick={() => setResetConfirmOpen(false)}
+            // The global Button theme forces white labels (for filled colored
+            // buttons); the default variant needs the readable theme text color
+            // so it isn't white-on-light. See WCAG contrast scan in a11y.spec.ts.
+            styles={{ root: { color: 'var(--mantine-color-text)' } }}
+          >
+            Cancel
+          </Button>
+          <Button
+            color='danger.8'
             onClick={() => {
               ctx.dispatch({ type: 'RESET_FACTORY', gameData: ctx.gameData });
               setResetConfirmOpen(false);

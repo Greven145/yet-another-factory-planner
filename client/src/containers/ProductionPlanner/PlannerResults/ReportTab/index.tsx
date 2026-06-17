@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import { Title, Text, Container, Group } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
@@ -192,6 +192,14 @@ const StatCard = styled.div<{ $accent?: boolean }>`
   background: ${({ theme, $accent }) => $accent ? theme.colors.primary[8] : 'light-dark(#e9ecef, #3f434a)'};
   border-radius: 4px;
   padding: 12px 14px;
+
+  /* The accent card uses the dark primary[8] background, so its text must be
+     light to keep WCAG AA contrast (dark-on-brown failed at ~1-2.5:1). */
+  ${({ $accent }) => $accent && css`
+    ${StatLabel} { color: #fff; }
+    ${StatValue} { color: #fff; }
+    ${StatUnit} { opacity: 1; }
+  `}
 `;
 
 const StatLabel = styled.div`
@@ -229,7 +237,7 @@ const StepTitle = styled(Title)`
   font-size: 15px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  opacity: 0.6;
+  opacity: 0.72;
   margin-bottom: 6px;
 `;
 
@@ -262,7 +270,7 @@ const ItemCellRate = styled.div`
 `;
 
 const LoopWarning = styled.div`
-  background: ${({ theme }) => theme.colors.danger[6]};
+  background: ${({ theme }) => theme.colors.danger[8]};
   color: #fff;
   border-radius: 4px;
   padding: 8px 14px;

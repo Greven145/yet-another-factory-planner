@@ -38,6 +38,7 @@ const InputsTab = () => {
               style={{ flex: '1 1 0' }}
             />
             <TextInput
+              aria-label='Input item amount'
               placeholder='Amount'
               className='no-spinner'
               type='number'
@@ -84,6 +85,7 @@ const InputsTab = () => {
           <ResourceRow key={data.key}>
             <ResourceName>{ctx.gameData.items[data.itemKey].name}</ResourceName>
             <TextInput
+              aria-label={`${ctx.gameData.items[data.itemKey].name} amount`}
               className='no-spinner'
               type='number'
               min='0'
@@ -100,6 +102,7 @@ const InputsTab = () => {
             />
             <ResourceCheckboxCell>
               <Checkbox
+                aria-label={`${ctx.gameData.items[data.itemKey].name} unlimited`}
                 checked={data.unlimited}
                 onChange={(e) => {
                   ctx.dispatch({
@@ -110,6 +113,7 @@ const InputsTab = () => {
               />
             </ResourceCheckboxCell>
             <TextInput
+              aria-label={`${ctx.gameData.items[data.itemKey].name} weight`}
               className='no-spinner'
               type='number'
               min='0'
@@ -139,10 +143,10 @@ const InputsTab = () => {
       </CollapsibleSection>
       <CollapsibleSection title='Raw Resources' tooltip='Set how much of each raw resource is available and its weight. Weight is a relative cost the solver pays per unit consumed: raise it to make a resource "precious" so the solver avoids it and favours recipes that lean on cheaper resources; lower it (or set 0) to use it freely. Weights are relative to each other and only take effect when Resource Efficiency (under Weighting Options) is above 0.'>
         <Group style={{ marginBottom: '12px' }}>
-          <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
+          <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_MAP_LIMITS', gameData: ctx.gameData }) }}>
             Set All To Maximum
           </Button>
-          <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_0' }) }}>
+          <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'SET_RESOURCES_TO_0' }) }}>
             Set All To 0
           </Button>
         </Group>
@@ -188,7 +192,7 @@ const ResourceHeaderCell = styled.div`
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  opacity: 0.6;
+  opacity: 0.72;
   color: light-dark(#212529, #eee);
 `;
 
