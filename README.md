@@ -85,6 +85,16 @@ Notes:
 - The AppHost includes the Vite client only in `Development` and `Testing` environments for local workflows.
 - Production deploys from this AppHost target the API/Cosmos backend stack; keep Static Web Apps as the public frontend.
 
+### CI/CD & deploy gating
+
+Production deploys are **gated on CI**. The single `CI` workflow (`.github/workflows/ci.yml`) runs build/test jobs on every push and pull request to `main`, and a `Deploy to Azure` job that only runs **after** both `Build & Test (.NET)` and `Build (Frontend)` succeed. A red CI run therefore blocks the deploy.
+
+- **Pushes/PRs that fail CI do not deploy** — the deploy job lists the build jobs in `needs:`, so it never starts when they fail.
+- **Pushes to `main`** that pass CI deploy to production automatically (every merge).
+- **Manual deploys**: trigger the `CI` workflow via *Actions → Run workflow* (`workflow_dispatch`). CI still runs first; there is no CI-bypassing deploy.
+
+See [`docs/adr/0001-ci-gated-production-deploys.md`](docs/adr/0001-ci-gated-production-deploys.md) for the decision and rejected alternatives.
+
 ---
 
 # Legacy Environment (for Comparison)
