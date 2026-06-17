@@ -591,7 +591,7 @@ const ProductionGraphTab = () => {
     });
 
     return { key: graphKey, elements };
-  }, [resultsGraph, ctx.gameData]);
+  }, [resultsGraph, ctx.gameData, graphKey]);
 
   return (
     <>
