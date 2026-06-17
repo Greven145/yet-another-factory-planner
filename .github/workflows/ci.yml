@@ -79,7 +79,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: client
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox webkit
 
       # Blocking gate: the scanned surfaces must report zero WCAG 2.0 A/AA
       # violations (axe-core via Playwright). The graph canvas is excluded as a
