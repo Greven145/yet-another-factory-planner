@@ -1,0 +1,63 @@
+name: Build CI image
+
+# Builds and publishes the reusable frontend CI image (Playwright browsers +
+# system libs + Node 20 + baked npm deps) to GHCR. The CI workflow's
+# `build-frontend` job runs inside this image so it no longer pays the per-run
+# cost of `npm ci` + `playwright install --with-deps`.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - client/package.json
+      - client/package-lock.json
+      - client/Dockerfile.ci
+      - .github/workflows/build-ci-image.yml
+  schedule:
+    # Weekly rebuild to pick up base-image security patches even when deps
+    # don't change (Mondays 06:00 UTC).
+    - cron: '0 6 * * 1'
+
+env:
+  IMAGE: ghcr.io/greven145/yet-another-factory-planner/frontend-ci
+
+jobs:
+  build-image:
+    name: Build & push frontend CI image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve Playwright version
+        id: pw
+        working-directory: client
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: client
+          file: client/Dockerfile.ci
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:pw-${{ steps.pw.outputs.version }}
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

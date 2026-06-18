@@ -47,19 +47,27 @@ jobs:
   build-frontend:
     name: Build (Frontend)
     runs-on: ubuntu-latest
+    # Run inside the prebuilt CI image (Playwright browsers + system libs +
+    # Node 20 + baked npm deps), published by build-ci-image.yml. This removes
+    # the per-run `npm ci` + `playwright install --with-deps` cost. --ipc=host
+    # is Playwright's recommended flag to stop Chromium running out of memory.
+    container:
+      image: ghcr.io/greven145/yet-another-factory-planner/frontend-ci:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --ipc=host
 
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          cache: npm
-          cache-dependency-path: client/package-lock.json
-
-      - name: Install dependencies
+      # The baked dependencies live at /opt/ci/node_modules in the image; the
+      # checkout above is a fresh tree, so copy them into the workspace. The
+      # image is rebuilt whenever client/package-lock.json changes, so this
+      # stays in sync with the committed lockfile.
+      - name: Restore baked node_modules
         working-directory: client
-        run: npm ci
+        run: cp -a /opt/ci/node_modules ./node_modules
 
       - name: Lint (ESLint + jsx-a11y)
         working-directory: client
@@ -76,10 +84,6 @@ jobs:
       - name: Lighthouse accessibility score
         working-directory: client
         run: npm run a11y:lhci
-
-      - name: Install Playwright browsers
-        working-directory: client
-        run: npx playwright install --with-deps chromium firefox webkit
 
       # Blocking gate: the scanned surfaces must report zero WCAG 2.0 A/AA
       # violations (axe-core via Playwright). The graph canvas is excluded as a
