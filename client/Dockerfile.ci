@@ -1,0 +1,28 @@
+# Reusable CI image for the client's E2E (Playwright) and A11y (axe + Lighthouse)
+# tests. It bakes the Playwright browsers, their system libraries, Node, and the
+# client's npm dependencies so the GitHub Actions `build-frontend` job no longer
+# pays the per-run cost of `npm ci` + `playwright install --with-deps`.
+#
+# IMPORTANT: the base image tag is coupled to the @playwright/test version in
+# client/package-lock.json (currently 1.58.2). When Playwright is bumped, bump
+# this tag to match or the baked browsers won't match the installed client.
+FROM mcr.microsoft.com/playwright:v1.58.2-noble
+
+# The Playwright image ships Node 24, but the rest of CI (and the deploy build)
+# standardizes on Node 20. Pin Node 20 here for parity so tests/build run under
+# the same runtime everywhere.
+RUN npm install -g n \
+    && n 20 \
+    && node --version
+
+WORKDIR /opt/ci
+
+# Copy manifests first so `npm ci` is cached unless the lockfile changes.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Point Lighthouse (lhci -> chrome-launcher reads CHROME_PATH) at the Playwright
+# chromium already in the base image so it never downloads its own Chrome.
+# Resolve the path via playwright-core so we don't hardcode the browser build no.
+RUN ln -s "$(node -e "console.log(require('playwright-core').chromium.executablePath())")" /usr/local/bin/chrome-for-ci
+ENV CHROME_PATH=/usr/local/bin/chrome-for-ci
