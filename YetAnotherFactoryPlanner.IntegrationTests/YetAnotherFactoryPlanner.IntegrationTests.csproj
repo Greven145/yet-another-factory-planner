@@ -32,7 +32,14 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <Target Name="InstallPlaywright" AfterTargets="Build">
+  <!--
+    Install the Playwright browser after building so a local `dotnet test` of
+    this project has Chromium available. Skipped when CI=true (set by GitHub
+    Actions): CI builds the solution but never runs these integration tests, so
+    the download is wasted and made the .NET build flaky (transient ECONNRESET).
+    When these tests are added to CI, install browsers in a dedicated step.
+  -->
+  <Target Name="InstallPlaywright" AfterTargets="Build" Condition="'$(CI)' != 'true'">
     <Exec Command="pwsh $(OutputPath)playwright.ps1 install chromium" />
   </Target>
 
