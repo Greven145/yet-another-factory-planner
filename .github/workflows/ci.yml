@@ -191,4 +191,3 @@ jobs:
           action: upload
           app_location: client/dist
           skip_app_build: true
-          skip_api_build: true
