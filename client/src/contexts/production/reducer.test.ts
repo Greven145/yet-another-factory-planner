@@ -492,12 +492,18 @@ describe('reducer', () => {
     });
 
     it('returns initial state on error', () => {
+      // The reducer logs the caught error via console.error; silence it here
+      // (and assert it fired) so this expected-error path doesn't print a
+      // TypeError to the test output.
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const result = reducer(createInitialState(), {
         type: 'LOAD_FROM_SHARED_FACTORY',
         config: null,
         gameData: mockGameData,
       });
       expect(result.productionItems).toEqual([]);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 

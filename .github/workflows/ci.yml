@@ -57,11 +57,6 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       options: --ipc=host
-    # GitHub sets HOME=/github/home for container jobs and that dir isn't owned
-    # by root, so Firefox/WebKit refuse to launch ("$HOME isn't owned by the
-    # current user"). Point HOME at the root-owned /root, as Playwright advises.
-    env:
-      HOME: /root
 
     steps:
       - uses: actions/checkout@v6
@@ -93,8 +88,15 @@ jobs:
       # Blocking gate: the scanned surfaces must report zero WCAG 2.0 A/AA
       # violations (axe-core via Playwright). The graph canvas is excluded as a
       # separate tracked follow-up; see client/tests/a11y.spec.ts.
+      # GitHub sets HOME=/github/home for container jobs and that dir isn't
+      # owned by root, so Firefox/WebKit refuse to launch ("$HOME isn't owned
+      # by the current user"). Point HOME at the root-owned /root, as Playwright
+      # advises. Scoped to this step only — a job-level HOME leaks to the host
+      # runner and breaks its docker config lookup (/root/.docker/config.json).
       - name: Accessibility e2e (axe)
         working-directory: client
+        env:
+          HOME: /root
         run: npm run test:e2e
 
       - name: Upload accessibility reports
