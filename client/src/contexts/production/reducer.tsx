@@ -5,6 +5,7 @@ import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
 import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, RecipeSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
 import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
+import { decode, WireFactory } from '../../utilities/shared-factory/codec';
 
 // DEFAULTS
 function getDefaultProductionItem(): ProductionItemOptions {
@@ -284,46 +285,45 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
     }
     case 'LOAD_FROM_SHARED_FACTORY': {
       try {
+        const decoded = decode(action.config as WireFactory);
         const newState: FactoryOptions = getInitialState(action.gameData);
-        newState.productionItems = (action.config.productionItems as any[]).map((i) => ({
+        newState.productionItems = decoded.productionItems.map((i) => ({
           ...getDefaultProductionItem(),
           itemKey: i.itemKey,
           mode: i.mode,
-          value: String(i.value),
+          value: i.value,
         }));
-        newState.inputItems = (action.config.inputItems as any[]).map((i) => ({
+        newState.inputItems = decoded.inputItems.map((i) => ({
           ...getDefaultInputItem(),
           itemKey: i.itemKey,
-          value: String(i.value),
-          weight: String(i.weight),
+          value: i.value,
+          weight: i.weight,
           unlimited: i.unlimited,
         }));
         newState.inputResources.forEach((r) => {
-          const resourceOptions = (action.config.inputResources as any[]).find((i) => r.itemKey === i.itemKey);
+          const resourceOptions = decoded.inputResources.find((i) => r.itemKey === i.itemKey);
           if (resourceOptions) {
-            r.value = String(resourceOptions.value);
-            r.weight = String(resourceOptions.weight);
+            r.value = resourceOptions.value;
+            r.weight = resourceOptions.weight;
             r.unlimited = resourceOptions.unlimited;
           }
         });
-        newState.allowHandGatheredItems = action.config.allowHandGatheredItems;
-        newState.weightingOptions.resources = String(action.config.weightingOptions.resources);
-        newState.weightingOptions.power = String(action.config.weightingOptions.power);
-        newState.weightingOptions.complexity = String(action.config.weightingOptions.complexity);
-        newState.weightingOptions.buildings = String(action.config.weightingOptions.buildings);
-        // gameModeOptions added in 1.2; default to 1x for pre-1.2 shared factories that lack it.
-        if (action.config.gameModeOptions) {
-          newState.gameModeOptions.recipePartsCost = String(action.config.gameModeOptions.recipePartsCost);
-          newState.gameModeOptions.powerConsumption = String(action.config.gameModeOptions.powerConsumption);
+        newState.allowHandGatheredItems = decoded.allowHandGatheredItems;
+        newState.weightingOptions = decoded.weightingOptions;
+        // gameModeOptions added in 1.2; keep the 1x default for pre-1.2 shared factories that lack it.
+        if (decoded.gameModeOptions) {
+          newState.gameModeOptions = decoded.gameModeOptions;
         }
-        (action.config.allowedRecipes as any[]).forEach((key) => {
+        decoded.allowedRecipes.forEach((key) => {
           if (newState.allowedRecipes[key] != null) {
             newState.allowedRecipes[key] = true;
           }
         });
-        newState.nodesPositions = action.config.nodesPositions;
-        newState.maximizeBalanceMode = action.config.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE;
-        newState.transportOptions = action.config.transportOptions ?? getInitialTransportOptions();
+        newState.nodesPositions = decoded.nodesPositions;
+        // maximizeBalanceMode/transportOptions aren't part of the share wire shape;
+        // read them defensively from the raw payload for any client-side persisted config.
+        newState.maximizeBalanceMode = (action.config as any).maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE;
+        newState.transportOptions = (action.config as any).transportOptions ?? getInitialTransportOptions();
         return newState;
       } catch (e) {
         console.error(e);
