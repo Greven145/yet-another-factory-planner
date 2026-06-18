@@ -129,7 +129,6 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
       worker.terminate();
       debouncedSolveRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCalculateFactory = useCallback(() => {
