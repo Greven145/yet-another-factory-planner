@@ -201,7 +201,6 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
               } else if (newItem.mode === 'maximize') {
                 let nextPriority = MAX_PRIORITY;
                 while (nextPriority && nextPriority > 0) {
-                  // eslint-disable-next-line no-loop-func
                   const priorityTaken = !!state.productionItems.find((i) => i.mode === 'maximize' && i.value === String(nextPriority));
                   if (!priorityTaken) {
                     break;
