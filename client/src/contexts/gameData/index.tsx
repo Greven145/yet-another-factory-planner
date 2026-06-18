@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useGetInitialize } from '../../api/modules/initialize/useGetInitialize';
 import { GameData } from './types';
-import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM, API_GAME_VERSION_TO_DISPLAY } from './consts';
+import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
+import { toDisplay } from '../../utilities/shared-factory/codec';
 import { usePrevious } from '../../hooks/usePrevious';
 import { FactoryOptions } from '../production/types';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -119,7 +120,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       window.sessionStorage?.removeItem('state');
 
       if (factoryConfig?.gameVersion) {
-        setGameVersion(API_GAME_VERSION_TO_DISPLAY[factoryConfig.gameVersion] ?? factoryConfig.gameVersion);
+        setGameVersion(toDisplay(factoryConfig.gameVersion));
       } else if (legacyEncoding) {
         setGameVersion(DEFAULT_GAME_VERSION);
       } else if (sessionVersion && sessionState) {

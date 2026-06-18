@@ -25,7 +25,7 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
     /// </summary>
     internal async Task<string> FindOrSaveAsync(FactoryConfigSchema config, CancellationToken cancellationToken = default)
     {
-        var normalizedVersion = NormalizeGameVersion(config.GameVersion);
+        var normalizedVersion = GameVersions.Normalize(config.GameVersion);
 
         var existing = await dbContext.Factories
             .Where(f => f.Id == config.Id && f.GameVersion == normalizedVersion)
@@ -58,7 +58,7 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
     {
         try
         {
-            var normalizedVersion = NormalizeGameVersion(gameVersion);
+            var normalizedVersion = GameVersions.Normalize(gameVersion);
 
             var factory = await dbContext.Factories
                 .Where(f => f.Id == factoryKey && f.GameVersion == normalizedVersion)
@@ -72,15 +72,6 @@ public sealed class FactoryClient(FactoryDbContext dbContext, ILogger<FactoryCli
             return new None();
         }
     }
-
-    private static string NormalizeGameVersion(string gameVersion) => gameVersion switch
-    {
-        "1.1" => "V1_1",
-        "V1_1" => "V1_1",
-        "1.2" => "V1_2",
-        "V1_2" => "V1_2",
-        _ => gameVersion,
-    };
 }
 
 [GenerateOneOf]
