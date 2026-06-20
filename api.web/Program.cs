@@ -96,7 +96,7 @@ app.MapGet("/initialize", async (
 {
     try
     {
-        gameVersion ??= "1.2";
+        gameVersion ??= GameVersions.DefaultDisplay;
 
         var gameData = gameVersion switch
         {
@@ -174,20 +174,7 @@ app.MapPost("/share-factory", async (
         if (!validationResult.IsValid)
             return Results.BadRequest(new { message = string.Join(".", validationResult.Errors.Select(x => x.ErrorMessage)) });
 
-        var canonical = System.Text.Json.JsonSerializer.Serialize(new
-        {
-            gameVersion = config.GameVersion,
-            productionItems = config.ProductionItems.OrderBy(x => x.ItemKey).ThenBy(x => x.Mode).ThenBy(x => x.Value),
-            inputItems = config.InputItems.OrderBy(x => x.ItemKey),
-            inputResources = config.InputResources.OrderBy(x => x.ItemKey),
-            allowedRecipes = config.AllowedRecipes.OrderBy(x => x),
-            weightingOptions = config.WeightingOptions,
-            gameModeOptions = config.GameModeOptions,
-            allowHandGatheredItems = config.AllowHandGatheredItems,
-        });
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(canonical));
-        var factoryId = Convert.ToHexString(hash)[..16].ToLowerInvariant();
-        config.Id = factoryId;
+        config.Id = ShareFactoryId.Compute(config);
 
         var key = await factoryClient.FindOrSaveAsync(config, cancellationToken);
 

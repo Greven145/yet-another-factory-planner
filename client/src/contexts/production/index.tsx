@@ -1,17 +1,14 @@
-import React, { createContext, useContext, useReducer, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import debounce from 'lodash/debounce';
+import React, { createContext, useContext, useReducer, useEffect, useMemo, useRef } from 'react';
 import { usePrevious } from '../../hooks/usePrevious';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
-import { GraphError } from '../../utilities/error/GraphError';
 import { usePostSharedFactory } from '../../api/modules/shared-factories/usePostSharedFactory';
 import { reducer, FactoryAction, getInitialState } from './reducer';
 import { FactoryOptions } from './types';
 import { FactoryInitializer } from '../gameData';
 import { GameData } from '../gameData/types';
 import { SHARE_QUERY_PARAM } from '../gameData/consts';
-import { useGlobalContext } from '../global';
 import { SolverResults } from '../../utilities/production-solver/models';
-import type { WorkerOutput } from '../../utilities/production-solver/solver.worker';
+import { useSolverRun } from './useSolverRun';
 
 
 export type ShareLinkProps = { link: string, copyToClipboard: boolean, loading: boolean };
@@ -46,11 +43,6 @@ export function useProductionContext() {
 }
 
 
-const _setCalculating = debounce((value: boolean, setCalculating: React.Dispatch<React.SetStateAction<boolean>>) => {
-  setCalculating(value);
-}, 300, { leading: false, trailing: true });
-
-
 // PROVIDER
 type PropTypes = {
   gameData: GameData,
@@ -62,79 +54,18 @@ type PropTypes = {
 export const ProductionProvider = ({ gameData, gameVersion, initializer, triggerInitialize, children }: PropTypes) => {
   const [state, dispatch] = useReducer(reducer, getInitialState(gameData));
   const prevState = usePrevious(state);
-  const [solverResults, setSolverResults] = useState<SolverResults | null>(null);
 
-  const [calculating, setCalculating] = useState(false);
   const [autoCalculate, setAutoCalculate] = useSessionStorage<'false' | 'true'>({ key: 'auto-calculate', defaultValue: 'true' });
   const autoCalculateBool = autoCalculate === 'true' ? true : false;
 
-  const ctx = useGlobalContext();
-
   const postSharedFactory = usePostSharedFactory();
 
-  // Debounced post ref: 300ms leading+trailing, matching the previous module-level debounce.
-  const debouncedSolveRef = useRef<ReturnType<typeof debounce> | null>(null);
+  // Solver orchestration (worker lifecycle, debounced solve, stale-result discipline,
+  // and the calculating flag) lives in useSolverRun. The provider only decides WHEN to solve.
+  const { solverResults, calculating, calculate: handleCalculateFactory } = useSolverRun(state, gameData);
+
   // Set to true in triggerInitialize effect so the state-change effect runs the solve after dispatch applies.
   const forceCalculateRef = useRef(false);
-  // Monotonically-increasing ID for each solve request. Used to discard stale results from the worker,
-  // since worker and main-thread performance.now() have different origins and can't be compared.
-  const solveIdRef = useRef(0);
-
-  useEffect(() => {
-    const worker = new Worker(
-      new URL('../../utilities/production-solver/solver.worker.ts', import.meta.url),
-      { type: 'module' },
-    );
-
-    worker.onmessage = (event: MessageEvent<WorkerOutput>) => {
-      const data = event.data;
-      if (data.solveId < solveIdRef.current) {
-        return;
-      }
-      if (data.ok) {
-        setSolverResults(data.results);
-      } else {
-        setSolverResults({
-          productionGraph: null,
-          report: null,
-          timestamp: performance.now(),
-          computeTime: 0,
-          error: new GraphError(data.message, data.helpText),
-        });
-      }
-      _setCalculating(false, setCalculating);
-    };
-
-    worker.onerror = (e) => {
-      setSolverResults({
-        productionGraph: null,
-        report: null,
-        timestamp: performance.now(),
-        computeTime: 0,
-        error: new GraphError(e.message ?? 'Worker error'),
-      });
-      _setCalculating(false, setCalculating);
-    };
-
-    const debouncedSolve = debounce((state: FactoryOptions, gameData: GameData) => {
-      const solveId = ++solveIdRef.current;
-      _setCalculating(true, setCalculating);
-      worker.postMessage({ state, gameData, solveId });
-    }, 300, { leading: true, trailing: true });
-
-    debouncedSolveRef.current = debouncedSolve;
-
-    return () => {
-      debouncedSolve.cancel();
-      worker.terminate();
-      debouncedSolveRef.current = null;
-    };
-  }, []);
-
-  const handleCalculateFactory = useCallback(() => {
-    ctx.refreshTip();
-    debouncedSolveRef.current?.(state, gameData);
-  }, [ctx, gameData, state]);
 
   const handleSetAutoCalculate = (checked: boolean) => {
     setAutoCalculate(checked ? 'true' : 'false');

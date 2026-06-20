@@ -1,23 +1,18 @@
 ﻿using api.Models;
+using api.web.Services;
 using FluentValidation;
 
 namespace api.Validation;
 
 public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchema>
 {
-    // Accept both the client-facing "1.1" format and the internal "V1_1" enum name.
-    private static readonly HashSet<string> ValidGameVersions =
-    [
-        .. Enum.GetNames<GameVersion>(),
-        "1.1",
-        "1.2",
-    ];
-
     private static readonly HashSet<string> ValidModes = ["per-minute", "maximize", "rate"];
 
     public FactoryConfigSchemaValidator()
     {
-        RuleFor(x => x.GameVersion).Must(v => ValidGameVersions.Contains(v))
+        // Accepts both the client-facing "1.1" format and the internal "V1_1" enum name;
+        // the vocabulary lives in GameVersions.
+        RuleFor(x => x.GameVersion).Must(GameVersions.Valid.Contains)
             .WithMessage("'{PropertyValue}' is not a valid game version.");
         RuleFor(x => x.ProductionItems).NotEmpty()
             .Must(x => x.Count <= 500).WithMessage("ProductionItems must not exceed 500 items.");

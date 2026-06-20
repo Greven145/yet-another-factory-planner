@@ -1,18 +1,26 @@
 import loadGLPK, { GLPK, LP, Var } from 'glpk.js';
 import { FactoryOptions, RecipeSelectionMap } from '../../contexts/production/types';
 import { MaximizeBalanceMode } from '../../contexts/production/consts';
-import { GameData, ItemRate } from '../../contexts/gameData/types';
+import { GameData } from '../../contexts/gameData/types';
 import { GraphError } from '../error/GraphError';
 import {
-  GraphEdge,
-  GraphNode,
   NODE_TYPE,
   POINTS_ITEM_KEY,
-  ProducedItemInformation,
   ProductionGraph,
   Report,
   SolverResults,
 } from './models';
+import {
+  EPSILON,
+  RATE_TARGET_KEY,
+  Inputs,
+  RateTargets,
+  MaximizeTargets,
+  ProductionSolution,
+  getItemPoints,
+} from './internals';
+import { assembleGraph } from './assembleGraph';
+import { buildReport } from './buildReport';
 
 export {
   NODE_TYPE,
@@ -28,45 +36,16 @@ export type {
   SolverResults,
 } from './models';
 
-const EPSILON = 1e-8;
 const MIN_RESOURCE_WEIGHT = 0.0001;
 const MAXIMIZE_WEIGHT = 1e5;
 const ENFORCE_BIN_WEIGHT = 1000;
 const TIME_LIMIT = 3.0;
-const RATE_TARGET_KEY = 'RATE_TARGET_PASS';
-
-type Inputs = {
-  [key: string]: {
-    amount: number,
-    weight: number,
-    type: string,
-  }
-};
-
-type RateTargets = {
-  [key: string]: {
-    value: number,
-    recipe: string | null,
-    isPoints: boolean,
-  }
-};
-
-type MaximizeTargets = { key: string, priority: number };
 
 type GlobalWeights = {
   resources: number,
   power: number,
   complexity: number,
   buildings: number
-};
-
-type ProductionSolution = { [key: string]: number };
-type ProductionAmount = { recipeKey: string, amount: number };
-type ItemProductionTotals = {
-  [key: string]: {
-    producedBy: ProductionAmount[],
-    usedBy: ProductionAmount[],
-  }
 };
 
 type ItemMap = {
@@ -333,7 +312,7 @@ export class ProductionSolver {
     try {
       const glpk = await getGLPK();
       const productionSolution = await this.productionSolverPass([RATE_TARGET_KEY], this.inputs, glpk);
-      let productionGraph = this.generateProductionGraph(productionSolution);
+      let productionGraph = assembleGraph(productionSolution, this.graphContext());
 
       const priorityGroups = new Map<number, string[]>();
       for (const target of this.maximizeTargets) {
@@ -368,7 +347,7 @@ export class ProductionSolver {
           const maxima = new Map<string, number>();
           for (const targetKey of groupTargetKeys) {
             const individualSol = await this.productionSolverPass([targetKey], remainingInputs, glpk);
-            const tempGraph = this.generateProductionGraph(individualSol);
+            const tempGraph = assembleGraph(individualSol, this.graphContext());
             const node = Object.values(tempGraph.nodes).find(n => n.key === targetKey && n.type === NODE_TYPE.FINAL_PRODUCT);
             maxima.set(targetKey, node?.multiplier ?? 0);
           }
@@ -384,13 +363,13 @@ export class ProductionSolver {
             productionSolution[key] = multiplier;
           }
         }
-        productionGraph = this.generateProductionGraph(productionSolution);
+        productionGraph = assembleGraph(productionSolution, this.graphContext());
       }
 
       if (Object.keys(productionGraph.nodes).length === 0) {
         throw new GraphError('SOLUTION IS EMPTY', 'For some reason the solution for your parameters is an empty factory. Double check that your factory settings make sense.');
       }
-      const report = this.generateProductionReport(productionGraph);
+      const report = buildReport(productionGraph, { gameData: this.gameData, inputs: this.inputs });
 
       return {
         productionGraph,
@@ -410,9 +389,14 @@ export class ProductionSolver {
     }
   }
 
-  private getItemPoints(itemKey: string) {
-    const itemInfo = this.gameData.items[itemKey];
-    return itemInfo.isFicsmas ? 0 : itemInfo.sinkPoints;
+  private graphContext() {
+    return {
+      gameData: this.gameData,
+      inputs: this.inputs,
+      rateTargets: this.rateTargets,
+      maximizeTargets: this.maximizeTargets,
+      hasPointsTarget: this.hasPointsTarget,
+    };
   }
 
   private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK, maxima?: Map<string, number>): Promise<ProductionSolution> {
@@ -484,12 +468,12 @@ export class ProductionSolver {
         let pointCoef = 0;
         for (const product of recipeInfo.products) {
           if (!this.inputs[product.itemClass] || this.inputs[product.itemClass].type === NODE_TYPE.INPUT_ITEM) {
-            pointCoef -= product.perMinute * this.getItemPoints(product.itemClass) / 1000;
+            pointCoef -= product.perMinute * getItemPoints(this.gameData, product.itemClass) / 1000;
           }
         }
         for (const ingredient of recipeInfo.ingredients) {
           if (!this.inputs[ingredient.itemClass] || this.inputs[ingredient.itemClass].type === NODE_TYPE.INPUT_ITEM) {
-            pointCoef += ingredient.perMinute * this.getItemPoints(ingredient.itemClass) / 1000;
+            pointCoef += ingredient.perMinute * getItemPoints(this.gameData, ingredient.itemClass) / 1000;
           }
         }
         pointsVars.push({ name: recipeKey, coef: pointCoef });
@@ -501,13 +485,13 @@ export class ProductionSolver {
       let intrinsicPoints = 0;
       for (const [itemKey, inputInfo] of Object.entries(remainingInputs)) {
         if (inputInfo.type === NODE_TYPE.INPUT_ITEM) {
-          intrinsicPoints += this.getItemPoints(itemKey) * inputInfo.amount;
+          intrinsicPoints += getItemPoints(this.gameData, itemKey) * inputInfo.amount;
         }
       }
       if (isRateTargetPass) {
         for (const [itemKey, targetInfo] of Object.entries(this.rateTargets)) {
           if (itemKey !== POINTS_ITEM_KEY) {
-            intrinsicPoints -= this.getItemPoints(itemKey) * targetInfo.value;
+            intrinsicPoints -= getItemPoints(this.gameData, itemKey) * targetInfo.value;
           }
         }
         model.subjectTo.push({
@@ -690,413 +674,5 @@ export class ProductionSolver {
     return result;
   }
 
-  private generateProductionGraph(productionSolution: ProductionSolution): ProductionGraph {
-    const itemProductionTotals: ItemProductionTotals = {};
-    const graph: ProductionGraph = {
-      nodes: {},
-      edges: [],
-    };
-
-    for (const [recipeKey, multiplier] of Object.entries(productionSolution)) {
-      const recipeInfo = this.gameData.recipes[recipeKey];
-
-      for (const product of recipeInfo.products) {
-        const amount = multiplier * product.perMinute;
-        if (!itemProductionTotals[product.itemClass]) {
-          itemProductionTotals[product.itemClass] = {
-            producedBy: [],
-            usedBy: [],
-          };
-        }
-        itemProductionTotals[product.itemClass].producedBy.push({ recipeKey, amount });
-      }
-
-      for (const ingredient of recipeInfo.ingredients) {
-        const amount = multiplier * ingredient.perMinute;
-        if (!itemProductionTotals[ingredient.itemClass]) {
-          itemProductionTotals[ingredient.itemClass] = {
-            producedBy: [],
-            usedBy: [],
-          };
-        }
-        itemProductionTotals[ingredient.itemClass].usedBy.push({ recipeKey, amount });
-      }
-
-      graph.nodes[recipeKey] = {
-        id: recipeKey,
-        key: recipeKey,
-        type: NODE_TYPE.RECIPE,
-        multiplier,
-      };
-    }
-
-    for (const [itemKey, productionTotals] of Object.entries(itemProductionTotals)) {
-      const { producedBy, usedBy } = productionTotals;
-      let i = 0, j = 0;
-      nextDemand:
-      while (i < usedBy.length) {
-        const usageInfo = usedBy[i];
-        const usageNode = graph.nodes[usageInfo.recipeKey];
-
-        while (j < producedBy.length) {
-          const productionInfo = producedBy[j];
-          const productionNode = graph.nodes[productionInfo.recipeKey];
-
-          const outputRecipe = this.rateTargets[itemKey]?.recipe;
-          if (outputRecipe && outputRecipe === productionInfo.recipeKey) {
-            const outputInfo = this.rateTargets[itemKey];
-            const recipeInfo = this.gameData.recipes[outputRecipe];
-            const target = recipeInfo.products.find((p) => p.itemClass === itemKey)!;
-            const recipeAmount = outputInfo.value * target.perMinute;
-            productionInfo.amount -= recipeAmount;
-
-            let itemNode = graph.nodes[itemKey];
-            if (!itemNode) {
-              itemNode = {
-                id: itemKey,
-                key: itemKey,
-                type: NODE_TYPE.FINAL_PRODUCT,
-                multiplier: recipeAmount,
-              }
-              graph.nodes[itemKey] = itemNode;
-            } else {
-              graph.nodes[itemKey].multiplier += recipeAmount;
-            }
-            graph.edges.push({
-              key: itemKey,
-              from: productionNode.id,
-              to: itemNode.id,
-              productionRate: recipeAmount,
-            });
-          }
-
-          if (productionInfo.amount < EPSILON) {
-            j++
-            continue;
-          }
-
-          if (usageInfo.amount <= productionInfo.amount) {
-            graph.edges.push({
-              key: itemKey,
-              from: productionNode.id,
-              to: usageNode.id,
-              productionRate: usageInfo.amount,
-            });
-            productionInfo.amount -= usageInfo.amount;
-            usageInfo.amount = 0;
-          } else {
-            graph.edges.push({
-              key: itemKey,
-              from: productionNode.id,
-              to: usageNode.id,
-              productionRate: productionInfo.amount,
-            });
-            usageInfo.amount -= productionInfo.amount;
-            productionInfo.amount = 0;
-          }
-
-          if (usageInfo.amount < EPSILON) {
-            i++;
-            continue nextDemand;
-          }
-          j++;
-        }
-        break;
-      }
-
-      while (i < usedBy.length) {
-        const usageInfo = usedBy[i];
-        const usageNode = graph.nodes[usageInfo.recipeKey];
-        if (usageInfo.amount > EPSILON && this.inputs[itemKey]) {
-          let itemNode = graph.nodes[itemKey];
-          if (!itemNode) {
-            const inputInfo = this.inputs[itemKey];
-            itemNode = {
-              id: itemKey,
-              key: itemKey,
-              type: inputInfo.type,
-              multiplier: usageInfo.amount,
-            };
-            graph.nodes[itemKey] = itemNode;
-          } else {
-            itemNode.multiplier += usageInfo.amount;
-          }
-          graph.edges.push({
-            key: itemKey,
-            from: itemNode.id,
-            to: usageNode.id,
-            productionRate: usageInfo.amount,
-          });
-          usageInfo.amount = 0;
-        }
-        i++;
-      }
-
-      while (j < producedBy.length) {
-        const productionInfo = producedBy[j];
-        const productionNode = graph.nodes[productionInfo.recipeKey];
-        if (productionInfo.amount > EPSILON) {
-          let itemNode = graph.nodes[itemKey];
-          if (!itemNode) {
-            let nodeType = NODE_TYPE.SIDE_PRODUCT;
-            if (this.rateTargets[itemKey] || this.maximizeTargets.find((t) => t.key === itemKey)) {
-              nodeType = NODE_TYPE.FINAL_PRODUCT;
-            } else if (this.hasPointsTarget && this.getItemPoints(itemKey) > 0) {
-              nodeType = NODE_TYPE.FINAL_PRODUCT;
-            }
-            itemNode = {
-              id: itemKey,
-              key: itemKey,
-              type: nodeType,
-              multiplier: productionInfo.amount
-            };
-            graph.nodes[itemKey] = itemNode;
-          } else {
-            itemNode.multiplier += productionInfo.amount;
-          }
-          graph.edges.push({
-            key: itemKey,
-            from: productionNode.id,
-            to: itemNode.id,
-            productionRate: productionInfo.amount,
-          });
-          productionInfo.amount = 0;
-        }
-        j++;
-      }
-    }
-
-    return graph;
-  }
-
-  private generateProductionReport(productionGraph: ProductionGraph): Report {
-    const report: Report = {
-      pointsProduced: 0,
-      powerUsageEstimate: {
-        production: 0,
-        extraction: 0,
-        generators: 0,
-        total: 0,
-      },
-      resourceEfficiencyScore: 0,
-      totalBuildArea: 0,
-      estimatedFoundations: 0,
-      buildingsUsed: {},
-      totalMaterialCost: {},
-      totalRawResources: {},
-      totalItemsRecap: [],
-      loopWarning: false
-    };
-
-    report.totalItemsRecap = this.generateItemsPerStep(productionGraph);
-
-    for (const [key, node] of Object.entries(productionGraph.nodes)) {
-      if (this.gameData.resources[node.key])
-      {
-        report.totalRawResources[this.gameData.items[node.key].name] = node.multiplier;
-      }
-      if (node.type === NODE_TYPE.RECIPE) {
-        const recipeInfo = this.gameData.recipes[key];
-        const buildingKey = recipeInfo.producedIn;
-        const buildingInfo = this.gameData.buildings[buildingKey];
-        const power = node.multiplier * buildingInfo.power;
-        if (power < 0) {
-          report.powerUsageEstimate.generators += -power;
-        } else {
-          report.powerUsageEstimate.production += power;
-        }
-        report.powerUsageEstimate.total += power;
-        report.totalBuildArea += Math.ceil(node.multiplier) * buildingInfo.area;
-        if (!report.buildingsUsed[buildingKey]) {
-          report.buildingsUsed[buildingKey] = {
-            count: Math.ceil(node.multiplier),
-            materialCost: {},
-          };
-        } else {
-          report.buildingsUsed[buildingKey].count += Math.ceil(node.multiplier);
-        }
-
-        for (const ingredient of buildingInfo.buildCost) {
-          const amount = Math.ceil(node.multiplier) * ingredient.quantity;
-          if (!report.buildingsUsed[buildingKey].materialCost[ingredient.itemClass]) {
-            report.buildingsUsed[buildingKey].materialCost[ingredient.itemClass] = amount;
-          } else {
-            report.buildingsUsed[buildingKey].materialCost[ingredient.itemClass] += amount;
-          }
-          if (!report.totalMaterialCost[ingredient.itemClass]) {
-            report.totalMaterialCost[ingredient.itemClass] = amount;
-          } else {
-            report.totalMaterialCost[ingredient.itemClass] += amount;
-          }
-        }
-        continue;
-      }
-
-      if (node.type === NODE_TYPE.FINAL_PRODUCT) {
-        report.pointsProduced += node.multiplier * this.getItemPoints(key);
-      } else if (node.type === NODE_TYPE.RESOURCE) {
-        report.resourceEfficiencyScore += node.multiplier * this.inputs[key].weight;
-        let power = 0;
-        if (key === 'Desc_Water_C') {
-          power = node.multiplier / 120 * this.gameData.buildings['Desc_WaterPump_C'].power;
-
-          const numExtractors = Math.ceil(node.multiplier / 120);
-          report.buildingsUsed['Desc_WaterPump_C'] = {
-            count: numExtractors,
-            materialCost: {},
-          };
-          for (const ingredient of this.gameData.buildings['Desc_WaterPump_C'].buildCost) {
-            const amount = numExtractors * ingredient.quantity;
-            report.buildingsUsed['Desc_WaterPump_C'].materialCost[ingredient.itemClass] = amount;
-            if (!report.totalMaterialCost[ingredient.itemClass]) {
-              report.totalMaterialCost[ingredient.itemClass] = amount;
-            } else {
-              report.totalMaterialCost[ingredient.itemClass] += amount;
-            }
-          }
-
-        } else if (key === 'Desc_LiquidOil_C') {
-          power = node.multiplier / 120 * this.gameData.buildings['Desc_OilPump_C'].power;
-        } else if (key === 'Desc_NitrogenGas_C') {
-          // SKIP
-        } else {
-          power = node.multiplier / 240 * this.gameData.buildings['Desc_MinerMk3_C'].power;
-        }
-        report.powerUsageEstimate.extraction += power;
-        report.powerUsageEstimate.total += power;
-      }
-    }
-
-    report.estimatedFoundations = Math.ceil(2 * (report.totalBuildArea / 64));
-
-    report.loopWarning = this.hasLoop(productionGraph);
-
-    return report;
-  }
-
-  //Sort all items/resources involved in the factory by the MINIMUM number of steps needed to produce them in the chain
-  private generateItemsPerStep(productionGraph: ProductionGraph) : ProducedItemInformation[] {
-    let itemsList = [] as ProducedItemInformation[];
-    let step = 1;
-    let nodes = productionGraph.nodes;
-    let keys = Object.keys(nodes);
-    let usedKeys = [] as string[];
-
-    //We only need raw resources and recipes, remove final products and side products
-    keys = keys.filter((key) => nodes[key].type === 'RESOURCE' || nodes[key].type === 'RECIPE');
-
-    //First get all the items used and produced
-    for (var edge of productionGraph.edges){
-      this.AddItemAndAmountToItemList(itemsList, edge.key, edge.productionRate, step);
-    }
-
-    //Preload raw resources since no recipe produces them
-    for (var key of keys){
-      if (this.gameData.resources[key])
-      {
-        usedKeys.push(key);
-      }
-    }
-
-    keys = keys.filter((key) => !usedKeys.includes(key));
-    //We use this to keep the currently worked on recipes out of the current loop
-    //Otherwise we can have cases where a recipe we just added to the current step contributes
-    //to another recipe that should have been in the next step
-    let loopKeys = [] as string[];
-
-    let ingredientKeyFilter = (ingredient:ItemRate) => usedKeys.includes(ingredient.itemClass);
-    let unusedKeyFilter = (key:string) => !usedKeys.includes(key);
-
-    while (keys.length > 0){
-      for (key of keys){
-        const recipe = this.gameData.recipes[key];
-        const applicableIngredientsAmount = recipe.ingredients.filter(ingredientKeyFilter).length;
-        if (applicableIngredientsAmount === recipe.ingredients.length){
-          for (var product of recipe.products){
-            if (!this.gameData.resources[product.itemClass])
-            {
-              this.UpdateStepInItemList(itemsList, product.itemClass, step+1);
-            }
-            if (!loopKeys.includes(product.itemClass)){
-              loopKeys.push(product.itemClass);
-            }
-          }
-          loopKeys.push(key);
-        }
-      }
-
-      if ( usedKeys.length < loopKeys.length ||
-           !usedKeys.slice(-loopKeys.length).every((key, index) => key === loopKeys[index] )) {
-        usedKeys = [...usedKeys, ...loopKeys];
-        keys = keys.filter(unusedKeyFilter);
-        step++;
-      } else {
-        keys = [];
-      }
-    }
-
-    return itemsList;
-  }
-
-  private AddItemAndAmountToItemList(itemsList: ProducedItemInformation[], key: string, amount: number, step: number) {
-    let existingItems = itemsList.filter(item => item.key === key);
-    if (existingItems && existingItems.length > 0){
-      existingItems[0].amount += amount;
-    }
-    else {
-      itemsList.push({
-        key: key,
-        amount: amount,
-        name: this.gameData.items[key].name,
-        step: step
-      });
-    }
-  }
-
-  private UpdateStepInItemList(itemsList: ProducedItemInformation[], key: string, step: number){
-    let item = itemsList.find(item => item.key === key);
-    if (item){
-      item.step = step;
-    }
-  }
-
-  private hasLoop(productionGraph: ProductionGraph): boolean {
-    const adjacency = new Map<string, string[]>();
-    for (const edge of productionGraph.edges) {
-      if (!adjacency.has(edge.from)) adjacency.set(edge.from, []);
-      adjacency.get(edge.from)!.push(edge.to);
-    }
-
-    const visited = new Set<string>();
-    const stack = new Set<string>();
-
-    function dfs(node: string): boolean {
-      visited.add(node);
-      stack.add(node);
-
-      for (const edge of (adjacency.get(node) ?? [])) {
-        if ( stack.has(edge) ) {
-          return true;
-        } else if (!visited.has(edge)) {
-          if ( dfs(edge) ) {
-            return true;
-          }
-        }
-      }
-
-      stack.delete(node);
-      return false;
-    }
-
-    for (const node of Object.keys(productionGraph.nodes).map((k) => productionGraph.nodes[k])) {
-      if (!visited.has(node.id)) {
-        if (dfs(node.id)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
 }
 

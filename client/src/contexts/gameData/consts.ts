@@ -9,12 +9,6 @@ export const GAME_VERSION_OPTIONS = [
   { value: GV_1_1, label: '1.1' },
 ];
 
-/** Maps API enum names back to client display values */
-export const API_GAME_VERSION_TO_DISPLAY: Record<string, string> = {
-  V1_2: GV_1_2,
-  V1_1: GV_1_1,
-  U8: 'U8',
-  U7: 'U7',
-  U6: 'U6',
-  U5: 'U5',
-};
+// The game-version vocabulary lives in the shared-factory codec; re-export its
+// enum-name -> display mapping so callers don't redefine it here.
+export { toDisplay as apiGameVersionToDisplay } from '../../utilities/shared-factory/codec';

@@ -1,6 +1,7 @@
 import { post } from '../..';
 import { useApi } from "../../useApi";
 import { FactoryOptions } from '../../../contexts/production/types';
+import { encode } from '../../../utilities/shared-factory/codec';
 
 interface PostSharedFactoryRequest {
   gameVersion: string,
@@ -13,47 +14,9 @@ interface PostSharedFactoryResponse {
 
 export function usePostSharedFactory() {
   return useApi<PostSharedFactoryResponse, PostSharedFactoryRequest>(async (req) => {
-    // Convert game version from "1.1" format to "V1_1" enum name
-    const gameVersionToEnumName: { [key: string]: string } = {
-      "1.1": "V1_1",
-      "1.2": "V1_2"
-    };
-    
     const body = {
-      factoryConfig: {
-        gameVersion: gameVersionToEnumName[req.gameVersion] || req.gameVersion,
-        productionItems: req.factoryConfig.productionItems.map((i) => ({
-          itemKey: i.itemKey,
-          mode: i.mode,
-          value: Number(i.value),
-        })),
-        inputItems: req.factoryConfig.inputItems.map((i) => ({
-          itemKey: i.itemKey,
-          value: Number(i.value),
-          weight: Number(i.weight),
-          unlimited: i.unlimited,
-        })),
-        inputResources: req.factoryConfig.inputResources.map((i) => ({
-          itemKey: i.itemKey,
-          value: Number(i.value),
-          weight: Number(i.weight),
-          unlimited: i.unlimited,
-        })),
-        allowHandGatheredItems: req.factoryConfig.allowHandGatheredItems,
-        weightingOptions: {
-          resources: Number(req.factoryConfig.weightingOptions.resources),
-          power: Number(req.factoryConfig.weightingOptions.power),
-          complexity: Number(req.factoryConfig.weightingOptions.complexity),
-          buildings: Number(req.factoryConfig.weightingOptions.buildings),
-        },
-        gameModeOptions: {
-          recipePartsCost: Number(req.factoryConfig.gameModeOptions.recipePartsCost),
-          powerConsumption: Number(req.factoryConfig.gameModeOptions.powerConsumption),
-        },
-        allowedRecipes: Object.keys(req.factoryConfig.allowedRecipes).filter((key) => req.factoryConfig.allowedRecipes[key]),
-        nodesPositions: req.factoryConfig.nodesPositions,
-      }
-    }
+      factoryConfig: encode(req.factoryConfig, req.gameVersion),
+    };
     const res = await post('/share-factory', body);
     const json = res.data;
     return json.data;
