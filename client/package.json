@@ -18,8 +18,12 @@
         "deploy": "az storage blob upload-batch --account-name yafp -s ./dist -d '$web' --auth-mode login --overwrite",
         "test": "vitest run",
         "test:watch": "vitest",
+        "playwright:install": "playwright install",
+        "pretest:e2e": "npm run playwright:install",
         "test:e2e": "playwright test",
+        "pretest:e2e:ui": "npm run playwright:install",
         "test:e2e:ui": "playwright test --ui",
+        "pretest:e2e:headed": "npm run playwright:install",
         "test:e2e:headed": "playwright test --headed",
         "lint": "eslint \"src/**/*.{ts,tsx}\"",
         "a11y:lhci": "lhci autorun"

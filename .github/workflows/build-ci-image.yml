@@ -55,6 +55,10 @@ jobs:
           context: client
           file: client/Dockerfile.ci
           push: true
+          # Pin the Playwright base image to the locked @playwright/test version
+          # so the baked browsers always match the client (no manual tag bump).
+          build-args: |
+            PLAYWRIGHT_VERSION=${{ steps.pw.outputs.version }}
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:pw-${{ steps.pw.outputs.version }}
