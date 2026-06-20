@@ -3,10 +3,14 @@
 # client's npm dependencies so the GitHub Actions `build-frontend` job no longer
 # pays the per-run cost of `npm ci` + `playwright install --with-deps`.
 #
-# IMPORTANT: the base image tag is coupled to the @playwright/test version in
-# client/package-lock.json (currently 1.58.2). When Playwright is bumped, bump
-# this tag to match or the baked browsers won't match the installed client.
-FROM mcr.microsoft.com/playwright:v1.58.2-noble
+# The base image tag MUST match the @playwright/test version in
+# client/package-lock.json, or the baked browsers won't match the installed
+# client (the version/browser-build mismatch class of failure). To keep them in
+# lockstep automatically, build-ci-image.yml resolves the locked Playwright
+# version and passes it as the PLAYWRIGHT_VERSION build arg. The default below is
+# only a fallback for ad-hoc local `docker build` invocations without --build-arg.
+ARG PLAYWRIGHT_VERSION=1.58.2
+FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
 
 # The Playwright image ships Node 24, but the rest of CI (and the deploy build)
 # standardizes on Node 20. Pin Node 20 here for parity so tests/build run under
