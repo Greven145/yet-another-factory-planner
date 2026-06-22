@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -59,7 +59,7 @@ jobs:
       options: --ipc=host
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # The baked dependencies live at /opt/ci/node_modules in the image; the
       # checkout above is a fresh tree, so copy them into the workspace. The
@@ -141,7 +141,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install azd
         uses: Azure/setup-azd@v2
