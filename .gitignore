@@ -20,6 +20,10 @@ playwright-report/
 *.png
 .playwright-cli/
 .playwright-mcp/
+.playwright/
+
+# Agent skills (installed locally, not part of the repo)
+.agents/
 
 # Environment
 .env.local

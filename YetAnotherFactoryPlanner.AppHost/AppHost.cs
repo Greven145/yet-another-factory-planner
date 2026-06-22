@@ -54,6 +54,12 @@ if (builder.ExecutionContext.IsRunMode &&
     var client = builder.AddViteApp("client", "../client")
         .WithReference(api)
         .WithEnvironment("VITE_REACT_APP_API_BASE_URL", api.GetEndpoint("http"))
+        // AddViteApp sets NODE_ENV from Environment.IsDevelopment(), which only matches the
+        // literal "Development" environment name. In "Testing" that resolves to NODE_ENV=production,
+        // which makes @vitejs/plugin-react skip injecting the React-Refresh preamble — every
+        // component module then throws "$RefreshReg$ is not defined" on load and the app never
+        // mounts. Force dev mode here so Playwright-driven integration tests get a working app.
+        .WithEnvironment("NODE_ENV", "development")
         .WaitFor(api);
 }
 

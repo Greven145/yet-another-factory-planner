@@ -38,9 +38,12 @@
     Actions): CI builds the solution but never runs these integration tests, so
     the download is wasted and made the .NET build flaky (transient ECONNRESET).
     When these tests are added to CI, install browsers in a dedicated step.
+
+    Uses bash + the bundled node driver directly instead of playwright.ps1, so
+    this doesn't depend on PowerShell being installed.
   -->
   <Target Name="InstallPlaywright" AfterTargets="Build" Condition="'$(CI)' != 'true'">
-    <Exec Command="pwsh $(OutputPath)playwright.ps1 install chromium" />
+    <Exec Command="bash $(MSBuildThisFileDirectory)../scripts/install-playwright-browsers.sh $(OutputPath) install chromium" />
   </Target>
 
 </Project>

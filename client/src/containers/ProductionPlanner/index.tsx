@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader, Divider, Text, Title } from '@mantine/core';
+import { Loader, Divider, Text, Title, Button } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 import bgImage from '../../assets/stripe-bg.png';
@@ -48,6 +48,12 @@ const ProductionPlanner = () => {
                   <Title style={{ marginTop: '15px' }}>
                     An error occurred connecting to the server x_x
                   </Title>
+                  <Button
+                    style={{ marginTop: '20px' }}
+                    onClick={() => { window.location.href = window.location.pathname; }}
+                  >
+                    Start a new factory
+                  </Button>
                 </>
               ) : (
                 <>

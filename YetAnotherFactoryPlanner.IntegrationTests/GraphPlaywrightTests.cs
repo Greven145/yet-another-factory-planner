@@ -140,7 +140,11 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 
 	private static async Task SetAmountAsync(IPage page, string amount)
 	{
-		var amountInput = page.GetByLabel("Amount").First;
+		// The production-goal row's amount field only has a placeholder, not a <label>
+		// or aria-label — GetByLabel("Amount") instead substring-matches the Inputs tab's
+		// item-specific aria-labels (e.g. "Iron Ore amount"), which live on a different,
+		// inactive tab.
+		var amountInput = page.GetByPlaceholder("Amount").First;
 		await amountInput.ClickAsync();
 		await amountInput.FillAsync(amount);
 	}
