@@ -43,11 +43,7 @@ resource env 'Microsoft.App/managedEnvironments@2025-01-01' = {
   location: location
   properties: {
     appLogsConfiguration: {
-      destination: 'log-analytics'
-      logAnalyticsConfiguration: {
-        customerId: env_law.properties.customerId
-        sharedKey: env_law.listKeys().primarySharedKey
-      }
+      destination: 'azure-monitor'
     }
     workloadProfiles: [
       {
@@ -65,6 +61,30 @@ resource aspireDashboard 'Microsoft.App/managedEnvironments/dotNetComponents@202
     componentType: 'AspireDashboard'
   }
   parent: env
+}
+
+resource env_diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'env-diagnostics'
+  scope: env
+  properties: {
+    workspaceId: env_law.id
+    logs: [
+      {
+        category: 'ContainerAppConsoleLogs'
+        enabled: true
+      }
+      {
+        category: 'ContainerAppSystemLogs'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+      }
+    ]
+  }
 }
 
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = env_law.name
