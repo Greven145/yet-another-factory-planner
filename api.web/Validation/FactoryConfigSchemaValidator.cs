@@ -29,7 +29,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         // AllowedRecipes may be empty (means all recipes are allowed)
         RuleFor(x => x.AllowedRecipes)
             .Must(x => x.Count <= 500).WithMessage("AllowedRecipes must not exceed 500 items.");
-        RuleForEach(x => x.AllowedRecipes).NotEmpty();
+        RuleForEach(x => x.AllowedRecipes).NotEmpty().MaximumLength(200);
         RuleFor(x => x.NodesPositions)
             .Must(x => x.Count <= 1000).WithMessage("NodesPositions must not exceed 1000 items.");
         RuleForEach(x => x.NodesPositions).SetValidator(new NodePositionValidator());
@@ -39,8 +39,9 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
     {
         public ProductionItemsValidator()
         {
-            RuleFor(x => x.ItemKey).NotEmpty();
+            RuleFor(x => x.ItemKey).NotEmpty().MaximumLength(200);
             RuleFor(x => x.Mode).NotEmpty()
+                .MaximumLength(200)
                 .Must(m => ValidModes.Contains(m))
                 .WithMessage($"Mode must be one of: {string.Join(", ", ValidModes)}.");
             RuleFor(x => x.Value).NotNull();
@@ -51,7 +52,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
     {
         public InputValidator()
         {
-            RuleFor(x => x.ItemKey).NotEmpty();
+            RuleFor(x => x.ItemKey).NotEmpty().MaximumLength(200);
             RuleFor(x => x.Value).NotNull();
             RuleFor(x => x.Weight).NotNull();
             RuleFor(x => x.Unlimited).NotNull();
@@ -82,7 +83,7 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
     {
         public NodePositionValidator()
         {
-            RuleFor(x => x.Key).NotEmpty();
+            RuleFor(x => x.Key).NotEmpty().MaximumLength(200);
             RuleFor(x => x.X).NotNull();
             RuleFor(x => x.Y).NotNull();
         }
