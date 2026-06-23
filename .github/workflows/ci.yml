@@ -17,9 +17,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5
         with:
           dotnet-version: '10.x'
 
@@ -39,7 +39,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-results
           path: TestResults
@@ -52,14 +52,14 @@ jobs:
     # the per-run `npm ci` + `playwright install --with-deps` cost. --ipc=host
     # is Playwright's recommended flag to stop Chromium running out of memory.
     container:
-      image: ghcr.io/greven145/yet-another-factory-planner/frontend-ci:latest
+      image: ghcr.io/greven145/yet-another-factory-planner/frontend-ci@sha256:56b9e36b41b193f3f911b85d8af6a67867b506b974b3ad66a3e1864ae7ee85f4 # :latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
       options: --ipc=host
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       # The baked dependencies live at /opt/ci/node_modules in the image; the
       # checkout above is a fresh tree, so copy them into the workspace. The
@@ -101,7 +101,7 @@ jobs:
 
       - name: Upload accessibility reports
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: frontend-a11y-reports
           path: |
@@ -141,18 +141,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Install azd
-        uses: Azure/setup-azd@v2
+        uses: Azure/setup-azd@634ad924cf8baef2257898ba5663be8d19f15aca # v2
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@9a946fdbd5fb07b82b2f5a4466058b876ab72bb2 # v5
         with:
           dotnet-version: '10.x'
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           # Match the Node version CI validates the client under (build-frontend
           # uses 20) so the shipped artifact is built on the same runtime.
@@ -184,7 +184,7 @@ jobs:
           npm run build --prefix client
 
       - name: Deploy web to Static Web App
-        uses: Azure/static-web-apps-deploy@v1
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
