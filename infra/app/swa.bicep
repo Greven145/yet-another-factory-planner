@@ -12,7 +12,7 @@ resource staticWebApp 'Microsoft.Web/staticSites@2024-11-01' = {
   properties: {
     provider: 'Custom'
     stagingEnvironmentPolicy: 'Enabled'
-    allowConfigFileUpdates: true
+    allowConfigFileUpdates: false
   }
   tags: union(tags, {
     'azd-service-name': 'web'

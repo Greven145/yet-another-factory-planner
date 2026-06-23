@@ -35,6 +35,9 @@ public static class ShareFactoryId
     public static string Compute(FactoryConfigSchema config)
     {
         var canonical = Canonicalize(config);
+        // This ID is a content hash — deterministic and reproducible from the config alone.
+        // It is NOT a secret: anyone who knows the factory config can compute the same ID.
+        // It serves as a stable, short identifier for deduplication, not as an access-control mechanism.
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
