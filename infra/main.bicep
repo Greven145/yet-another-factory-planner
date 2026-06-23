@@ -89,6 +89,8 @@ module swaDomain 'app/swa-domain.bicep' = {
   }
 }
 
+output ENV_APPLICATIONINSIGHTS_CONNECTION_STRING string = env.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING
+
 output API_IDENTITY_CLIENTID string = api_identity.outputs.clientId
 output API_IDENTITY_ID string = api_identity.outputs.id
 output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN

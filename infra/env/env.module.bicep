@@ -63,6 +63,17 @@ resource aspireDashboard 'Microsoft.App/managedEnvironments/dotNetComponents@202
   parent: env
 }
 
+resource env_appinsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: take('envaiz-${uniqueString(resourceGroup().id)}', 63)
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: env_law.id
+  }
+  tags: tags
+}
+
 resource env_diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
   name: 'env-diagnostics'
   scope: env
@@ -86,6 +97,8 @@ resource env_diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-previ
     ]
   }
 }
+
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = env_appinsights.properties.ConnectionString
 
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = env_law.name
 

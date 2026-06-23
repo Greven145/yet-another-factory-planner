@@ -19,6 +19,8 @@ param env_outputs_azure_container_registry_endpoint string
 
 param env_outputs_azure_container_registry_managed_identity_id string
 
+param env_outputs_applicationinsights_connection_string string
+
 resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
   name: 'api'
   location: location
@@ -76,6 +78,10 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
             {
               name: 'AZURE_TOKEN_CREDENTIALS'
               value: 'ManagedIdentityCredential'
+            }
+            {
+              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+              value: env_outputs_applicationinsights_connection_string
             }
             {
               name: 'AllowedOrigins__0'
