@@ -7,6 +7,14 @@ param principalId string
 
 resource cosmos_db 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' existing = {
   name: cosmos_db_outputs_name
+
+  resource database 'sqlDatabases' existing = {
+    name: 'shared-factory'
+
+    resource container 'containers' existing = {
+      name: 'factories'
+    }
+  }
 }
 
 resource cosmos_db_roleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions@2024-08-15' existing = {
@@ -15,11 +23,11 @@ resource cosmos_db_roleDefinition 'Microsoft.DocumentDB/databaseAccounts/sqlRole
 }
 
 resource cosmos_db_roleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-08-15' = {
-  name: guid(principalId, cosmos_db_roleDefinition.id, cosmos_db.id)
+  name: guid(principalId, cosmos_db_roleDefinition.id, cosmos_db::database::container.id)
   properties: {
     principalId: principalId
     roleDefinitionId: cosmos_db_roleDefinition.id
-    scope: cosmos_db.id
+    scope: cosmos_db::database::container.id
   }
   parent: cosmos_db
 }
