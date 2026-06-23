@@ -27,7 +27,8 @@ resource cosmos_db_roleAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRole
   properties: {
     principalId: principalId
     roleDefinitionId: cosmos_db_roleDefinition.id
-    scope: cosmos_db::database::container.id
+    // Cosmos DB RBAC requires the data-plane path format (dbs/colls), not the ARM path format (sqlDatabases/containers)
+    scope: '${cosmos_db.id}/dbs/${cosmos_db::database.name}/colls/${cosmos_db::database::container.name}'
   }
   parent: cosmos_db
 }
