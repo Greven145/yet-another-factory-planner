@@ -87,10 +87,6 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
               name: 'AllowedOrigins__0'
               value: 'https://yafp.game.gottselig.ca'
             }
-            {
-              name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-              value: env_outputs_applicationinsights_connection_string
-            }
           ]
         }
       ]
