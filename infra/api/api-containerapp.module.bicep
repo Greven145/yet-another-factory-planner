@@ -77,6 +77,10 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
               name: 'AZURE_TOKEN_CREDENTIALS'
               value: 'ManagedIdentityCredential'
             }
+            {
+              name: 'AllowedOrigins__0'
+              value: 'https://yafp.game.gottselig.ca'
+            }
           ]
         }
       ]
