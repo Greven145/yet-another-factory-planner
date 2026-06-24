@@ -48,7 +48,7 @@ jobs:
     name: Build (Frontend)
     runs-on: ubuntu-latest
     # Run inside the prebuilt CI image (Playwright browsers + system libs +
-    # Node 20 + baked npm deps), published by build-ci-image.yml. This removes
+    # Node 24 + baked npm deps), published by build-ci-image.yml. This removes
     # the per-run `npm ci` + `playwright install --with-deps` cost. --ipc=host
     # is Playwright's recommended flag to stop Chromium running out of memory.
     container:
@@ -155,8 +155,8 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           # Match the Node version CI validates the client under (build-frontend
-          # uses 20) so the shipped artifact is built on the same runtime.
-          node-version: '20'
+          # uses 24) so the shipped artifact is built on the same runtime.
+          node-version: '24'
 
       - name: Log in with Azure (Federated Credentials)
         run: |
