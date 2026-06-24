@@ -37,6 +37,18 @@ export type {
 } from './models';
 
 const MIN_RESOURCE_WEIGHT = 0.0001;
+
+// GCD helpers used to derive per-cycle ingredient quantities from stored perMinute rates.
+// perMinute = 60 * quantity / craftTime, so GCD(all perMinutes) = 60 / craftTime,
+// and quantity = perMinute / GCD. We scale to integers to avoid floating-point drift.
+function gcdIntegers(a: number, b: number): number {
+  while (b > 0) { [a, b] = [b, a % b]; }
+  return a;
+}
+function gcdFloats(a: number, b: number): number {
+  const scale = 1e6;
+  return gcdIntegers(Math.round(a * scale), Math.round(b * scale)) / scale;
+}
 const MAXIMIZE_WEIGHT = 1e5;
 const ENFORCE_BIN_WEIGHT = 1000;
 const TIME_LIMIT = 3.0;
@@ -283,6 +295,11 @@ export class ProductionSolver {
   // Returns a copy of gameData with 1.2 Game Mode multipliers baked in: recipe ingredient costs
   // scaled by recipeCostMultiplier (outputs untouched) and consumer power scaled by powerMultiplier
   // (generators, power < 0, left alone). All downstream solver/report logic then reads scaled values.
+  //
+  // The game applies the cost multiplier to the integer *per-cycle quantities*, not to the stored
+  // perMinute rates directly. The cycle time is derived from the GCD of all perMinute values in the
+  // recipe (ingredients + products): craftTime = 60 / GCD, perCycleQty = perMinute / GCD.
+  // Scaled quantities are rounded to the nearest whole number (minimum 1 per the game's floor).
   private static applyGameModeMultipliers(gameData: GameData, recipeCostMultiplier: number, powerMultiplier: number): GameData {
     if (recipeCostMultiplier === 1 && powerMultiplier === 1) {
       return gameData;
@@ -290,10 +307,23 @@ export class ProductionSolver {
 
     const recipes: GameData['recipes'] = {};
     for (const [key, recipe] of Object.entries(gameData.recipes)) {
-      recipes[key] = recipeCostMultiplier === 1 ? recipe : {
-        ...recipe,
-        ingredients: recipe.ingredients.map((i) => ({ ...i, perMinute: i.perMinute * recipeCostMultiplier })),
-      };
+      if (recipeCostMultiplier === 1) {
+        recipes[key] = recipe;
+      } else {
+        const allRates = [
+          ...recipe.ingredients.map((i) => i.perMinute),
+          ...recipe.products.map((p) => p.perMinute),
+        ];
+        const gcd = allRates.reduce(gcdFloats);
+        recipes[key] = {
+          ...recipe,
+          ingredients: recipe.ingredients.map((i) => {
+            const perCycle = Math.round(i.perMinute / gcd);
+            const scaledPerCycle = Math.max(1, Math.round(perCycle * recipeCostMultiplier));
+            return { ...i, perMinute: scaledPerCycle * gcd };
+          }),
+        };
+      }
     }
 
     const buildings: GameData['buildings'] = {};
