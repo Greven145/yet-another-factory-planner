@@ -4,7 +4,7 @@
 
 FROM node:24-alpine as build
 WORKDIR /home/node/app
-COPY client/package.json client/package-lock.json ./
+COPY client/.npmrc client/package.json client/package-lock.json ./
 RUN npm install
 RUN npx update-browserslist-db@latest
 COPY client/. .

@@ -15,7 +15,7 @@ FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
 WORKDIR /opt/ci
 
 # Copy manifests first so `npm ci` is cached unless the lockfile changes.
-COPY package.json package-lock.json ./
+COPY .npmrc package.json package-lock.json ./
 RUN npm ci
 
 # Point Lighthouse (lhci -> chrome-launcher reads CHROME_PATH) at the Playwright
