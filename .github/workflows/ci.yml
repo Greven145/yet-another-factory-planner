@@ -179,7 +179,7 @@ jobs:
             exit 1
           fi
           apiUrl="https://api.$caDomain"
-          echo "VITE_REACT_APP_API_BASE_URL=$apiUrl" > client/.env.production
+          echo "VITE_API_BASE_URL=$apiUrl" > client/.env.production
           npm ci --prefix client
           npm run build --prefix client
 
