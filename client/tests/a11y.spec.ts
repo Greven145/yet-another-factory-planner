@@ -34,7 +34,7 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     // Disable CSS transitions/animations so axe never samples an element mid-fade
     // (e.g. a modal/popover transition), which produces non-deterministic
     // composited colours — especially under headless WebKit.
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
     await page.addInitScript(() => {
       const style = document.createElement('style');
       style.textContent =

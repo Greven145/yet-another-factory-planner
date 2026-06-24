@@ -64,6 +64,12 @@ const GlobalStylesheet = createGlobalStyle<any>`
     background-color: #ffffff !important;
   }
 
+  // Active tab in dark mode gets an orange primary background; ensure text is
+  // pure white (not the theme's #eee "white") so contrast meets 4.5:1.
+  :root[data-mantine-color-scheme="dark"] button[role="tab"][data-active] {
+    color: #ffffff !important;
+  }
+
   // Tabs supply their own backgrounds (above); keep the list strip transparent
   // so it doesn't paint a block to the right of the tabs.
   :root[data-mantine-color-scheme="light"] [role="tablist"] {
