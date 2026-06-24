@@ -12,13 +12,6 @@
 ARG PLAYWRIGHT_VERSION=1.58.2
 FROM mcr.microsoft.com/playwright:v${PLAYWRIGHT_VERSION}-noble
 
-# The Playwright image ships Node 24, but the rest of CI (and the deploy build)
-# standardizes on Node 20. Pin Node 20 here for parity so tests/build run under
-# the same runtime everywhere.
-RUN npm install -g n \
-    && n 20 \
-    && node --version
-
 WORKDIR /opt/ci
 
 # Copy manifests first so `npm ci` is cached unless the lockfile changes.

@@ -2,10 +2,10 @@
 # It is NOT the active deployment path. The canonical dev and deployment path is
 # the .NET Aspire AppHost (YetAnotherFactoryPlanner.AppHost).
 
-FROM node:20-alpine3.17 as build
+FROM node:24-alpine as build
 WORKDIR /home/node/app
 COPY client/package.json client/package-lock.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 RUN npx update-browserslist-db@latest
 COPY client/. .
 RUN echo 'VITE_API_BASE_URL="http://localhost:8080/"' > .env
