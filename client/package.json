@@ -10,7 +10,7 @@
     "scripts": {
         "dev": "vite",
         "start": "vite",
-        "build": "vite build",
+        "build": "vite build && node scripts/patch-csp.js",
         "preview": "vite preview",
         "analyze": "source-map-explorer 'dist/assets/*.js'",
         "staging": "env-cmd -f .env.staging npm start",
