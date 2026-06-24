@@ -26,7 +26,8 @@
         "pretest:e2e:headed": "npm run playwright:install",
         "test:e2e:headed": "playwright test --headed",
         "lint": "eslint \"src/**/*.{ts,tsx}\"",
-        "a11y:lhci": "lhci autorun"
+        "a11y:lhci": "lhci autorun",
+        "test:smoke": "node scripts/smoke-runner.js"
     },
     "browserslist": {
         "production": [
