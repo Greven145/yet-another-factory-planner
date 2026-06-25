@@ -44,6 +44,62 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
 {
     containerApp.Template.Scale.MinReplicas = 1; // keep one warm replica: scale-to-zero measured ~27s cold starts
     containerApp.Template.Scale.MaxReplicas = 3;
+
+    // Multiple-revision mode is required for blue-green deployments: each deploy creates a new
+    // revision and traffic is shifted from blue→green after smoke tests pass.
+    containerApp.Configuration.ActiveRevisionsMode = ContainerAppActiveRevisionsMode.Multiple;
+
+    // ACA health probes. Cold start is ~27s (measured, see scale comment above), so startup
+    // probe uses a long initialDelay window before the liveness/readiness probes kick in.
+    //
+    // Startup probe  → HTTP GET /alive every 10s, up to 6 failures (60s total budget).
+    //                  Blocks liveness/readiness probes until it passes once.
+    // Liveness probe → HTTP GET /alive every 30s, 3 failure threshold. Restarts the container
+    //                  if the app is hung (not just slow to hit Cosmos).
+    // Readiness probe → HTTP GET /health every 10s, 3 failure threshold. Pulls the replica
+    //                   out of the ingress pool when Cosmos is unreachable (Unhealthy),
+    //                   without restarting the container.
+    var container = containerApp.Template.Containers[0].Value!;
+    container.Probes.Add(new ContainerAppProbe
+    {
+        ProbeType = ContainerAppProbeType.Startup,
+        HttpGet = new ContainerAppHttpRequestInfo
+        {
+            Path = "/alive",
+            Port = 8080,
+            Scheme = ContainerAppHttpScheme.Http,
+        },
+        InitialDelaySeconds = 5,
+        PeriodSeconds = 10,
+        FailureThreshold = 6,   // 60 s budget before ACA gives up and restarts
+        TimeoutSeconds = 5,
+    });
+    container.Probes.Add(new ContainerAppProbe
+    {
+        ProbeType = ContainerAppProbeType.Liveness,
+        HttpGet = new ContainerAppHttpRequestInfo
+        {
+            Path = "/alive",
+            Port = 8080,
+            Scheme = ContainerAppHttpScheme.Http,
+        },
+        PeriodSeconds = 30,
+        FailureThreshold = 3,
+        TimeoutSeconds = 5,
+    });
+    container.Probes.Add(new ContainerAppProbe
+    {
+        ProbeType = ContainerAppProbeType.Readiness,
+        HttpGet = new ContainerAppHttpRequestInfo
+        {
+            Path = "/health",
+            Port = 8080,
+            Scheme = ContainerAppHttpScheme.Http,
+        },
+        PeriodSeconds = 10,
+        FailureThreshold = 3,
+        TimeoutSeconds = 5,
+    });
 });
 
 if (builder.ExecutionContext.IsRunMode &&
