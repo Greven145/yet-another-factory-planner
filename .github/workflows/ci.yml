@@ -195,22 +195,32 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
+      # Bootstrap the "blue" label onto the current production revision BEFORE provision.
+      # The IaC ingress traffic block pins 100% to the "blue" label, so the label must
+      # exist before `azd provision` applies that template (otherwise the first apply has
+      # no target). Idempotent: a no-op once "blue" is established.
+      - name: Ensure blue label (bootstrap)
+        id: ensure_blue
+        run: bash scripts/aca-bluegreen.sh ensure-blue
+
       # ── Infra ────────────────────────────────────────────────────────────────
+      # Provision pins ingress traffic to the "blue" label (stable production alias), so
+      # azd no longer resets traffic to "latest" on each run.
       - name: Provision Infrastructure
         run: azd provision --no-prompt
 
       # ── API blue-green ────────────────────────────────────────────────────────
-      # azd deploy creates a new ACA revision. aca-bluegreen.sh deploy-green then
-      # LABELS the current-active revision "blue" and the latest "green", pinning
-      # traffic blue=100%/green=0% so production keeps flowing to blue while we
-      # smoke-test green on its revision-specific FQDN.
+      # azd deploy creates a new ACA revision. With traffic pinned to "blue", that new
+      # revision lands at 0%. aca-bluegreen.sh deploy-green just labels it "green"; the
+      # smoke step validates it on its own FQDN; shift then moves the "blue" label onto
+      # green to promote it. Production keeps flowing to blue until shift.
       - name: Deploy API
         id: deploy_api
         run: azd deploy api --no-prompt
 
-      # Label blue/green and set traffic blue=100%/green=0%. Does not print a
+      # Label the just-deployed revision "green" (stays at 0% traffic). Does not print a
       # FQDN; the smoke step resolves green's FQDN itself.
-      - name: Label blue/green revisions
+      - name: Label green revision
         id: label_green
         run: bash scripts/aca-bluegreen.sh deploy-green
 
@@ -221,17 +231,18 @@ jobs:
         id: api_smoke
         run: bash scripts/aca-bluegreen.sh smoke
 
-      # Shift traffic green=100% and remove the blue label on smoke success.
+      # Promote green by moving the "blue" label onto it (traffic is pinned to "blue",
+      # so this atomically shifts 100% to green). Only on smoke success.
       - name: Shift API traffic to green
         if: success()
         run: bash scripts/aca-bluegreen.sh shift
 
-      # Restore traffic blue=100% if any preceding step in the API block failed.
-      # Gated on label_green having succeeded because rollback relies on the blue
-      # label existing — if labeling never ran, there is nothing to roll back to.
-      # The job still exits red because failure() is only true when failing.
+      # Failure safety net. Smoke runs before shift, so a pre-shift failure leaves "blue"
+      # on the previous (good) revision and production is unaffected — rollback just
+      # reports that. Gated on ensure_blue so it only runs once "blue" exists. The job
+      # still exits red because failure() is only true when failing.
       - name: Rollback API to blue on failure
-        if: failure() && steps.label_green.outcome == 'success'
+        if: failure() && steps.ensure_blue.outcome == 'success'
         run: bash scripts/aca-bluegreen.sh rollback
 
       # ── Client blue-green (SWA Free tier) ─────────────────────────────────────

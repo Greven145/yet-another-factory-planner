@@ -49,6 +49,22 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
     // revision and traffic is shifted from blue→green after smoke tests pass.
     containerApp.Configuration.ActiveRevisionsMode = ContainerAppActiveRevisionsMode.Multiple;
 
+    // Cap retained inactive revisions so historic blue-green revisions don't pile up.
+    containerApp.Configuration.MaxInactiveRevisions = 5;
+
+    // Pin ingress traffic to the "blue" label rather than letting it default to
+    // latestRevision. Without this block azd re-applies a traffic-less template on every
+    // provision, and ACA resets traffic to 100%→latest — which would route live traffic to
+    // a freshly deployed (un-smoke-tested) revision. With it, "blue" is a stable alias for
+    // the current production revision: new revisions land at 0%, and scripts/aca-bluegreen.sh
+    // moves the "blue" label onto green only after smoke passes. The label is bootstrapped
+    // onto the current revision by `aca-bluegreen.sh ensure-blue` before the first provision.
+    containerApp.Configuration.Ingress.Traffic.Add(new ContainerAppRevisionTrafficWeight
+    {
+        Label = "blue",
+        Weight = 100,
+    });
+
     // ACA health probes. Cold start is ~27s (measured, see scale comment above), so startup
     // probe uses a long initialDelay window before the liveness/readiness probes kick in.
     //
