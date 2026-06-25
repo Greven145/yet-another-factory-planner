@@ -62,33 +62,16 @@ SUBCOMMAND="${1:-}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-aca_cmd() {
-  az containerapp "${AZ_FLAGS[@]}" \
-    --resource-group "$ACA_RESOURCE_GROUP" \
-    --name "$ACA_APP_NAME" \
-    "$@"
-}
-
-# Returns the revision name for a given label, or empty string if not found.
+# Returns the revision name for a given traffic label, or empty string if not found.
+# Labels live on the app-level ingress traffic array (ingress.traffic[].label),
+# NOT on revision objects, so we query the ingress traffic config here.
 revision_for_label() {
   local label="$1"
-  az containerapp revision list \
+  az containerapp ingress traffic show \
     "${AZ_FLAGS[@]}" \
     --resource-group "$ACA_RESOURCE_GROUP" \
     --name "$ACA_APP_NAME" \
-    --query "[?properties.trafficWeight[?label=='${label}'].label | [0]].name | [0]" \
-    -o tsv 2>/dev/null || true
-}
-
-# Returns the revision-specific FQDN for a given revision label.
-fqdn_for_label() {
-  local label="$1"
-  az containerapp revision show \
-    "${AZ_FLAGS[@]}" \
-    --resource-group "$ACA_RESOURCE_GROUP" \
-    --name "$ACA_APP_NAME" \
-    --revision "$(revision_for_label "$label")" \
-    --query "properties.fqdn" \
+    --query "[?label=='${label}'].revisionName | [0]" \
     -o tsv 2>/dev/null || true
 }
 
@@ -185,12 +168,13 @@ cmd_smoke() {
   fi
   echo "[smoke] Green revision: $GREEN_REV"
 
-  # Build the revision-specific FQDN: <revision-name>.<app-default-domain-suffix>
-  # ACA revision-specific URLs follow the pattern:
-  #   https://<container-app-name>--<revision-name>.<env-default-domain>
+  # Build the revision-specific FQDN. ACA exposes each revision at:
+  #   https://<revision-name>.<env-default-domain>
+  # where <revision-name> is already "<app-name>--<suffix>" (as returned by Azure),
+  # and the app's default FQDN is "<app-name>.<env-default-domain>". So we strip the
+  # "<app-name>." prefix off the app FQDN to get the env domain, then prepend the
+  # full revision name. This targets the green revision directly, bypassing blue.
   APP_FQDN=$(app_fqdn)
-  # The revision FQDN is derived by replacing the app name prefix with the revision name.
-  # Pattern: <app-name>.<env-domain> → <revision-name>.<env-domain>
   ENV_DOMAIN="${APP_FQDN#"${ACA_APP_NAME}."}"
   GREEN_FQDN="https://${GREEN_REV}.${ENV_DOMAIN}"
 
@@ -265,7 +249,9 @@ cmd_rollback() {
   echo "[rollback] To deactivate the green revision, run:"
   echo "[rollback]   az containerapp revision deactivate --name $ACA_APP_NAME \\"
   echo "[rollback]     --resource-group $ACA_RESOURCE_GROUP \\"
-  echo "[rollback]     --revision \$(./scripts/aca-bluegreen.sh _green-rev)"
+  echo "[rollback]     --revision \$(az containerapp ingress traffic show --name $ACA_APP_NAME \\"
+  echo "[rollback]       --resource-group $ACA_RESOURCE_GROUP \\"
+  echo "[rollback]       --query \"[?label=='green'].revisionName | [0]\" -o tsv)"
 }
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────

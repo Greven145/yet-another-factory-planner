@@ -59,6 +59,12 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
     // Readiness probe → HTTP GET /health every 10s, 3 failure threshold. Pulls the replica
     //                   out of the ingress pool when Cosmos is unreachable (Unhealthy),
     //                   without restarting the container.
+    // Probe target port. Must stay in sync with the container's target/listening port,
+    // which is the ACA ingress targetPort (int(api_containerport), fed from the azd
+    // bicepparam '{{ targetPortOrDefault 8080 }}'). 8080 is the Aspire/.NET container
+    // default; if the container port ever changes, update this constant to match.
+    const int ProbePort = 8080;
+
     var container = containerApp.Template.Containers[0].Value!;
     container.Probes.Add(new ContainerAppProbe
     {
@@ -66,7 +72,7 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
         HttpGet = new ContainerAppHttpRequestInfo
         {
             Path = "/alive",
-            Port = 8080,
+            Port = ProbePort,
             Scheme = ContainerAppHttpScheme.Http,
         },
         InitialDelaySeconds = 5,
@@ -80,7 +86,7 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
         HttpGet = new ContainerAppHttpRequestInfo
         {
             Path = "/alive",
-            Port = 8080,
+            Port = ProbePort,
             Scheme = ContainerAppHttpScheme.Http,
         },
         PeriodSeconds = 30,
@@ -93,7 +99,7 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
         HttpGet = new ContainerAppHttpRequestInfo
         {
             Path = "/health",
-            Port = 8080,
+            Port = ProbePort,
             Scheme = ContainerAppHttpScheme.Http,
         },
         PeriodSeconds = 10,
