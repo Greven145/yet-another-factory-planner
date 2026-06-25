@@ -134,6 +134,10 @@ jobs:
         || github.ref == 'refs/heads/integration/blue-green-deploys')
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # Hard cap so a hung step (e.g. a wedged smoke test) can never run for hours and
+    # hold the deploy-production concurrency lock. Generous enough for provision + both
+    # blue-green deploys.
+    timeout-minutes: 30
     # Serialize production deploys so overlapping merges to main don't run
     # concurrent azd provision/deploy against the same environment.
     concurrency:
@@ -279,6 +283,9 @@ jobs:
       - name: Smoke-test client (SWA preview)
         id: client_smoke
         working-directory: client
+        # Step-level cap (in addition to the job cap and Playwright's per-test
+        # timeout) so a wedged browser install / launch fails fast.
+        timeout-minutes: 10
         run: npm run test:smoke -- --url "${{ steps.swa_preview.outputs.static_web_app_url }}"
 
       # Promote the already-built client/dist to production by re-uploading
