@@ -35,8 +35,12 @@ async function openControlPanel(page: import('@playwright/test').Page) {
   });
   await page.goto('/');
 
-  // Wait for the app shell to be present before interacting.
-  await page.waitForSelector('[role="main"], #root > *', { timeout: 30_000 });
+  // Wait for the app shell to actually mount. The game-version combobox is the
+  // real readiness signal (a bare `#root > *` matches the Mantine <style> tag
+  // injected before React renders, which would return a false-green).
+  await expect(
+    page.getByRole('combobox', { name: 'Game version' }),
+  ).toBeVisible({ timeout: 30_000 });
 
   const openBtn = page.getByRole('button', { name: 'Open Control Panel' });
   await openBtn.waitFor({ state: 'visible', timeout: 30_000 });
@@ -56,18 +60,17 @@ test.describe('Smoke: app shell', () => {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-    // The app root must contain rendered content within 30 s.
-    const root = page.locator('#root');
-    await expect(root).not.toBeEmpty({ timeout: 30_000 });
+    // App-shell-mounted assertion: the game-version combobox is the real
+    // readiness signal — it only renders once React has mounted the header.
+    // (A bare `#root > *` would match the Mantine <style> tag injected before
+    // React renders, producing a false-green.)
+    await expect(
+      page.getByRole('combobox', { name: 'Game version' }),
+    ).toBeVisible({ timeout: 30_000 });
 
     // Page must not be a plain error page (5xx / blank).
     const bodyText = await page.locator('body').innerText();
     expect(bodyText.trim().length).toBeGreaterThan(0);
-
-    // Version selector is always present in the header once the app mounts.
-    await expect(
-      page.getByRole('combobox', { name: 'Game version' }),
-    ).toBeVisible({ timeout: 30_000 });
 
     // No critical JS errors (network 4xx/5xx are logged as errors; filter known
     // non-fatal ones that occur even in production).

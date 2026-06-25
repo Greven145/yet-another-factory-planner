@@ -9,7 +9,7 @@
 
 'use strict';
 
-const { execFileSync } = require('child_process');
+const { spawnSync } = require('child_process');
 
 const args = process.argv.slice(2);
 
@@ -26,9 +26,18 @@ if (urlIndex !== -1) {
   }
 }
 
-// Forward remaining args (e.g. --headed, --debug) to playwright.
-execFileSync(
-  'npx',
-  ['playwright', 'test', '--config', 'playwright.smoke.config.ts', ...args],
+// Fail fast with a clear message rather than letting Playwright fall back to
+// localhost and surface a confusing CONNECTION_REFUSED on CI.
+if (!process.env.SMOKE_URL) {
+  console.error('smoke-runner: SMOKE_URL is not set. Pass --url <url> or set SMOKE_URL.');
+  process.exit(1);
+}
+
+// Use the locally installed playwright binary (not npx) to avoid version skew,
+// and propagate its exit code explicitly so CI sees real pass/fail.
+const result = spawnSync(
+  'node_modules/.bin/playwright',
+  ['test', '--config', 'playwright.smoke.config.ts', ...args],
   { stdio: 'inherit', env: process.env },
 );
+process.exit(result.status ?? 1);
