@@ -1,7 +1,6 @@
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
@@ -101,33 +100,17 @@ public static class Extensions
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
-            // Add a default liveness check to ensure app is responsive
+            // Liveness/readiness check: the app process is up and responsive. Both
+            // GET /health (readiness) and GET /alive (liveness) pass once this does.
+            //
+            // NOTE: we intentionally do NOT probe Cosmos here. The EF Core Cosmos provider
+            // does not support DbContext.Database.CanConnectAsync (it throws
+            // NotSupportedException), and the obvious alternative — CosmosClient.ReadAccountAsync
+            // — is a control-plane call the API's data-plane-only managed identity cannot make.
+            // Either would make readiness fail permanently and pull every replica from rotation.
+            // Cosmos data-plane connectivity is instead validated functionally by the deploy
+            // smoke test (scripts/smoke-api.sh runs a share-factory -> get-factory round-trip).
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
-
-        // The Aspire EF Core Cosmos integration (builder.AddCosmosDbContext<T>(...)) does
-        // NOT automatically register a health check. We add one here, tagged "ready", so that
-        // GET /health (the readiness probe) surfaces Cosmos connectivity without crashing the
-        // app if Cosmos is briefly unavailable — it reports Unhealthy rather than throwing.
-        // GET /alive (liveness) only runs checks tagged "live" and is unaffected.
-        //
-        // The concrete DbContext type is discovered by scanning the service descriptors inside
-        // the HealthCheckRegistration factory delegate (service descriptors are final by the
-        // time the factory runs, because the host builds the DI container after all
-        // builder.Services calls complete). This avoids coupling ServiceDefaults to
-        // the concrete FactoryDbContext type defined in api.web.
-        var services = builder.Services;
-        builder.Services.AddHealthChecks()
-            .Add(new HealthCheckRegistration(
-                name: "cosmos",
-                factory: sp =>
-                {
-                    var dbContextType = services
-                        .Select(sd => sd.ServiceType)
-                        .FirstOrDefault(t => t != typeof(DbContext) && typeof(DbContext).IsAssignableFrom(t));
-                    return new CosmosHealthCheck(sp.GetRequiredService<IServiceScopeFactory>(), dbContextType);
-                },
-                failureStatus: HealthStatus.Unhealthy,
-                tags: ["ready"]));
 
         return builder;
     }
@@ -145,39 +128,5 @@ public static class Extensions
         });
 
         return app;
-    }
-}
-
-/// <summary>
-/// Readiness health check that verifies Cosmos DB connectivity via the registered EF Core DbContext.
-/// Reports <see cref="HealthCheckResult.Unhealthy"/> when Cosmos is unreachable rather than
-/// throwing, so the ACA readiness probe receives a clean 503 instead of an unhandled exception.
-/// Liveness (GET /alive) is unaffected — it only runs checks tagged "live".
-/// </summary>
-internal sealed class CosmosHealthCheck(IServiceScopeFactory scopeFactory, Type? dbContextType) : IHealthCheck
-{
-    private readonly Type? _dbContextType = dbContextType;
-
-    public async Task<HealthCheckResult> CheckHealthAsync(
-        HealthCheckContext context,
-        CancellationToken cancellationToken = default)
-    {
-        if (_dbContextType is null)
-            return HealthCheckResult.Degraded("No DbContext is registered; Cosmos connectivity cannot be verified.");
-
-        try
-        {
-            // Create a fresh scope so we don't capture a long-lived DbContext.
-            await using var scope = scopeFactory.CreateAsyncScope();
-            var dbContext = (DbContext)scope.ServiceProvider.GetRequiredService(_dbContextType);
-            var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
-            return canConnect
-                ? HealthCheckResult.Healthy("Cosmos DB is reachable.")
-                : HealthCheckResult.Unhealthy("Cosmos DB connection check returned false.");
-        }
-        catch (Exception ex)
-        {
-            return HealthCheckResult.Unhealthy("Cosmos DB is unreachable.", ex);
-        }
     }
 }
