@@ -112,6 +112,12 @@ jobs:
   # Production deploy gate: this job only runs after both build jobs above
   # succeed, and only on a push to main or a manual run. A red CI therefore
   # blocks the deploy. Manual runs (workflow_dispatch) still run CI first.
+  #
+  # Blue-green strategy:
+  #   API  — ACA Multiple-revision mode; azd deploys green at 0% traffic;
+  #           smoke passes → shift 100%; smoke fails → rollback, job fails.
+  #   Client — SWA Free tier preview environment; smoke passes → promote to
+  #             production (no rebuild); smoke fails → keep old production.
   deploy:
     name: Deploy to Azure
     needs: [build-and-test, build-frontend]
@@ -135,6 +141,14 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      # scripts/aca-bluegreen.sh reads ACA_RESOURCE_GROUP and ACA_APP_NAME.
+      # The container-app name is hardcoded to "api" in the bicep (name: 'api');
+      # the resource group is rg-<AZURE_ENV_NAME>. ACA_RESOURCE_GROUP is
+      # re-resolved at runtime in "Resolve ACA env vars" (preferring azd's
+      # AZURE_RESOURCE_GROUP output) but defaulted here so the script always has
+      # a value even if that step is skipped.
+      ACA_APP_NAME: api
+      ACA_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -165,14 +179,65 @@ jobs:
             --federated-credential-provider "github" \
             --tenant-id "$AZURE_TENANT_ID"
 
+      # ── Infra ────────────────────────────────────────────────────────────────
       - name: Provision Infrastructure
         run: azd provision --no-prompt
 
+      # Prefer azd's own AZURE_RESOURCE_GROUP output for the resource group so
+      # that scripts/aca-bluegreen.sh targets the exact RG azd provisioned;
+      # fall back to the rg-<AZURE_ENV_NAME> convention (already set in env:)
+      # if azd does not expose it. ACA_APP_NAME stays "api" (set in env:).
+      - name: Resolve ACA env vars
+        run: |
+          set -euo pipefail
+          resourceGroup=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || true)
+          if [ -n "$resourceGroup" ]; then
+            echo "ACA_RESOURCE_GROUP=$resourceGroup" >> "$GITHUB_ENV"
+          else
+            echo "AZURE_RESOURCE_GROUP not exposed by azd; keeping default rg-\$AZURE_ENV_NAME"
+          fi
+
+      # ── API blue-green ────────────────────────────────────────────────────────
+      # azd deploy creates a new ACA revision. aca-bluegreen.sh deploy-green then
+      # LABELS the current-active revision "blue" and the latest "green", pinning
+      # traffic blue=100%/green=0% so production keeps flowing to blue while we
+      # smoke-test green on its revision-specific FQDN.
       - name: Deploy API
+        id: deploy_api
         run: azd deploy api --no-prompt
 
+      # Label blue/green and set traffic blue=100%/green=0%. Does not print a
+      # FQDN; the smoke step resolves green's FQDN itself.
+      - name: Label blue/green revisions
+        id: label_green
+        run: bash scripts/aca-bluegreen.sh deploy-green
+
+      # Smoke-test the green revision. The script resolves green's revision-
+      # specific FQDN and runs scripts/smoke-api.sh against it internally,
+      # exiting non-zero on failure.
+      - name: Smoke-test API (green revision)
+        id: api_smoke
+        run: bash scripts/aca-bluegreen.sh smoke
+
+      # Shift traffic green=100% and remove the blue label on smoke success.
+      - name: Shift API traffic to green
+        if: success()
+        run: bash scripts/aca-bluegreen.sh shift
+
+      # Restore traffic blue=100% if any preceding step in the API block failed.
+      # Gated on label_green having succeeded because rollback relies on the blue
+      # label existing — if labeling never ran, there is nothing to roll back to.
+      # The job still exits red because failure() is only true when failing.
+      - name: Rollback API to blue on failure
+        if: failure() && steps.label_green.outcome == 'success'
+        run: bash scripts/aca-bluegreen.sh rollback
+
+      # ── Client blue-green (SWA Free tier) ─────────────────────────────────────
+      # Build the client ONCE here; it is uploaded twice (preview → production)
+      # without a second build.
       - name: Build web client
         run: |
+          set -euo pipefail
           caDomain=$(azd env get-value AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)
           if [ -z "$caDomain" ]; then
             echo "ERROR: AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN is empty — provision must run first" >&2
@@ -183,7 +248,10 @@ jobs:
           npm ci --prefix client
           npm run build --prefix client
 
-      - name: Deploy web to Static Web App
+      # Upload to a named SWA preview environment ("staging").  The action's
+      # static_web_app_url output exposes the preview URL for smoke testing.
+      - name: Deploy client to SWA preview (staging)
+        id: swa_preview
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
@@ -191,3 +259,27 @@ jobs:
           action: upload
           app_location: client/dist
           skip_app_build: true
+          deployment_environment: staging
+
+      # Run the client smoke suite against the preview URL.  The suite is
+      # invoked via `npm run test:smoke` so the exact test runner (Playwright,
+      # etc.) is an implementation detail of the client package.
+      - name: Smoke-test client (SWA preview)
+        id: client_smoke
+        working-directory: client
+        run: npm run test:smoke -- --url "${{ steps.swa_preview.outputs.static_web_app_url }}"
+
+      # Promote the already-built client/dist to production by re-uploading
+      # WITHOUT the deployment_environment input.  No rebuild occurs.
+      # Explicitly gated on the client smoke succeeding so production keeps the
+      # old version on a smoke failure.
+      - name: Promote client to SWA production
+        if: steps.client_smoke.outcome == 'success'
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: client/dist
+          skip_app_build: true
+          # No deployment_environment → targets the production slot.
