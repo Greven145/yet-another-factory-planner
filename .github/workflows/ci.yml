@@ -3,10 +3,7 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    # TEMPORARY: integration/blue-green-deploys is included so the blue-green
-    # deploy flow can be exercised live while it's being built. Remove this
-    # branch (and the matching deploy-job guard below) before merging to main.
-    branches: [main, integration/blue-green-deploys]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -124,14 +121,10 @@ jobs:
   deploy:
     name: Deploy to Azure
     needs: [build-and-test, build-frontend]
-    # Deploy on a push to main or a manual run targeting main.
-    # TEMPORARY: also deploy from integration/blue-green-deploys so the blue-green
-    # flow can be validated live while it's built. Revert this guard (and the push
-    # trigger above) to main-only before merging. workflow_dispatch can be launched
-    # from any branch, so the ref is guarded explicitly.
+    # Only ever deploy main: a push to main, or a manual run targeting main.
+    # workflow_dispatch can be launched from any branch, so guard the ref too.
     if: >-
-      (github.ref == 'refs/heads/main'
-        || github.ref == 'refs/heads/integration/blue-green-deploys')
+      github.ref == 'refs/heads/main'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Hard cap so a hung step (e.g. a wedged smoke test) can never run for hours and
