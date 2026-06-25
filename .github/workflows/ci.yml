@@ -277,16 +277,33 @@ jobs:
           skip_app_build: true
           deployment_environment: staging
 
-      # Run the client smoke suite against the preview URL.  The suite is
-      # invoked via `npm run test:smoke` so the exact test runner (Playwright,
-      # etc.) is an implementation detail of the client package.
+      # Smoke-test the preview deployment: confirm it serves the app shell (HTTP 200
+      # + the React root div) before promoting to production. This is an HTTP-level
+      # check on purpose — a full browser-driven Playwright run in the deploy job
+      # downloads ~170 MB of browser per run and proved unreliable on the bare runner
+      # (browser-artifact downloads stalled). The client's functional behaviour
+      # (create -> share -> restore) is covered by the e2e suite in build-frontend,
+      # and the API round-trip by the API smoke above; here we just verify the static
+      # deploy is live. (The Playwright smoke spec remains in client/ for local runs.)
       - name: Smoke-test client (SWA preview)
         id: client_smoke
-        working-directory: client
-        # Step-level cap (in addition to the job cap and Playwright's per-test
-        # timeout) so a wedged browser install / launch fails fast.
-        timeout-minutes: 10
-        run: npm run test:smoke -- --url "${{ steps.swa_preview.outputs.static_web_app_url }}"
+        timeout-minutes: 5
+        env:
+          PREVIEW_URL: ${{ steps.swa_preview.outputs.static_web_app_url }}
+        run: |
+          set -euo pipefail
+          echo "Smoke-testing client preview: $PREVIEW_URL"
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o /tmp/preview-index.html -w '%{http_code}' --max-time 30 "$PREVIEW_URL/" || echo "000")
+            if [ "$code" = "200" ] && grep -q 'id="root"' /tmp/preview-index.html; then
+              echo "Preview is live: HTTP 200 and app shell present."
+              exit 0
+            fi
+            echo "attempt $attempt: http=$code, app shell not ready yet; retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: client preview did not serve the app shell (last http=$code)." >&2
+          exit 1
 
       # Promote the already-built client/dist to production by re-uploading
       # WITHOUT the deployment_environment input.  No rebuild occurs.
