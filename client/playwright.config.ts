@@ -2,9 +2,6 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  // Exclude the smoke suite — it targets a deployed URL and is run separately
-  // via `npm run test:smoke` / playwright.smoke.config.ts.
-  testIgnore: '**/smoke.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

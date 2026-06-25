@@ -230,15 +230,18 @@ jobs:
 
       # Promote green: set 100% of traffic to the new revision. Only on smoke success.
       - name: Shift API traffic to green
+        id: shift_api
         if: success()
         run: bash scripts/aca-bluegreen.sh shift
 
-      # Failure safety net. Smoke runs before shift, so a pre-shift failure leaves traffic on
-      # blue and production is unaffected; rollback re-pins BLUE_REVISION to be safe. Gated on
-      # resolve_blue so a blue revision is known. The job still exits red (failure() is only
-      # true when failing).
+      # Failure safety net, scoped to the API stage. Rollback runs only when the traffic
+      # shift did NOT succeed (shift_api.outcome != 'success' covers a failed/skipped shift,
+      # i.e. any failure at or before deploy/verify/smoke/shift). Once the shift succeeds the
+      # green revision is live and validated, so a LATER failure in the client stage
+      # (preview/smoke/promote) must NOT revert the API — hence we exclude shift success here.
+      # Also requires resolve_blue so a blue revision is known. Job still exits red.
       - name: Rollback API to blue on failure
-        if: failure() && steps.resolve_blue.outcome == 'success'
+        if: failure() && steps.resolve_blue.outcome == 'success' && steps.shift_api.outcome != 'success'
         run: bash scripts/aca-bluegreen.sh rollback
 
       # ── Client blue-green (SWA Free tier) ─────────────────────────────────────
