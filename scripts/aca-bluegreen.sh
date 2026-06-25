@@ -1,50 +1,42 @@
 #!/usr/bin/env bash
 # aca-bluegreen.sh — Blue-green deployment driver for Azure Container Apps.
 #
-# Traffic model: ingress traffic is pinned to the "blue" label in IaC
-# (api-containerapp.module.bicep -> ingress.traffic: [{ label: 'blue', weight: 100 }]).
-# "blue" is therefore a STABLE ALIAS for the current production revision — it always
-# receives 100% of traffic. Promotion is just moving the "blue" label onto the green
-# revision after smoke passes; the template stays consistent across azd provisions, so
-# azd never resets traffic to "latest".
+# Traffic model: ingress traffic is pinned by REVISION NAME in IaC
+# (api-containerapp.module.bicep -> ingress.traffic: [{ revisionName: api_blue_revision,
+# weight: 100 }]). CI resolves the current production ("blue") revision with
+# `current-revision` and passes it to azd as BLUE_REVISION before `azd deploy api`. The
+# deploy then creates the new ("green") revision while keeping 100% of traffic on blue, so
+# green lands at 0% and can be smoke-tested before any shift. ACA/ARM rejects a traffic
+# weight without a revisionName (when latestRevision is false), which is why we pin by name
+# rather than by label.
 #
 # Subcommands:
-#   ensure-blue    Bootstrap: if no revision carries the "blue" label yet, assign it to
-#                  the current serving revision. Idempotent. Run before `azd provision`
-#                  so the IaC traffic block (which references the "blue" label) applies
-#                  cleanly on the first deploy.
+#   current-revision  Print the revision name currently serving production traffic. CI feeds
+#                     this to `azd env set BLUE_REVISION` so the deploy keeps traffic on it.
+#                     Falls back to the latest revision when traffic is on the latestRevision
+#                     pointer (greenfield / pre-pin). Prints nothing if there are no revisions.
 #
-#   deploy-green   Identify the just-deployed revision (latest) and label it "green".
-#                  No traffic change: with traffic pinned to "blue", green sits at 0%.
+#   deploy-green      Verify a new revision (latest) exists and differs from the current
+#                     production revision. No traffic change (green is already at 0%).
 #
-#   smoke          Run smoke-api.sh against the green revision's revision-specific FQDN
-#                  (targets green directly, bypassing the blue-served production traffic).
+#   smoke             Run smoke-api.sh against the green revision's revision-specific FQDN
+#                     (targets green directly, bypassing blue-served production traffic).
 #
-#   shift          Promote: move the "blue" label from the old revision onto green. Since
-#                  traffic is pinned to the "blue" label, this atomically shifts 100% of
-#                  traffic to green. Removes the now-redundant "green" label.
+#   shift             Promote green: set ingress traffic 100% to the latest (green) revision.
 #
-#   rollback       Safety net for the CI failure path. Smoke runs BEFORE shift, so a
-#                  pre-shift failure leaves "blue" untouched and production unaffected —
-#                  rollback then just reports the still-serving blue revision (no-op).
+#   rollback          Restore 100% traffic to the previous production revision. Prefers
+#                     $BLUE_REVISION (the value CI pinned for this deploy); otherwise the
+#                     revision currently serving the most traffic. Smoke runs before shift,
+#                     so on a pre-shift failure this is effectively a no-op (blue unchanged).
 #
 # Required environment variables:
 #   ACA_RESOURCE_GROUP     Azure resource group containing the Container App.
 #   ACA_APP_NAME           Name of the Azure Container App (e.g. "api").
 #
 # Optional:
-#   SMOKE_SCRIPT           Path to the smoke-api.sh script.
-#                          Default: <script-dir>/smoke-api.sh
+#   BLUE_REVISION          Production revision name pinned for this deploy (used by rollback).
+#   SMOKE_SCRIPT           Path to smoke-api.sh. Default: <script-dir>/smoke-api.sh
 #   ACA_SUBSCRIPTION       Azure subscription ID or name (passed to az --subscription).
-#                          If empty, the az CLI's current subscription is used.
-#
-# Example workflow (mirrors .github/workflows/ci.yml):
-#   ./scripts/aca-bluegreen.sh ensure-blue   # before: azd provision
-#   #   azd provision ; azd deploy api       # provision pins traffic to blue; deploy makes green
-#   ./scripts/aca-bluegreen.sh deploy-green  # label the new revision "green" (stays at 0%)
-#   ./scripts/aca-bluegreen.sh smoke         # validate green on its own FQDN
-#   ./scripts/aca-bluegreen.sh shift         # move "blue" onto green -> 100% traffic
-#   #   on failure before shift: rollback is a no-op; production stayed on blue
 
 set -euo pipefail
 
@@ -65,32 +57,18 @@ SUBCOMMAND="${1:-}"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-# Returns the revision name for a given traffic label, or empty string if not found.
-# Labels live on the app-level ingress traffic array (ingress.traffic[].label),
-# NOT on revision objects, so we query the ingress traffic config here.
-revision_for_label() {
-  local label="$1"
-  az containerapp ingress traffic show \
-    "${AZ_FLAGS[@]}" \
-    --resource-group "$ACA_RESOURCE_GROUP" \
-    --name "$ACA_APP_NAME" \
-    --query "[?label=='${label}'].revisionName | [0]" \
-    -o tsv 2>/dev/null || true
-}
-
-# Returns the latest (most recently created) revision name.
+# Latest (most recently created) revision name, or empty if there are none.
 latest_revision() {
   az containerapp revision list \
     "${AZ_FLAGS[@]}" \
     --resource-group "$ACA_RESOURCE_GROUP" \
     --name "$ACA_APP_NAME" \
     --query "sort_by([], &properties.createdTime)[-1].name" \
-    -o tsv
+    -o tsv 2>/dev/null || true
 }
 
-# Returns the revision name currently receiving the most traffic. When traffic is on
-# the latestRevision pointer (pre-bootstrap), no revisionName is present, so fall back
-# to the latest revision.
+# Revision currently receiving the most traffic. When traffic is on the latestRevision
+# pointer (no revisionName present), fall back to the latest revision.
 current_serving_revision() {
   local rev
   rev=$(az containerapp ingress traffic show \
@@ -105,7 +83,7 @@ current_serving_revision() {
   echo "$rev"
 }
 
-# Returns the default ingress FQDN for the container app (used to derive the env domain).
+# Default ingress FQDN for the container app (used to derive the env domain).
 app_fqdn() {
   az containerapp show \
     "${AZ_FLAGS[@]}" \
@@ -115,88 +93,58 @@ app_fqdn() {
     -o tsv
 }
 
-# Assigns a label to a revision, moving it from any other revision (--no-prompt
-# suppresses the "label is in use, move it?" confirmation).
-assign_label() {
-  local label="$1" revision="$2"
-  az containerapp revision label add \
+set_traffic_to() {
+  local revision="$1"
+  az containerapp ingress traffic set \
     "${AZ_FLAGS[@]}" \
     --resource-group "$ACA_RESOURCE_GROUP" \
     --name "$ACA_APP_NAME" \
-    --revision "$revision" \
-    --label "$label" \
-    --no-prompt
+    --revision-weight "${revision}=100"
 }
 
 # ── Subcommands ───────────────────────────────────────────────────────────────
 
-cmd_ensure_blue() {
-  local blue
-  blue=$(revision_for_label "blue")
-  if [ -n "$blue" ]; then
-    echo "[ensure-blue] 'blue' label already on $blue — nothing to do."
-    return 0
-  fi
-
-  local serving
-  serving=$(current_serving_revision)
-  if [ -z "$serving" ]; then
-    echo "ERROR: Could not determine a revision to bootstrap the 'blue' label onto." >&2
-    exit 1
-  fi
-
-  echo "[ensure-blue] Bootstrapping 'blue' label onto current serving revision: $serving"
-  assign_label "blue" "$serving"
-  echo "[ensure-blue] Done. The IaC ingress traffic block can now pin to 'blue'."
+cmd_current_revision() {
+  # Plain stdout (no log noise) so CI can capture it directly.
+  current_serving_revision
 }
 
 cmd_deploy_green() {
   echo "[deploy-green] Identifying blue and green revisions..."
-
   local blue green
-  blue=$(revision_for_label "blue")
-  if [ -z "$blue" ]; then
-    echo "ERROR: No revision carries the 'blue' label. Run 'ensure-blue' (and provision" >&2
-    echo "  the IaC traffic block) before deploy-green." >&2
-    exit 1
-  fi
-  echo "[deploy-green] Current production (blue) revision: $blue"
-
-  # The latest revision is the one azd just deployed (green candidate).
+  blue=$(current_serving_revision)
   green=$(latest_revision)
+
   if [ -z "$green" ]; then
     echo "ERROR: Could not determine the latest (green) revision." >&2
     exit 1
   fi
-  if [ "$green" = "$blue" ]; then
+  echo "[deploy-green] Current production (blue) revision: ${blue:-<none>}"
+  echo "[deploy-green] New (green) revision: $green"
+
+  if [ -n "$blue" ] && [ "$green" = "$blue" ]; then
     echo "ERROR: The latest revision equals the current production revision — no new" >&2
     echo "  revision was deployed. Run 'azd deploy api' first." >&2
     exit 1
   fi
-  echo "[deploy-green] New (green) revision: $green"
-
-  # Label green so smoke/shift can find it. No traffic change: traffic is pinned to the
-  # "blue" label, so the green revision sits at 0% until 'shift' moves "blue" onto it.
-  assign_label "green" "$green"
-  echo "[deploy-green] Labeled $green as 'green' (0% traffic). Run 'smoke' next."
+  echo "[deploy-green] Green is at 0% (traffic pinned to blue). Run 'smoke' next."
 }
 
 cmd_smoke() {
   echo "[smoke] Locating green revision..."
   local green
-  green=$(revision_for_label "green")
+  green=$(latest_revision)
   if [ -z "$green" ]; then
-    echo "ERROR: No revision labeled 'green' found. Run 'deploy-green' first." >&2
+    echo "ERROR: Could not determine the green (latest) revision." >&2
     exit 1
   fi
   echo "[smoke] Green revision: $green"
 
-  # Build the revision-specific FQDN. ACA exposes each revision at:
+  # Revision-specific FQDN. ACA exposes each revision at
   #   https://<revision-name>.<env-default-domain>
-  # where <revision-name> is already "<app-name>--<suffix>" (as returned by Azure),
-  # and the app's default FQDN is "<app-name>.<env-default-domain>". Strip the
-  # "<app-name>." prefix off the app FQDN to get the env domain, then prepend the
-  # full revision name. This targets green directly, bypassing blue-served traffic.
+  # where <revision-name> is "<app-name>--<suffix>" and the app FQDN is
+  # "<app-name>.<env-default-domain>". Strip the "<app-name>." prefix to get the env
+  # domain, then prepend the full revision name to target green directly.
   local app_domain env_domain green_fqdn
   app_domain=$(app_fqdn)
   env_domain="${app_domain#"${ACA_APP_NAME}."}"
@@ -211,70 +159,54 @@ cmd_smoke() {
 }
 
 cmd_shift() {
-  echo "[shift] Promoting green to production (moving the 'blue' label)..."
-
-  local green blue
-  green=$(revision_for_label "green")
+  local green
+  green=$(latest_revision)
   if [ -z "$green" ]; then
-    echo "ERROR: No revision labeled 'green' found. Run 'deploy-green' and 'smoke' first." >&2
+    echo "ERROR: Could not determine the green (latest) revision." >&2
     exit 1
   fi
-  blue=$(revision_for_label "blue")
-  echo "[shift] green=$green, previous blue=${blue:-<none>}"
-
-  # Move the "blue" label onto green. Traffic is pinned to "blue" in IaC, so this
-  # atomically shifts 100% of traffic to green. --no-prompt confirms the move.
-  assign_label "blue" "$green"
-  echo "[shift] 'blue' now points at $green — it is serving 100% of traffic."
-
-  # Drop the now-redundant "green" label (green has been promoted to blue/production).
-  az containerapp revision label remove \
-    "${AZ_FLAGS[@]}" \
-    --resource-group "$ACA_RESOURCE_GROUP" \
-    --name "$ACA_APP_NAME" \
-    --label "green" 2>/dev/null || true
-
-  echo "[shift] Done. $green is the new production (blue) revision."
+  echo "[shift] Promoting green ($green) to 100% of traffic..."
+  set_traffic_to "$green"
+  echo "[shift] Done. $green is now serving 100% of traffic."
 }
 
 cmd_rollback() {
-  echo "[rollback] Checking production traffic state..."
-
   local blue
-  blue=$(revision_for_label "blue")
+  blue="${BLUE_REVISION:-}"
   if [ -z "$blue" ]; then
-    echo "ERROR: No revision carries the 'blue' label. Production traffic target is" >&2
-    echo "  unknown — manual intervention required (re-run 'ensure-blue')." >&2
+    blue=$(current_serving_revision)
+  fi
+  if [ -z "$blue" ]; then
+    echo "ERROR: No production (blue) revision to roll back to. Manual intervention needed." >&2
     exit 1
   fi
-
-  # Smoke runs before shift, so a failure that triggers rollback almost always occurs
-  # while "blue" still points at the previous (good) production revision: nothing to undo.
-  echo "[rollback] 'blue' (production) is on $blue. No traffic shift was committed;"
-  echo "[rollback] production is unaffected. The green revision, if any, sits at 0%."
+  echo "[rollback] Restoring 100% traffic to the previous production revision: $blue"
+  set_traffic_to "$blue"
+  echo "[rollback] Done. Production is on $blue."
 }
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 
 usage() {
-  echo "Usage: $0 {ensure-blue|deploy-green|smoke|shift|rollback}" >&2
+  echo "Usage: $0 {current-revision|deploy-green|smoke|shift|rollback}" >&2
   echo "" >&2
   echo "Required env vars:" >&2
   echo "  ACA_RESOURCE_GROUP   Azure resource group (e.g. rg-myenv)" >&2
   echo "  ACA_APP_NAME         Container app name (e.g. api)" >&2
   echo "" >&2
   echo "Optional env vars:" >&2
+  echo "  BLUE_REVISION        Production revision pinned for this deploy (rollback target)" >&2
   echo "  ACA_SUBSCRIPTION     Azure subscription ID or name" >&2
   echo "  SMOKE_SCRIPT         Path to smoke-api.sh (default: <script-dir>/smoke-api.sh)" >&2
 }
 
 case "$SUBCOMMAND" in
-  ensure-blue)  cmd_ensure_blue ;;
-  deploy-green) cmd_deploy_green ;;
-  smoke)        cmd_smoke ;;
-  shift)        cmd_shift ;;
-  rollback)     cmd_rollback ;;
-  "")           usage; exit 1 ;;
+  current-revision) cmd_current_revision ;;
+  deploy-green)     cmd_deploy_green ;;
+  smoke)            cmd_smoke ;;
+  shift)            cmd_shift ;;
+  rollback)         cmd_rollback ;;
+  "")               usage; exit 1 ;;
   *)
     echo "ERROR: Unknown subcommand '$SUBCOMMAND'" >&2
     usage

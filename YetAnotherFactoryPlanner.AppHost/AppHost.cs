@@ -52,18 +52,15 @@ api.PublishAsAzureContainerApp((infra, containerApp) =>
     // Cap retained inactive revisions so historic blue-green revisions don't pile up.
     containerApp.Configuration.MaxInactiveRevisions = 5;
 
-    // Pin ingress traffic to the "blue" label rather than letting it default to
-    // latestRevision. Without this block azd re-applies a traffic-less template on every
-    // provision, and ACA resets traffic to 100%→latest — which would route live traffic to
-    // a freshly deployed (un-smoke-tested) revision. With it, "blue" is a stable alias for
-    // the current production revision: new revisions land at 0%, and scripts/aca-bluegreen.sh
-    // moves the "blue" label onto green only after smoke passes. The label is bootstrapped
-    // onto the current revision by `aca-bluegreen.sh ensure-blue` before the first provision.
-    containerApp.Configuration.Ingress.Traffic.Add(new ContainerAppRevisionTrafficWeight
-    {
-        Label = "blue",
-        Weight = 100,
-    });
+    // NOTE: ingress traffic is managed in the committed bicep
+    // (infra/api/api-containerapp.module.bicep), NOT here. ACA/ARM rejects a traffic
+    // weight that has no revisionName and latestRevision=false, so a stable blue-green
+    // pin can only be expressed by revisionName — which changes every deploy and so must
+    // be a deployment parameter (api_blue_revision), fed by CI. Azure.Provisioning can't
+    // cleanly express the "empty -> latestRevision, else revisionName" guard, so the
+    // traffic block lives in the committed bicep. If this AppHost is ever re-synthesized
+    // (`azd infra synth`), re-apply that traffic block by hand (same dual-maintenance note
+    // as the probes/revision-mode config).
 
     // ACA health probes. Cold start is ~27s (measured, see scale comment above), so startup
     // probe uses a long initialDelay window before the liveness/readiness probes kick in.

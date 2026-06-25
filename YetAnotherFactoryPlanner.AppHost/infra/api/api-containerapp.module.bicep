@@ -7,6 +7,9 @@ param env_outputs_azure_container_apps_environment_id string
 
 param api_containerimage string
 
+@description('Revision name to keep serving 100% of ingress traffic (the current production / "blue" revision). When empty (e.g. first/greenfield deploy), traffic falls back to latestRevision. Fed by CI from scripts/aca-bluegreen.sh current-revision.')
+param api_blue_revision string = ''
+
 param api_identity_outputs_id string
 
 param api_containerport string
@@ -35,14 +38,20 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
         external: true
         targetPort: int(api_containerport)
         transport: 'http'
-        // Pin traffic to the "blue" label instead of latestRevision. Without this block,
-        // ACA defaults to routing 100% to the newest revision, so every deploy would serve
-        // un-smoke-tested code immediately. "blue" is a stable alias for the current
-        // production revision; scripts/aca-bluegreen.sh moves it to green only after smoke
-        // passes, and `ensure-blue` bootstraps it before the first provision.
-        traffic: [
+        // Keep 100% of traffic on the current production revision (api_blue_revision) so a
+        // deploy that creates a new revision lands it at 0% — letting smoke tests run before
+        // any traffic shift. Without an explicit traffic block, ACA resets to 100%→latest on
+        // every azd apply, which would serve un-smoke-tested code immediately. ACA requires a
+        // revisionName when latestRevision is false, so we pin by name (CI supplies it); on a
+        // greenfield deploy the name is empty and we fall back to latestRevision.
+        traffic: empty(api_blue_revision) ? [
           {
-            label: 'blue'
+            latestRevision: true
+            weight: 100
+          }
+        ] : [
+          {
+            revisionName: api_blue_revision
             weight: 100
           }
         ]

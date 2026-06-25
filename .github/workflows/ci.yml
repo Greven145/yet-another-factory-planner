@@ -195,54 +195,53 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # Bootstrap the "blue" label onto the current production revision BEFORE provision.
-      # The IaC ingress traffic block pins 100% to the "blue" label, so the label must
-      # exist before `azd provision` applies that template (otherwise the first apply has
-      # no target). Idempotent: a no-op once "blue" is established.
-      - name: Ensure blue label (bootstrap)
-        id: ensure_blue
-        run: bash scripts/aca-bluegreen.sh ensure-blue
-
       # ── Infra ────────────────────────────────────────────────────────────────
-      # Provision pins ingress traffic to the "blue" label (stable production alias), so
-      # azd no longer resets traffic to "latest" on each run.
       - name: Provision Infrastructure
         run: azd provision --no-prompt
 
       # ── API blue-green ────────────────────────────────────────────────────────
-      # azd deploy creates a new ACA revision. With traffic pinned to "blue", that new
-      # revision lands at 0%. aca-bluegreen.sh deploy-green just labels it "green"; the
-      # smoke step validates it on its own FQDN; shift then moves the "blue" label onto
-      # green to promote it. Production keeps flowing to blue until shift.
+      # Resolve the current production ("blue") revision and pin it for the deploy. The API
+      # bicep keeps 100% of ingress traffic on api_blue_revision (fed via BLUE_REVISION), so
+      # `azd deploy api` lands the new ("green") revision at 0% instead of letting ACA reset
+      # traffic to 100%→latest. Empty on a greenfield deploy → bicep falls back to
+      # latestRevision. Also exported to the env for the rollback step's target.
+      - name: Resolve production (blue) revision
+        id: resolve_blue
+        run: |
+          set -euo pipefail
+          blue=$(bash scripts/aca-bluegreen.sh current-revision)
+          echo "Current production (blue) revision: ${blue:-<none / greenfield>}"
+          azd env set BLUE_REVISION "$blue"
+          echo "BLUE_REVISION=$blue" >> "$GITHUB_ENV"
+
+      # azd deploy creates a new ACA revision. Traffic stays pinned to blue (above), so the
+      # new revision lands at 0%; smoke validates it before any shift.
       - name: Deploy API
         id: deploy_api
         run: azd deploy api --no-prompt
 
-      # Label the just-deployed revision "green" (stays at 0% traffic). Does not print a
-      # FQDN; the smoke step resolves green's FQDN itself.
-      - name: Label green revision
-        id: label_green
+      # Verify a new (green) revision exists and differs from blue. No traffic change.
+      - name: Verify green revision
+        id: green_check
         run: bash scripts/aca-bluegreen.sh deploy-green
 
-      # Smoke-test the green revision. The script resolves green's revision-
-      # specific FQDN and runs scripts/smoke-api.sh against it internally,
-      # exiting non-zero on failure.
+      # Smoke-test the green revision. The script resolves green's revision-specific FQDN and
+      # runs scripts/smoke-api.sh against it internally, exiting non-zero on failure.
       - name: Smoke-test API (green revision)
         id: api_smoke
         run: bash scripts/aca-bluegreen.sh smoke
 
-      # Promote green by moving the "blue" label onto it (traffic is pinned to "blue",
-      # so this atomically shifts 100% to green). Only on smoke success.
+      # Promote green: set 100% of traffic to the new revision. Only on smoke success.
       - name: Shift API traffic to green
         if: success()
         run: bash scripts/aca-bluegreen.sh shift
 
-      # Failure safety net. Smoke runs before shift, so a pre-shift failure leaves "blue"
-      # on the previous (good) revision and production is unaffected — rollback just
-      # reports that. Gated on ensure_blue so it only runs once "blue" exists. The job
-      # still exits red because failure() is only true when failing.
+      # Failure safety net. Smoke runs before shift, so a pre-shift failure leaves traffic on
+      # blue and production is unaffected; rollback re-pins BLUE_REVISION to be safe. Gated on
+      # resolve_blue so a blue revision is known. The job still exits red (failure() is only
+      # true when failing).
       - name: Rollback API to blue on failure
-        if: failure() && steps.ensure_blue.outcome == 'success'
+        if: failure() && steps.resolve_blue.outcome == 'success'
         run: bash scripts/aca-bluegreen.sh rollback
 
       # ── Client blue-green (SWA Free tier) ─────────────────────────────────────
