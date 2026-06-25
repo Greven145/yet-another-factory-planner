@@ -1,6 +1,7 @@
 using './api-containerapp.module.bicep'
 
 param api_containerimage = '{{ .Image }}'
+param api_blue_revision = '{{ .Env.BLUE_REVISION }}'
 param api_containerport = '{{ targetPortOrDefault 8080 }}'
 param api_identity_outputs_clientid = '{{ .Env.API_IDENTITY_CLIENTID }}'
 param api_identity_outputs_id = '{{ .Env.API_IDENTITY_ID }}'

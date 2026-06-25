@@ -100,7 +100,16 @@ public static class Extensions
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
-            // Add a default liveness check to ensure app is responsive
+            // Liveness/readiness check: the app process is up and responsive. Both
+            // GET /health (readiness) and GET /alive (liveness) pass once this does.
+            //
+            // NOTE: we intentionally do NOT probe Cosmos here. The EF Core Cosmos provider
+            // does not support DbContext.Database.CanConnectAsync (it throws
+            // NotSupportedException), and the obvious alternative — CosmosClient.ReadAccountAsync
+            // — is a control-plane call the API's data-plane-only managed identity cannot make.
+            // Either would make readiness fail permanently and pull every replica from rotation.
+            // Cosmos data-plane connectivity is instead validated functionally by the deploy
+            // smoke test (scripts/smoke-api.sh runs a share-factory -> get-factory round-trip).
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
 
         return builder;

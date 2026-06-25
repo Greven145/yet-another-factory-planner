@@ -112,6 +112,12 @@ jobs:
   # Production deploy gate: this job only runs after both build jobs above
   # succeed, and only on a push to main or a manual run. A red CI therefore
   # blocks the deploy. Manual runs (workflow_dispatch) still run CI first.
+  #
+  # Blue-green strategy:
+  #   API  — ACA Multiple-revision mode; azd deploys green at 0% traffic;
+  #           smoke passes → shift 100%; smoke fails → rollback, job fails.
+  #   Client — SWA Free tier preview environment; smoke passes → promote to
+  #             production (no rebuild); smoke fails → keep old production.
   deploy:
     name: Deploy to Azure
     needs: [build-and-test, build-frontend]
@@ -121,6 +127,10 @@ jobs:
       github.ref == 'refs/heads/main'
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    # Hard cap so a hung step (e.g. a wedged smoke test) can never run for hours and
+    # hold the deploy-production concurrency lock. Generous enough for provision + both
+    # blue-green deploys.
+    timeout-minutes: 30
     # Serialize production deploys so overlapping merges to main don't run
     # concurrent azd provision/deploy against the same environment.
     concurrency:
@@ -135,6 +145,13 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      # scripts/aca-bluegreen.sh reads ACA_RESOURCE_GROUP and ACA_APP_NAME.
+      # The container-app name is hardcoded to "api" in the bicep (name: 'api');
+      # the resource group is the rg-<AZURE_ENV_NAME> that infra/main.bicep
+      # creates (resourceGroups name: 'rg-${environmentName}'), so this default
+      # is exact — azd does not expose AZURE_RESOURCE_GROUP as an output.
+      ACA_APP_NAME: api
+      ACA_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -165,14 +182,74 @@ jobs:
             --federated-credential-provider "github" \
             --tenant-id "$AZURE_TENANT_ID"
 
+      # azd and the az CLI keep separate auth contexts. scripts/aca-bluegreen.sh
+      # drives blue-green traffic with `az containerapp`, so the az CLI needs its
+      # own OIDC login (same federated credential; uses the job's id-token: write).
+      - name: Log in to Azure CLI (Federated Credentials)
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Infra ────────────────────────────────────────────────────────────────
       - name: Provision Infrastructure
         run: azd provision --no-prompt
 
+      # ── API blue-green ────────────────────────────────────────────────────────
+      # Resolve the current production ("blue") revision and pin it for the deploy. The API
+      # bicep keeps 100% of ingress traffic on api_blue_revision (fed via BLUE_REVISION), so
+      # `azd deploy api` lands the new ("green") revision at 0% instead of letting ACA reset
+      # traffic to 100%→latest. Empty on a greenfield deploy → bicep falls back to
+      # latestRevision. Also exported to the env for the rollback step's target.
+      - name: Resolve production (blue) revision
+        id: resolve_blue
+        run: |
+          set -euo pipefail
+          blue=$(bash scripts/aca-bluegreen.sh current-revision)
+          echo "Current production (blue) revision: ${blue:-<none / greenfield>}"
+          azd env set BLUE_REVISION "$blue"
+          echo "BLUE_REVISION=$blue" >> "$GITHUB_ENV"
+
+      # azd deploy creates a new ACA revision. Traffic stays pinned to blue (above), so the
+      # new revision lands at 0%; smoke validates it before any shift.
       - name: Deploy API
+        id: deploy_api
         run: azd deploy api --no-prompt
 
+      # Verify a new (green) revision exists and differs from blue. No traffic change.
+      - name: Verify green revision
+        id: green_check
+        run: bash scripts/aca-bluegreen.sh deploy-green
+
+      # Smoke-test the green revision. The script resolves green's revision-specific FQDN and
+      # runs scripts/smoke-api.sh against it internally, exiting non-zero on failure.
+      - name: Smoke-test API (green revision)
+        id: api_smoke
+        run: bash scripts/aca-bluegreen.sh smoke
+
+      # Promote green: set 100% of traffic to the new revision. Only on smoke success.
+      - name: Shift API traffic to green
+        id: shift_api
+        if: success()
+        run: bash scripts/aca-bluegreen.sh shift
+
+      # Failure safety net, scoped to the API stage. Rollback runs only when the traffic
+      # shift did NOT succeed (shift_api.outcome != 'success' covers a failed/skipped shift,
+      # i.e. any failure at or before deploy/verify/smoke/shift). Once the shift succeeds the
+      # green revision is live and validated, so a LATER failure in the client stage
+      # (preview/smoke/promote) must NOT revert the API — hence we exclude shift success here.
+      # Also requires resolve_blue so a blue revision is known. Job still exits red.
+      - name: Rollback API to blue on failure
+        if: failure() && steps.resolve_blue.outcome == 'success' && steps.shift_api.outcome != 'success'
+        run: bash scripts/aca-bluegreen.sh rollback
+
+      # ── Client blue-green (SWA Free tier) ─────────────────────────────────────
+      # Build the client ONCE here; it is uploaded twice (preview → production)
+      # without a second build.
       - name: Build web client
         run: |
+          set -euo pipefail
           caDomain=$(azd env get-value AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)
           if [ -z "$caDomain" ]; then
             echo "ERROR: AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN is empty — provision must run first" >&2
@@ -183,7 +260,10 @@ jobs:
           npm ci --prefix client
           npm run build --prefix client
 
-      - name: Deploy web to Static Web App
+      # Upload to a named SWA preview environment ("staging").  The action's
+      # static_web_app_url output exposes the preview URL for smoke testing.
+      - name: Deploy client to SWA preview (staging)
+        id: swa_preview
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
@@ -191,3 +271,47 @@ jobs:
           action: upload
           app_location: client/dist
           skip_app_build: true
+          deployment_environment: staging
+
+      # Smoke-test the preview deployment: confirm it serves the app shell (HTTP 200
+      # + the React root div) before promoting to production. This is an HTTP-level
+      # check on purpose — a full browser-driven Playwright run in the deploy job
+      # downloads ~170 MB of browser per run and proved unreliable on the bare runner
+      # (browser-artifact downloads stalled). The client's functional behaviour
+      # (create -> share -> restore) is covered by the e2e suite in build-frontend,
+      # and the API round-trip by the API smoke above; here we just verify the static
+      # deploy is live. (The Playwright smoke spec remains in client/ for local runs.)
+      - name: Smoke-test client (SWA preview)
+        id: client_smoke
+        timeout-minutes: 5
+        env:
+          PREVIEW_URL: ${{ steps.swa_preview.outputs.static_web_app_url }}
+        run: |
+          set -euo pipefail
+          echo "Smoke-testing client preview: $PREVIEW_URL"
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o /tmp/preview-index.html -w '%{http_code}' --max-time 30 "$PREVIEW_URL/" || echo "000")
+            if [ "$code" = "200" ] && grep -q 'id="root"' /tmp/preview-index.html; then
+              echo "Preview is live: HTTP 200 and app shell present."
+              exit 0
+            fi
+            echo "attempt $attempt: http=$code, app shell not ready yet; retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: client preview did not serve the app shell (last http=$code)." >&2
+          exit 1
+
+      # Promote the already-built client/dist to production by re-uploading
+      # WITHOUT the deployment_environment input.  No rebuild occurs.
+      # Explicitly gated on the client smoke succeeding so production keeps the
+      # old version on a smoke failure.
+      - name: Promote client to SWA production
+        if: steps.client_smoke.outcome == 'success'
+        uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: client/dist
+          skip_app_build: true
+          # No deployment_environment → targets the production slot.

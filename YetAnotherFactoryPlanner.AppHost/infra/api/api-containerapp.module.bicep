@@ -7,6 +7,9 @@ param env_outputs_azure_container_apps_environment_id string
 
 param api_containerimage string
 
+@description('Revision name to keep serving 100% of ingress traffic (the current production / "blue" revision). When empty (e.g. first/greenfield deploy), traffic falls back to latestRevision. Fed by CI from scripts/aca-bluegreen.sh current-revision.')
+param api_blue_revision string = ''
+
 param api_identity_outputs_id string
 
 param api_containerport string
@@ -26,11 +29,32 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
   location: location
   properties: {
     configuration: {
-      activeRevisionsMode: 'Single'
+      // Multiple-revision mode enables blue-green deployments: each deploy creates a new
+      // revision and traffic is shifted from blue→green after smoke tests pass.
+      activeRevisionsMode: 'Multiple'
+      // Cap retained inactive revisions so historic blue-green revisions don't pile up.
+      maxInactiveRevisions: 5
       ingress: {
         external: true
         targetPort: int(api_containerport)
         transport: 'http'
+        // Keep 100% of traffic on the current production revision (api_blue_revision) so a
+        // deploy that creates a new revision lands it at 0% — letting smoke tests run before
+        // any traffic shift. Without an explicit traffic block, ACA resets to 100%→latest on
+        // every azd apply, which would serve un-smoke-tested code immediately. ACA requires a
+        // revisionName when latestRevision is false, so we pin by name (CI supplies it); on a
+        // greenfield deploy the name is empty and we fall back to latestRevision.
+        traffic: empty(api_blue_revision) ? [
+          {
+            latestRevision: true
+            weight: 100
+          }
+        ] : [
+          {
+            revisionName: api_blue_revision
+            weight: 100
+          }
+        ]
       }
       registries: [
         {
@@ -86,6 +110,50 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
             {
               name: 'AllowedOrigins__0'
               value: 'https://yafp.game.gottselig.ca'
+            }
+          ]
+          // ACA health probes. Cold start is ~27s (measured), so the startup probe
+          // gives a 60s window (6 failures × 10s period) before ACA gives up.
+          //
+          // Startup  → GET /alive — blocks liveness/readiness until the app is up.
+          // Liveness → GET /alive — restarts the container if the app is hung.
+          // Readiness → GET /health — pulls the replica from the ingress pool when
+          //             Cosmos is unreachable (GET /health runs the "cosmos" check
+          //             tagged "ready" in addition to the "self" liveness check).
+          probes: [
+            {
+              type: 'Startup'
+              httpGet: {
+                path: '/alive'
+                port: int(api_containerport)
+                scheme: 'HTTP'
+              }
+              initialDelaySeconds: 5
+              periodSeconds: 10
+              failureThreshold: 6
+              timeoutSeconds: 5
+            }
+            {
+              type: 'Liveness'
+              httpGet: {
+                path: '/alive'
+                port: int(api_containerport)
+                scheme: 'HTTP'
+              }
+              periodSeconds: 30
+              failureThreshold: 3
+              timeoutSeconds: 5
+            }
+            {
+              type: 'Readiness'
+              httpGet: {
+                path: '/health'
+                port: int(api_containerport)
+                scheme: 'HTTP'
+              }
+              periodSeconds: 10
+              failureThreshold: 3
+              timeoutSeconds: 5
             }
           ]
         }
