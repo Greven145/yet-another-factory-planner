@@ -150,10 +150,9 @@ jobs:
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
       # scripts/aca-bluegreen.sh reads ACA_RESOURCE_GROUP and ACA_APP_NAME.
       # The container-app name is hardcoded to "api" in the bicep (name: 'api');
-      # the resource group is rg-<AZURE_ENV_NAME>. ACA_RESOURCE_GROUP is
-      # re-resolved at runtime in "Resolve ACA env vars" (preferring azd's
-      # AZURE_RESOURCE_GROUP output) but defaulted here so the script always has
-      # a value even if that step is skipped.
+      # the resource group is the rg-<AZURE_ENV_NAME> that infra/main.bicep
+      # creates (resourceGroups name: 'rg-${environmentName}'), so this default
+      # is exact — azd does not expose AZURE_RESOURCE_GROUP as an output.
       ACA_APP_NAME: api
       ACA_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
       DOTNET_NOLOGO: true
@@ -189,20 +188,6 @@ jobs:
       # ── Infra ────────────────────────────────────────────────────────────────
       - name: Provision Infrastructure
         run: azd provision --no-prompt
-
-      # Prefer azd's own AZURE_RESOURCE_GROUP output for the resource group so
-      # that scripts/aca-bluegreen.sh targets the exact RG azd provisioned;
-      # fall back to the rg-<AZURE_ENV_NAME> convention (already set in env:)
-      # if azd does not expose it. ACA_APP_NAME stays "api" (set in env:).
-      - name: Resolve ACA env vars
-        run: |
-          set -euo pipefail
-          resourceGroup=$(azd env get-value AZURE_RESOURCE_GROUP 2>/dev/null || true)
-          if [ -n "$resourceGroup" ]; then
-            echo "ACA_RESOURCE_GROUP=$resourceGroup" >> "$GITHUB_ENV"
-          else
-            echo "AZURE_RESOURCE_GROUP not exposed by azd; keeping default rg-\$AZURE_ENV_NAME"
-          fi
 
       # ── API blue-green ────────────────────────────────────────────────────────
       # azd deploy creates a new ACA revision. aca-bluegreen.sh deploy-green then
