@@ -139,6 +139,9 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      # Pull the prebuilt frontend-ci image (Playwright browsers baked in) from
+      # GHCR for the client smoke step below.
+      packages: read
     env:
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -273,22 +276,18 @@ jobs:
           skip_app_build: true
           deployment_environment: staging
 
-      # Smoke-test the preview deployment: confirm it serves the app shell (HTTP 200
-      # + the React root div) before promoting to production. This is an HTTP-level
-      # check on purpose — a full browser-driven Playwright run in the deploy job
-      # downloads ~170 MB of browser per run and proved unreliable on the bare runner
-      # (browser-artifact downloads stalled). The client's functional behaviour
-      # (create -> share -> restore) is covered by the e2e suite in build-frontend,
-      # and the API round-trip by the API smoke above; here we just verify the static
-      # deploy is live. (The Playwright smoke spec remains in client/ for local runs.)
-      - name: Smoke-test client (SWA preview)
-        id: client_smoke
+      # Readiness gate: cheap HTTP poll until the SWA preview serves the app shell
+      # (HTTP 200 + the React root div). This waits out SWA preview propagation so
+      # the browser smoke below launches against a live deployment instead of racing
+      # the CDN. Bounded by retries + timeout-minutes.
+      - name: Wait for client preview to be live
+        id: client_live
         timeout-minutes: 5
         env:
           PREVIEW_URL: ${{ steps.swa_preview.outputs.static_web_app_url }}
         run: |
           set -euo pipefail
-          echo "Smoke-testing client preview: $PREVIEW_URL"
+          echo "Waiting for client preview: $PREVIEW_URL"
           for attempt in $(seq 1 10); do
             code=$(curl -sS -o /tmp/preview-index.html -w '%{http_code}' --max-time 30 "$PREVIEW_URL/" || echo "000")
             if [ "$code" = "200" ] && grep -q 'id="root"' /tmp/preview-index.html; then
@@ -300,6 +299,45 @@ jobs:
           done
           echo "ERROR: client preview did not serve the app shell (last http=$code)." >&2
           exit 1
+
+      # GHCR login so the smoke step can pull the prebuilt frontend-ci image.
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      # Functional smoke against the REAL deployed preview + live API: drives the
+      # create -> share -> restore flow (client/tests/smoke.spec.ts) in a browser,
+      # asserting /share-factory returns a key and the share link restores via
+      # /initialize. This is the post-deploy validation the pre-deploy e2e suite
+      # (local dev server, mocked) and the API smoke can't give us.
+      #
+      # It runs inside the SAME prebuilt frontend-ci image build-frontend uses
+      # (Playwright browsers + system libs baked in) via `docker run`, so browsers
+      # are NEVER installed on the bare deploy runner — that bare-runner install is
+      # exactly what stalled the original in-job smoke. Guardrails: CI=true selects
+      # Playwright's non-blocking `line` reporter (the `html` reporter's report
+      # server hung the runner on failure); --ipc=host is Playwright's Chromium
+      # memory flag; per-test/expect timeouts live in playwright.smoke.config.ts;
+      # timeout-minutes caps the step; `docker run`'s exit code propagates pass/fail.
+      # The image's baked deps (/opt/ci/node_modules) replace the host client deps
+      # so the installed Playwright matches its baked browsers (the build-frontend
+      # pattern). The host's client/node_modules already exists from the earlier
+      # `npm ci --prefix client`, so it is removed first to avoid a nested copy.
+      - name: Smoke-test client (Playwright, deployed preview)
+        id: client_smoke
+        timeout-minutes: 8
+        env:
+          PREVIEW_URL: ${{ steps.swa_preview.outputs.static_web_app_url }}
+          CI_IMAGE: ghcr.io/greven145/yet-another-factory-planner/frontend-ci@sha256:56b9e36b41b193f3f911b85d8af6a67867b506b974b3ad66a3e1864ae7ee85f4 # :latest
+        run: |
+          set -euo pipefail
+          echo "Smoke-testing client preview in browser: $PREVIEW_URL"
+          docker run --rm --ipc=host \
+            -e CI=true \
+            -e SMOKE_URL="$PREVIEW_URL" \
+            -v "$PWD/client:/client" \
+            -w /client \
+            "$CI_IMAGE" \
+            sh -c 'rm -rf ./node_modules && cp -a /opt/ci/node_modules ./node_modules && npm run test:smoke'
 
       # Promote the already-built client/dist to production by re-uploading
       # WITHOUT the deployment_environment input.  No rebuild occurs.
