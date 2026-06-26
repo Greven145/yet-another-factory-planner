@@ -3,7 +3,11 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    # TEMP: reintroduce-client-playwright-smoke is included to exercise a real
+    # deploy (and the new client Playwright smoke) from the feature branch before
+    # merge. REVERT to [main] before merging. A matching federated credential
+    # exists on msi-yet-another-factory-planner and must be deleted afterwards.
+    branches: [main, reintroduce-client-playwright-smoke]
   pull_request:
     branches: [main]
 
@@ -123,8 +127,10 @@ jobs:
     needs: [build-and-test, build-frontend]
     # Only ever deploy main: a push to main, or a manual run targeting main.
     # workflow_dispatch can be launched from any branch, so guard the ref too.
+    # TEMP: the feature-branch ref is allowed here to test the deploy + client
+    # smoke before merge. REVERT to main-only before merging.
     if: >-
-      github.ref == 'refs/heads/main'
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/reintroduce-client-playwright-smoke')
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Hard cap so a hung step (e.g. a wedged smoke test) can never run for hours and
