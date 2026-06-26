@@ -31,6 +31,10 @@ export type RecipeSelectionMap = {
   [key: string]: boolean,
 };
 
+export type BuildingSelectionMap = {
+  [key: string]: boolean,
+};
+
 export type NodeInfo = {
   key: string,
   x: number,
@@ -51,6 +55,7 @@ export type FactoryOptions = {
   weightingOptions: WeightingOptions,
   gameModeOptions: GameModeOptions,
   allowedRecipes: RecipeSelectionMap,
+  allowedBuildings: BuildingSelectionMap,
   nodesPositions: NodeInfo[],
   maximizeBalanceMode: MaximizeBalanceMode,
   transportOptions: TransportOptions,

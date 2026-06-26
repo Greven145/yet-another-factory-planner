@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Container, Tabs, Paper, Title, Group, Button, Switch, Space, TextInput, Popover, Text, Modal } from '@mantine/core';
-import { TrendingUp, Shuffle, Box } from 'react-feather';
+import { TrendingUp, Shuffle, Box, Tool } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import ProductionTab from './ProductionTab';
 import InputsTab from './InputsTab';
 import RecipesTab from './RecipesTab';
+import BuildingsTab from './BuildingsTab';
 import { usePrevious } from '../../../hooks/usePrevious';
 
 const PlannerOptions = () => {
@@ -127,6 +128,7 @@ const PlannerOptions = () => {
           <Tabs.Tab value="production" leftSection={<TrendingUp size={16} />}>Production</Tabs.Tab>
           <Tabs.Tab value="inputs" leftSection={<Shuffle size={16} />}>Inputs</Tabs.Tab>
           <Tabs.Tab value="recipes" leftSection={<Box size={16} />}>Recipes</Tabs.Tab>
+          <Tabs.Tab value="buildings" leftSection={<Tool size={16} />}>Buildings</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="production">
           <TabContainer fluid>
@@ -141,6 +143,11 @@ const PlannerOptions = () => {
         <Tabs.Panel value="recipes">
           <TabContainer fluid>
             <RecipesTab />
+          </TabContainer>
+        </Tabs.Panel>
+        <Tabs.Panel value="buildings">
+          <TabContainer fluid>
+            <BuildingsTab />
           </TabContainer>
         </Tabs.Panel>
       </Tabs>

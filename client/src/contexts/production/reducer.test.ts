@@ -163,6 +163,12 @@ describe('getInitialState', () => {
     expect(state.allowedRecipes['Recipe_AlternateIronPlate_C']).toBe(false);
   });
 
+  it('enables every recipe-producing building by default', () => {
+    const state = createInitialState();
+    expect(state.allowedBuildings['Build_SmelterMk1_C']).toBe(true);
+    expect(state.allowedBuildings['Build_ConstructorMk1_C']).toBe(true);
+  });
+
   it('has a unique key', () => {
     const state1 = createInitialState();
     const state2 = createInitialState();
@@ -455,6 +461,28 @@ describe('reducer', () => {
     });
   });
 
+  describe('SET_BUILDING_ACTIVE', () => {
+    it('disables a building', () => {
+      const state = createInitialState();
+      const result = reducer(state, { type: 'SET_BUILDING_ACTIVE', key: 'Build_ConstructorMk1_C', active: false });
+      expect(result.allowedBuildings['Build_ConstructorMk1_C']).toBe(false);
+      expect(result.allowedBuildings['Build_SmelterMk1_C']).toBe(true);
+    });
+  });
+
+  describe('MASS_SET_BUILDINGS_ACTIVE', () => {
+    it('disables multiple buildings at once', () => {
+      const state = createInitialState();
+      const result = reducer(state, {
+        type: 'MASS_SET_BUILDINGS_ACTIVE',
+        buildings: ['Build_ConstructorMk1_C', 'Build_SmelterMk1_C'],
+        active: false,
+      });
+      expect(result.allowedBuildings['Build_ConstructorMk1_C']).toBe(false);
+      expect(result.allowedBuildings['Build_SmelterMk1_C']).toBe(false);
+    });
+  });
+
   describe('LOAD_FROM_SHARED_FACTORY', () => {
     it('loads a shared factory config', () => {
       const sharedConfig = {
@@ -489,6 +517,50 @@ describe('reducer', () => {
       expect(result.weightingOptions.resources).toBe('500');
       expect(result.allowedRecipes['Recipe_IronIngot_C']).toBe(true);
       expect(result.allowedRecipes['Recipe_IronPlate_C']).toBe(true);
+    });
+
+    it('applies a present allowedBuildings list as a full overwrite', () => {
+      const sharedConfig = {
+        productionItems: [],
+        inputItems: [],
+        inputResources: [],
+        allowHandGatheredItems: false,
+        weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
+        allowedRecipes: ['Recipe_IronIngot_C', 'Recipe_IronPlate_C'],
+        allowedBuildings: ['Build_SmelterMk1_C'],
+        nodesPositions: [],
+      };
+
+      const result = reducer(createInitialState(), {
+        type: 'LOAD_FROM_SHARED_FACTORY',
+        config: sharedConfig,
+        gameData: mockGameData,
+      });
+
+      expect(result.allowedBuildings['Build_SmelterMk1_C']).toBe(true);
+      // listed buildings stay on; everything else is forced off
+      expect(result.allowedBuildings['Build_ConstructorMk1_C']).toBe(false);
+    });
+
+    it('leaves all buildings enabled when allowedBuildings is absent (pre-feature share)', () => {
+      const sharedConfig = {
+        productionItems: [],
+        inputItems: [],
+        inputResources: [],
+        allowHandGatheredItems: false,
+        weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
+        allowedRecipes: ['Recipe_IronIngot_C', 'Recipe_IronPlate_C'],
+        nodesPositions: [],
+      };
+
+      const result = reducer(createInitialState(), {
+        type: 'LOAD_FROM_SHARED_FACTORY',
+        config: sharedConfig,
+        gameData: mockGameData,
+      });
+
+      expect(result.allowedBuildings['Build_SmelterMk1_C']).toBe(true);
+      expect(result.allowedBuildings['Build_ConstructorMk1_C']).toBe(true);
     });
 
     it('returns initial state on error', () => {
