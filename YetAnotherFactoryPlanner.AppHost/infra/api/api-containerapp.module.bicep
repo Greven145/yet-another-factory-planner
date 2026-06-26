@@ -111,6 +111,15 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
               name: 'AllowedOrigins__0'
               value: 'https://yafp.game.gottselig.ca'
             }
+            // SWA "staging" preview environment origin. The blue-green client
+            // pipeline deploys to this named preview, runs the functional smoke
+            // against it, then promotes to production — so the preview must be
+            // allowed to call the API or every request is CORS-blocked. This is a
+            // stable per-resource hostname (SWA default name + "-staging").
+            {
+              name: 'AllowedOrigins__1'
+              value: 'https://thankful-dune-099ce8c0f-staging.eastus2.7.azurestaticapps.net'
+            }
           ]
           // ACA health probes. Cold start is ~27s (measured), so the startup probe
           // gives a 60s window (6 failures × 10s period) before ACA gives up.
