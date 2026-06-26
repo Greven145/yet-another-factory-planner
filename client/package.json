@@ -13,7 +13,6 @@
         "build": "vite build && node scripts/patch-csp.js",
         "preview": "vite preview",
         "analyze": "source-map-explorer 'dist/assets/*.js'",
-        "staging": "env-cmd -f .env.staging npm start",
         "predeploy": "npm run build && echo yafp.game.gottselig.ca > ./dist/CNAME",
         "deploy": "az storage blob upload-batch --account-name yafp -s ./dist -d '$web' --auth-mode login --overwrite",
         "test": "vitest run",
@@ -56,7 +55,6 @@
         "cytoscape-popper": "^4.0.1",
         "env-cmd": "^11.0.0",
         "framer-motion": "^12.40.0",
-        "gh-pages": "^6.3.0",
         "glpk.js": "^5.0.0",
         "lodash": "^4.18.1",
         "nanoid": "^5.1.11",
@@ -66,8 +64,7 @@
         "react-feather": "^2.0.10",
         "seedrandom": "^3.0.5",
         "styled-components": "^6.4.2",
-        "typescript": "^6.0.3",
-        "web-vitals": "^5.3.0"
+        "typescript": "^6.0.3"
     },
     "devDependencies": {
         "@axe-core/playwright": "^4.10.2",
