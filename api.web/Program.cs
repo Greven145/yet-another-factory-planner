@@ -213,5 +213,3 @@ app.MapGet("/get-factory", async (
     .WithName("GetFactory");
 
 app.Run();
-
-public record ShareFactoryRequest(FactoryConfigSchema FactoryConfig);

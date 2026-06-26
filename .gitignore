@@ -17,13 +17,18 @@ client/dist/
 # Test artifacts
 test-results/
 playwright-report/
-*.png
+test-results/**/*.png
+playwright-report/**/*.png
+.playwright-cli/**/*.png
+.playwright-mcp/**/*.png
+.playwright/**/*.png
 .playwright-cli/
 .playwright-mcp/
 .playwright/
 
 # Agent skills (installed locally, not part of the repo)
 .agents/
+.github/skills/
 
 # Environment
 .env.local
