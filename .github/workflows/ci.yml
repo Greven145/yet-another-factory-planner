@@ -45,7 +45,7 @@ jobs:
           path: TestResults
 
   build-frontend:
-    name: Build (Frontend)
+    name: Build & Test (NodeJS)
     runs-on: ubuntu-latest
     # Run inside the prebuilt CI image (Playwright browsers + system libs +
     # Node 24 + baked npm deps), published by build-ci-image.yml. This removes

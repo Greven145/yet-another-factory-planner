@@ -99,7 +99,7 @@ See [`docs/adr/0001-ci-gated-production-deploys.md`](docs/adr/0001-ci-gated-prod
 
 # Legacy Environment (for Comparison)
 
-The `legacy/docker-baseline` branch preserves the last known working state of the app before the modernization effort (React 17 + CRA + Azure Functions v4 + .NET 7). It runs alongside the current version on different ports using Docker Compose.
+The `legacy/docker-baseline` branch preserves the last known working state of the app before the modernization effort (React 17 + Azure Functions v4 + .NET 7). It runs alongside the current version on different ports using Docker Compose.
 
 ## Setup
 
