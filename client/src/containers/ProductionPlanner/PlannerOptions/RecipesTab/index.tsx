@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import styled from 'styled-components';
-import { List, Checkbox, TextInput, Button, Group, Title, Grid } from '@mantine/core';
+import { List, Checkbox, TextInput, Button, Group, Title, Grid, Text } from '@mantine/core';
 import { Search } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { CollapsibleSection } from '../../../../components/Section';
@@ -37,27 +37,38 @@ const RecipesTab = () => {
   }, [ctx.gameData]);
 
   const renderRecipeList = useCallback((recipeList: { key: string, label: string }[]) => {
-    return recipeList.map(({ key, label }) => ({
-      key,
-      label,
-      component: (
-        <List.Item key={key}>
-          <Checkbox
-            label={label}
-            checked={ctx.state.allowedRecipes[key]}
-            onChange={() => {
-              ctx.dispatch({
-                type: 'SET_RECIPE_ACTIVE',
-                key,
-                active: !ctx.state.allowedRecipes[key],
-              });
-            }}
-          />
-        </List.Item>
-      )
-    }));
+    return recipeList.map(({ key, label }) => {
+      // A recipe whose producing building is turned off on the Buildings tab is
+      // excluded by the solver no matter its own checkbox; dim it and say why.
+      const producedIn = ctx.gameData.recipes[key]?.producedIn;
+      const buildingDisabled = producedIn != null && ctx.state.allowedBuildings[producedIn] === false;
+      return {
+        key,
+        label,
+        component: (
+          <List.Item key={key} style={buildingDisabled ? { opacity: 0.5 } : undefined}>
+            <Checkbox
+              label={label}
+              checked={ctx.state.allowedRecipes[key]}
+              onChange={() => {
+                ctx.dispatch({
+                  type: 'SET_RECIPE_ACTIVE',
+                  key,
+                  active: !ctx.state.allowedRecipes[key],
+                });
+              }}
+            />
+            {buildingDisabled && (
+              <Text size='xs' c='dimmed' style={{ marginLeft: '32px' }}>
+                {`${ctx.gameData.buildings[producedIn!]?.name ?? producedIn} disabled`}
+              </Text>
+            )}
+          </List.Item>
+        )
+      };
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.state, ctx.dispatch]);
+  }, [ctx.state, ctx.gameData, ctx.dispatch]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const renderedBaseRecipes = useMemo(() => renderRecipeList(baseRecipes), [renderRecipeList]);

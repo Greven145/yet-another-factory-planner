@@ -93,6 +93,8 @@ export type WireFactory = {
   weightingOptions: WireWeightingOptions,
   gameModeOptions: WireGameModeOptions,
   allowedRecipes: string[],
+  /** Enabled building keys. Added after 1.2; absent on older shares (= all enabled). */
+  allowedBuildings?: string[],
   nodesPositions: NodeInfo[],
 };
 
@@ -107,6 +109,8 @@ export type DecodedFactory = {
   gameModeOptions: GameModeOptions | null,
   /** Recipe keys that should be marked allowed. */
   allowedRecipes: string[],
+  /** Enabled building keys, or null when the share predates building selection (= all enabled). */
+  allowedBuildings: string[] | null,
   nodesPositions: NodeInfo[],
 };
 
@@ -144,6 +148,7 @@ export function encode(config: FactoryOptions, gameVersion: string): WireFactory
       powerConsumption: Number(config.gameModeOptions.powerConsumption),
     },
     allowedRecipes: Object.keys(config.allowedRecipes).filter((key) => config.allowedRecipes[key]),
+    allowedBuildings: Object.keys(config.allowedBuildings).filter((key) => config.allowedBuildings[key]),
     nodesPositions: config.nodesPositions,
   };
 }
@@ -184,6 +189,8 @@ export function decode(wire: WireFactory): DecodedFactory {
         }
       : null,
     allowedRecipes: wire.allowedRecipes,
+    // Building selection added after 1.2; older shares lack it => null = leave all enabled.
+    allowedBuildings: wire.allowedBuildings ?? null,
     nodesPositions: wire.nodesPositions,
   };
 }

@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { decodeState_v1_U5 } from './legacy-state-decoders/v1_U5';
 import { decodeState_v2_U5 } from './legacy-state-decoders/v2_U5';
 import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
-import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, RecipeSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
+import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, RecipeSelectionMap, BuildingSelectionMap, FactoryOptions, NodeInfo, TransportOptions } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
 import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 import { decode, WireFactory } from '../../utilities/shared-factory/codec';
@@ -100,6 +100,17 @@ function getInitialAllowedRecipes(recipes: RecipeMap): RecipeSelectionMap {
   return recipeMap;
 }
 
+// Keyed only by buildings that actually produce a recipe (derived from recipes,
+// not gameData.buildings, so generators/extractors/foundations don't appear).
+// Buildings have no "alternates" concept, so every machine starts enabled.
+function getInitialAllowedBuildings(recipes: RecipeMap): BuildingSelectionMap {
+  const buildingMap: BuildingSelectionMap = {};
+  Object.values(recipes).forEach((data) => {
+    buildingMap[data.producedIn] = true;
+  });
+  return buildingMap;
+}
+
 export function getInitialState(gameData: GameData): FactoryOptions {
   return {
     key: nanoid(),
@@ -110,6 +121,7 @@ export function getInitialState(gameData: GameData): FactoryOptions {
     weightingOptions: getInitialWeightingOptions(),
     gameModeOptions: getInitialGameModeOptions(),
     allowedRecipes: getInitialAllowedRecipes(gameData.recipes),
+    allowedBuildings: getInitialAllowedBuildings(gameData.recipes),
     nodesPositions: [],
     maximizeBalanceMode: DEFAULT_MAXIMIZE_BALANCE_MODE,
     transportOptions: getInitialTransportOptions(),
@@ -137,6 +149,8 @@ export type FactoryAction =
   | { type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: GameData }
   | { type: 'SET_RECIPE_ACTIVE', key: string, active: boolean }
   | { type: 'MASS_SET_RECIPES_ACTIVE', recipes: string[], active: boolean }
+  | { type: 'SET_BUILDING_ACTIVE', key: string, active: boolean }
+  | { type: 'MASS_SET_BUILDINGS_ACTIVE', buildings: string[], active: boolean }
   | { type: 'LOAD_FROM_SHARED_FACTORY', config: any, gameData: GameData }
   | { type: 'LOAD_FROM_LEGACY_ENCODING', encoding: string, gameData: GameData }
   | { type: 'LOAD_FROM_SESSION_STORAGE', sessionState: FactoryOptions, gameData: GameData }
@@ -283,6 +297,18 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
       });
       return { ...state, allowedRecipes: newAllowedRecipes };
     }
+    case 'SET_BUILDING_ACTIVE': {
+      const newAllowedBuildings = { ...state.allowedBuildings };
+      newAllowedBuildings[action.key] = action.active;
+      return { ...state, allowedBuildings: newAllowedBuildings };
+    }
+    case 'MASS_SET_BUILDINGS_ACTIVE': {
+      const newAllowedBuildings = { ...state.allowedBuildings };
+      action.buildings.forEach((buildingKey) => {
+        newAllowedBuildings[buildingKey] = action.active;
+      });
+      return { ...state, allowedBuildings: newAllowedBuildings };
+    }
     case 'LOAD_FROM_SHARED_FACTORY': {
       try {
         const decoded = decode(action.config as WireFactory);
@@ -319,6 +345,15 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
             newState.allowedRecipes[key] = true;
           }
         });
+        // allowedBuildings stores the ENABLED set and defaults to all-on, so a
+        // present list is a full overwrite: each known building is on iff it's in
+        // the decoded set. Absent (pre-feature shares) => keep the all-on default.
+        if (decoded.allowedBuildings) {
+          const enabled = new Set(decoded.allowedBuildings);
+          Object.keys(newState.allowedBuildings).forEach((key) => {
+            newState.allowedBuildings[key] = enabled.has(key);
+          });
+        }
         newState.nodesPositions = decoded.nodesPositions;
         // maximizeBalanceMode/transportOptions aren't part of the share wire shape;
         // read them defensively from the raw payload for any client-side persisted config.
@@ -346,6 +381,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
           maximizeBalanceMode: action.sessionState.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
           transportOptions: action.sessionState.transportOptions ?? getInitialTransportOptions(),
           gameModeOptions: action.sessionState.gameModeOptions ?? getInitialGameModeOptions(),
+          allowedBuildings: action.sessionState.allowedBuildings ?? getInitialAllowedBuildings(action.gameData.recipes),
         };
       } catch (e) {
         console.error(e);

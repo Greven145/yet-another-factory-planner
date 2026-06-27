@@ -25,6 +25,11 @@ function sampleConfig(): FactoryOptions {
       Recipe_IronPlate_C: true,
       Recipe_AlternateIronPlate_C: false,
     },
+    allowedBuildings: {
+      Build_SmelterMk1_C: true,
+      Build_ConstructorMk1_C: true,
+      Build_Blender_C: false,
+    },
     nodesPositions: [{ key: 'node1', x: 10, y: 20 }],
     maximizeBalanceMode: 'TRUE_MAXIMIZE' as any,
     transportOptions: { beltCapacity: null, pipeCapacity: null },
@@ -62,6 +67,8 @@ describe('encode', () => {
     expect(wire.gameModeOptions).toEqual({ recipePartsCost: 1, powerConsumption: 1 });
     // only enabled recipes survive the flatten
     expect(wire.allowedRecipes).toEqual(['Recipe_IronIngot_C', 'Recipe_IronPlate_C']);
+    // allowedBuildings flattens the same way: only the enabled set is stored
+    expect(wire.allowedBuildings).toEqual(['Build_SmelterMk1_C', 'Build_ConstructorMk1_C']);
   });
 });
 
@@ -78,6 +85,13 @@ describe('decode', () => {
     delete wire.gameModeOptions;
     const decoded = decode(wire as WireFactory);
     expect(decoded.gameModeOptions).toBeNull();
+  });
+
+  it('yields null allowedBuildings when the wire payload omits them (pre-feature share)', () => {
+    const wire = encode(sampleConfig(), '1.2') as Partial<WireFactory>;
+    delete wire.allowedBuildings;
+    const decoded = decode(wire as WireFactory);
+    expect(decoded.allowedBuildings).toBeNull();
   });
 });
 
@@ -103,6 +117,7 @@ describe('round-trip decode(encode(x))', () => {
     expect(decoded.gameModeOptions).toEqual(config.gameModeOptions);
     // allowedRecipes is map -> filtered list on encode; decode yields the enabled keys
     expect(decoded.allowedRecipes).toEqual(['Recipe_IronIngot_C', 'Recipe_IronPlate_C']);
+    expect(decoded.allowedBuildings).toEqual(['Build_SmelterMk1_C', 'Build_ConstructorMk1_C']);
     expect(decoded.nodesPositions).toEqual(config.nodesPositions);
   });
 });

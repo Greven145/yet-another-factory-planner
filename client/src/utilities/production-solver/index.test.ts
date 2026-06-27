@@ -138,6 +138,10 @@ function createValidOptions(overrides?: Partial<FactoryOptions>): FactoryOptions
       'Recipe_IronIngot_C': true,
       'Recipe_IronPlate_C': true,
     },
+    allowedBuildings: {
+      'Build_SmelterMk1_C': true,
+      'Build_ConstructorMk1_C': true,
+    },
     nodesPositions: [],
     maximizeBalanceMode: 'proportional',
     transportOptions: { beltCapacity: null, pipeCapacity: null },
@@ -222,6 +226,28 @@ describe('ProductionSolver constructor', () => {
       },
     });
     expect(() => new ProductionSolver(options, mockGameData)).toThrow(GraphError);
+  });
+
+  it('throws when targeting a recipe whose building is disabled', () => {
+    const options = createValidOptions({
+      productionItems: [{
+        key: 'prod-1',
+        itemKey: 'Desc_IronPlate_C',
+        mode: 'Recipe_IronPlate_C',
+        value: '2',
+      }],
+      // Recipe is allowed, but the Constructor that makes it is disabled.
+      allowedBuildings: {
+        'Build_SmelterMk1_C': true,
+        'Build_ConstructorMk1_C': false,
+      },
+    });
+    expect(() => new ProductionSolver(options, mockGameData)).toThrow(GraphError);
+  });
+
+  it('treats a missing allowedBuildings entry as enabled', () => {
+    const options = createValidOptions({ allowedBuildings: {} });
+    expect(() => new ProductionSolver(options, mockGameData)).not.toThrow();
   });
 
   it('allows duplicate maximization priority', () => {

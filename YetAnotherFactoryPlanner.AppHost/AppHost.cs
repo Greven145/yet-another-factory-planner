@@ -128,7 +128,11 @@ if (builder.ExecutionContext.IsRunMode &&
     // Keep the Vite app in local/test orchestration. Production frontend is served by Azure Static Web Apps.
     var client = builder.AddViteApp("client", "../client")
         .WithReference(api)
-        .WithEnvironment("VITE_REACT_APP_API_BASE_URL", api.GetEndpoint("http"))
+        // The client reads import.meta.env.VITE_API_BASE_URL (see client/src/api/index.ts and
+        // client/.env.example); inject that exact name so axios gets a real base URL. Otherwise
+        // baseURL is undefined, /initialize resolves against the Vite dev server, returns the SPA
+        // index.html, and the app hangs on "Loading game data...".
+        .WithEnvironment("VITE_API_BASE_URL", api.GetEndpoint("http"))
         // AddViteApp sets NODE_ENV from Environment.IsDevelopment(), which only matches the
         // literal "Development" environment name. In "Testing" that resolves to NODE_ENV=production,
         // which makes @vitejs/plugin-react skip injecting the React-Refresh preamble — every

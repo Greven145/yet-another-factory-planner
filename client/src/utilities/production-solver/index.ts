@@ -79,7 +79,10 @@ export class ProductionSolver {
   private rateTargets: RateTargets;
   private maximizeTargets: MaximizeTargets[];
   private hasPointsTarget: boolean;
-  private allowedRecipes: RecipeSelectionMap;
+  // allowedRecipes ANDed with the building filter: a recipe is usable only if its
+  // own toggle is on AND its producing building is enabled. This is the single map
+  // every solver pass gates on.
+  private effectiveAllowedRecipes: RecipeSelectionMap;
   private allowedItems: ItemMap;
   private scale: number;
   private maximizeBalanceMode: MaximizeBalanceMode;
@@ -103,10 +106,20 @@ export class ProductionSolver {
     const parsedPipe = rawPipe != null ? Number(rawPipe) : NaN;
     this.pipeCapacity = !Number.isNaN(parsedPipe) && parsedPipe > 0 ? parsedPipe : null;
 
-    this.allowedRecipes = options.allowedRecipes;
+    const allowedRecipes = options.allowedRecipes;
+    // allowedBuildings may be absent on state restored from very old session storage;
+    // the reducer backfills it, but guard here too (an unknown building => allowed).
+    const allowedBuildings = options.allowedBuildings ?? {};
+    this.effectiveAllowedRecipes = {};
+    Object.entries(allowedRecipes).forEach(([recipeKey, allowed]) => {
+      const recipeInfo = this.gameData.recipes[recipeKey];
+      const buildingAllowed = allowedBuildings[recipeInfo.producedIn] !== false;
+      this.effectiveAllowedRecipes[recipeKey] = allowed && buildingAllowed;
+    });
+
     this.allowedItems = {};
 
-    Object.entries(this.allowedRecipes).forEach(([recipeKey, allowed]) => {
+    Object.entries(this.effectiveAllowedRecipes).forEach(([recipeKey, allowed]) => {
       if (!allowed) return;
       const recipeInfo = this.gameData.recipes[recipeKey];
       recipeInfo.ingredients.forEach((i) => {
@@ -240,8 +253,8 @@ export class ProductionSolver {
           const recipeKey = item.mode;
           const recipeInfo = this.gameData.recipes[recipeKey];
           if (recipeInfo) {
-            if (!this.allowedRecipes[recipeKey]) {
-              throw new GraphError('CANNOT TARGET DISABLED RECIPE', 'Make sure the recipe you are targeting is enabled in the Recipes tab.');
+            if (!this.effectiveAllowedRecipes[recipeKey]) {
+              throw new GraphError('CANNOT TARGET DISABLED RECIPE', 'Make sure the recipe you are targeting is enabled in the Recipes tab and its building is enabled in the Buildings tab.');
             }
             const target = recipeInfo.products.find((p) => p.itemClass === item.itemKey)!;
             this.scale += target.perMinute * amount;
@@ -448,7 +461,7 @@ export class ProductionSolver {
     const objectiveVarMap = new Map<string, Var>();
 
     for (const [recipeKey, recipeInfo] of Object.entries(this.gameData.recipes)) {
-      if (!this.allowedRecipes[recipeKey]) continue;
+      if (!this.effectiveAllowedRecipes[recipeKey]) continue;
       const buildingInfo = this.gameData.buildings[recipeInfo.producedIn];
       const powerScore = buildingInfo.power > 0 ? buildingInfo.power * this.globalWeights.power : 0;
       const buildingsScore = this.globalWeights.buildings;
@@ -553,7 +566,7 @@ export class ProductionSolver {
       const binVars: Var[] = [];
 
       for (const recipeKey of itemInfo.usedInRecipes) {
-        if (!this.allowedRecipes[recipeKey]) continue;
+        if (!this.effectiveAllowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.ingredients.find((i) => i.itemClass === itemKey)!;
         const v: Var = { name: recipeKey, coef: target.perMinute };
@@ -566,7 +579,7 @@ export class ProductionSolver {
       }
 
       for (const recipeKey of itemInfo.producedFromRecipes) {
-        if (!this.allowedRecipes[recipeKey]) continue;
+        if (!this.effectiveAllowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.products.find((p) => p.itemClass === itemKey)!;
 
