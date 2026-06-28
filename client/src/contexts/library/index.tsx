@@ -99,34 +99,32 @@ export const LibraryProvider = ({ children }: PropTypes) => {
     if (id !== activeId) selectId(id);
   }, [activeId, selectId]);
 
-  const create = useCallback((): LibraryFactory => {
-    const gameVersion = library[activeId]?.gameVersion ?? DEFAULT_GAME_VERSION;
-    const factory = makeFactory(gameVersion);
+  // Add a freshly-built factory to the library and make it active.
+  const addFactory = useCallback((factory: LibraryFactory): LibraryFactory => {
     commit({ ...library, [factory.id]: factory });
     selectId(factory.id);
     return factory;
-  }, [activeId, commit, library, selectId]);
+  }, [commit, library, selectId]);
+
+  const create = useCallback((): LibraryFactory => {
+    const gameVersion = library[activeId]?.gameVersion ?? DEFAULT_GAME_VERSION;
+    return addFactory(makeFactory(gameVersion));
+  }, [activeId, addFactory, library]);
 
   const importFactory = useCallback(
-    (input: { config?: FactoryOptions; gameVersion: string; sourceKey?: string }): LibraryFactory => {
-      const factory = makeFactory(input.gameVersion, { config: input.config, sourceKey: input.sourceKey });
-      commit({ ...library, [factory.id]: factory });
-      selectId(factory.id);
-      return factory;
-    },
-    [commit, library, selectId],
+    (input: { config?: FactoryOptions; gameVersion: string; sourceKey?: string }): LibraryFactory =>
+      addFactory(makeFactory(input.gameVersion, { config: input.config, sourceKey: input.sourceKey })),
+    [addFactory],
   );
 
   const duplicate = useCallback((id: string) => {
     const src = library[id];
     if (!src) return;
-    const copy = makeFactory(src.gameVersion, {
+    addFactory(makeFactory(src.gameVersion, {
       config: src.config,
       nickname: src.nickname ? `${src.nickname} (copy)` : undefined,
-    });
-    commit({ ...library, [copy.id]: copy });
-    selectId(copy.id);
-  }, [commit, library, selectId]);
+    }));
+  }, [addFactory, library]);
 
   const rename = useCallback((id: string, nickname: string) => {
     const src = library[id];

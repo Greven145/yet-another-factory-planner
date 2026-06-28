@@ -9,6 +9,7 @@ import { Plus, Share2, MoreHorizontal, Edit2, Copy, Trash2, RotateCcw } from 're
 import { useProductionContext } from '../../../contexts/production';
 import { useLibraryContext } from '../../../contexts/library';
 import { labelOf, relativeTime } from '../../../utilities/factory-label';
+import { canShareFactory } from '../../../utilities/shared-factory/codec';
 import { RenameDialog, DeleteDialog } from './factory-dialogs';
 
 const FactorySwitcher = () => {
@@ -26,12 +27,10 @@ const FactorySwitcher = () => {
   // editing AND shows the correct label the instant you switch tabs — deriving the
   // active label from the reducer state instead lags a render behind the switch and
   // flashes the previous factory's name.
-  const labelFor = (id: string) => labelOf(lib.factories.find((f) => f.id === id)!, ctx.gameData);
   const activeLabel = labelOf(activeFactory, ctx.gameData);
 
-  // The API only accepts factories with at least one selected product, so guard the
-  // Share button rather than firing a POST that 400s with no feedback.
-  const canShare = ctx.state.productionItems.some((i) => i.itemKey);
+  // Guard the Share button rather than firing a POST that 400s with no feedback.
+  const canShare = canShareFactory(ctx.state);
   const onShare = () => { ctx.generateShareLink(); setCopied(true); setTimeout(() => setCopied(false), 2500); };
 
   return (
@@ -58,13 +57,16 @@ const FactorySwitcher = () => {
             {/* Drop the track's built-in bottom margin; the band padding controls
                 spacing now so the controls align to the tab track. */}
             <Tabs.List style={{ flexWrap: 'nowrap', marginBottom: 0 }}>
-              {lib.factories.map((f) => (
-                <Tabs.Tab key={f.id} value={f.id} title={`${labelFor(f.id)} · edited ${relativeTime(f.updatedAt)}`}>
-                  <span style={{ display: 'inline-block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>
-                    {labelFor(f.id)}
-                  </span>
-                </Tabs.Tab>
-              ))}
+              {lib.factories.map((f) => {
+                const label = labelOf(f, ctx.gameData);
+                return (
+                  <Tabs.Tab key={f.id} value={f.id} title={`${label} · edited ${relativeTime(f.updatedAt)}`}>
+                    <span style={{ display: 'inline-block', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}>
+                      {label}
+                    </span>
+                  </Tabs.Tab>
+                );
+              })}
             </Tabs.List>
           </Tabs>
         </div>

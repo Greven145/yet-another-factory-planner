@@ -92,21 +92,15 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
     }
   };
 
-  // Initial load (and after a different-version refetch remounts this provider).
+  // Load the active factory whenever game data tells us to: on the initial load /
+  // different-version refetch (triggerInitialize), or a same-version switch that
+  // reloads without a refetch (reinitToken).
   useEffect(() => {
-    if (triggerInitialize) {
+    if (triggerInitialize || reinitToken > 0) {
       loadFromInitializer();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerInitialize]);
-
-  // Same-version factory switch: reload the new active config without a refetch.
-  useEffect(() => {
-    if (reinitToken > 0) {
-      loadFromInitializer();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reinitToken]);
+  }, [triggerInitialize, reinitToken]);
 
   // Performance is good enough to always auto-solve on any state change. The initial
   // state (prevState === undefined) is skipped; the load dispatch above produces the
