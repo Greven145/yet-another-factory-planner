@@ -153,7 +153,7 @@ export type FactoryAction =
   | { type: 'MASS_SET_BUILDINGS_ACTIVE', buildings: string[], active: boolean }
   | { type: 'LOAD_FROM_SHARED_FACTORY', config: any, gameData: GameData }
   | { type: 'LOAD_FROM_LEGACY_ENCODING', encoding: string, gameData: GameData }
-  | { type: 'LOAD_FROM_SESSION_STORAGE', sessionState: FactoryOptions, gameData: GameData }
+  | { type: 'LOAD_FROM_LIBRARY', config: FactoryOptions, gameData: GameData }
   | { type: 'UPDATE_NODES_POSTIONS', nodesPositions: NodeInfo[] }
   | { type: 'SET_MAXIMIZE_BALANCE_MODE', mode: MaximizeBalanceMode }
   | { type: 'UPDATE_TRANSPORT_OPTIONS', data: TransportOptions };
@@ -373,15 +373,15 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
         return getInitialState(action.gameData);
       }
     }
-    case 'LOAD_FROM_SESSION_STORAGE': {
+    case 'LOAD_FROM_LIBRARY': {
       try {
         // TODO: some validation
         return {
-          ...action.sessionState,
-          maximizeBalanceMode: action.sessionState.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
-          transportOptions: action.sessionState.transportOptions ?? getInitialTransportOptions(),
-          gameModeOptions: action.sessionState.gameModeOptions ?? getInitialGameModeOptions(),
-          allowedBuildings: action.sessionState.allowedBuildings ?? getInitialAllowedBuildings(action.gameData.recipes),
+          ...action.config,
+          maximizeBalanceMode: action.config.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
+          transportOptions: action.config.transportOptions ?? getInitialTransportOptions(),
+          gameModeOptions: action.config.gameModeOptions ?? getInitialGameModeOptions(),
+          allowedBuildings: action.config.allowedBuildings ?? getInitialAllowedBuildings(action.gameData.recipes),
         };
       } catch (e) {
         console.error(e);

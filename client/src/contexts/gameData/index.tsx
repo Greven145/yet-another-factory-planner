@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useGetInitialize } from '../../api/modules/initialize/useGetInitialize';
 import { GameData } from './types';
 import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
@@ -6,14 +6,17 @@ import { toDisplay } from '../../utilities/shared-factory/codec';
 import { usePrevious } from '../../hooks/usePrevious';
 import { FactoryOptions } from '../production/types';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import { useLibraryContext } from '../library';
 
 
 // TYPE
 export type FactoryInitializer = {
+  // Raw share payload (decoded by the reducer) for URL share loads.
   factoryConfig: any | null,
   shareKey: string | null,
   legacyEncoding: string | null,
-  sessionState: FactoryOptions | null,
+  // A stored library config loaded straight into the reducer. Null => reset.
+  libraryConfig: FactoryOptions | null,
 };
 
 export type GameDataContextType = {
@@ -22,6 +25,9 @@ export type GameDataContextType = {
   loading: boolean,
   loadingError: boolean,
   completedThisFrame: boolean,
+  // Bumped to reload the active factory into the reducer WITHOUT refetching game
+  // data (a same-version factory switch). Different-version switches refetch instead.
+  reinitToken: number,
   gameVersion: string,
   setGameVersion: (version: string) => void,
 };
@@ -45,24 +51,26 @@ export function useGameDataContext() {
 // PROVIDER
 type PropTypes = { children: React.ReactNode };
 export const GameDataProvider = ({ children }: PropTypes) => {
+  const lib = useLibraryContext();
   const [gameData, setGameData] = useState<GameData | null>(null);
   const [gameVersion, setGameVersion] = useState('');
   const [initializer, setInitializer] = useState<FactoryInitializer | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingError, setLoadingError] = useState(false);
+  const [reinitToken, setReinitToken] = useState(0);
   const prevLoading = usePrevious(loading);
   const [needToFetchGameData, setNeedToFetchGameData] = useState(true);
   const completedThisFrame = useMemo(() => !loading && loading !== prevLoading, [loading, prevLoading]);
+
+  // The active factory id whose content is already reflected in the reducer. The
+  // switch observer below only fires when the active id drifts from this.
+  const handledActiveIdRef = useRef<string>(lib.activeId);
 
   const getInitialize = useGetInitialize();
 
   const pageTitle = useMemo(() => {
     const base = 'Another... Yet Another Factory Planner';
-    let versionPart = '';
-    if (gameVersion) {
-      versionPart = `[${gameVersion}] `;
-    }
-    return versionPart + base;
+    return (gameVersion ? `[${gameVersion}] ` : '') + base;
   }, [gameVersion]);
 
   usePageTitle(pageTitle);
@@ -77,17 +85,15 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       const params = new URLSearchParams(window.location.search);
       const shareKey = params.get(SHARE_QUERY_PARAM);
       const legacyEncoding = params.get('f');
-      const sessionVersion = window.sessionStorage?.getItem('game-version');
-      const sessionState = window.sessionStorage?.getItem('state');
 
       if (shareKey) {
         getInitialize.request({ factoryKey: shareKey });
       } else if (legacyEncoding) {
         getInitialize.request({ gameVersion: DEFAULT_GAME_VERSION });
-      } else if (sessionVersion && sessionState) {
-        getInitialize.request({ gameVersion: sessionVersion });
       } else {
-        getInitialize.request({ gameVersion: gameVersion || DEFAULT_GAME_VERSION });
+        // Library-driven: fetch the active factory's game version.
+        const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
+        getInitialize.request({ gameVersion: version });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,57 +104,72 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       if (getInitialize.error) {
         setLoadingError(true);
       }
-      const gameData = getInitialize.data?.game_data || null;
+      const newGameData = getInitialize.data?.game_data || null;
       const factoryConfig = getInitialize.data?.factory_config || null;
 
       const params = new URLSearchParams(window.location.search);
       const shareKey = params.get(SHARE_QUERY_PARAM);
       const legacyEncoding = params.get('f');
-      const sessionVersion = window.sessionStorage?.getItem('game-version');
-      let sessionState: FactoryOptions | null = null;
-      try {
-        const sessionStateJSON = window.sessionStorage?.getItem('state');
-        if (sessionVersion && sessionStateJSON) {
-          sessionState = JSON.parse(sessionStateJSON);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-
       window.history.replaceState(null, '', `${window.location.pathname}`);
-      window.sessionStorage?.removeItem('game-version');
-      window.sessionStorage?.removeItem('state');
 
+      // Resolve the version this load landed on.
+      let version: string;
       if (factoryConfig?.gameVersion) {
-        setGameVersion(toDisplay(factoryConfig.gameVersion));
+        version = toDisplay(factoryConfig.gameVersion);
       } else if (legacyEncoding) {
-        setGameVersion(DEFAULT_GAME_VERSION);
-      } else if (sessionVersion && sessionState) {
-        setGameVersion(sessionVersion);
+        version = DEFAULT_GAME_VERSION;
       } else {
-        setGameVersion(gameVersion || DEFAULT_GAME_VERSION);
+        version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
       }
 
-      setGameData(gameData);
+      let libraryConfig: FactoryOptions | null = null;
+      if (shareKey || legacyEncoding) {
+        // Import the incoming URL factory as a new library slot (no dedupe). Its
+        // config is filled in by autosave once the reducer loads the share payload.
+        const imported = lib.importFactory({ gameVersion: version, sourceKey: shareKey ?? undefined });
+        handledActiveIdRef.current = imported.id;
+      } else {
+        libraryConfig = lib.activeFactory?.config ?? null;
+        handledActiveIdRef.current = lib.activeId;
+      }
+
+      setGameVersion(version);
+      setGameData(newGameData);
       setInitializer({
-        factoryConfig,
+        factoryConfig: (shareKey || legacyEncoding) ? factoryConfig : null,
         shareKey,
         legacyEncoding,
-        sessionState,
+        libraryConfig,
       });
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getInitialize]);
 
+  // Observe active-factory switches that don't go through a refetch. Same version
+  // => reload the config into the reducer (instant); different version => refetch.
+  useEffect(() => {
+    if (loading) return;
+    if (lib.activeId === handledActiveIdRef.current) return;
+    const factory = lib.activeFactory;
+    if (!factory) return;
+    if (factory.gameVersion !== gameVersion) {
+      setNeedToFetchGameData(true);
+    } else {
+      setInitializer({ factoryConfig: null, shareKey: null, legacyEncoding: null, libraryConfig: factory.config ?? null });
+      handledActiveIdRef.current = lib.activeId;
+      setReinitToken((t) => t + 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lib.activeId, loading]);
+
+  // Version selector: retarget the active factory and refetch game data for it.
   const handleSetGameVersion = useCallback((version: string) => {
     if (version !== gameVersion) {
-      setGameVersion(version);
+      lib.setActiveVersion(version);
       setNeedToFetchGameData(true);
-      window.sessionStorage?.removeItem('game-version');
-      window.sessionStorage?.removeItem('state');
     }
-  }, [gameVersion]);
+  }, [gameVersion, lib]);
 
   const ctxValue = useMemo(() => {
     return {
@@ -157,10 +178,11 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       loading,
       loadingError,
       completedThisFrame,
+      reinitToken,
       gameVersion,
       setGameVersion: handleSetGameVersion,
     }
-  }, [completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading, loadingError]);
+  }, [completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading, loadingError, reinitToken]);
 
   return (
     <GameDataContext.Provider value={ctxValue}>

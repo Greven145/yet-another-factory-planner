@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import styled from 'styled-components';
-import { Container, Tabs, Paper, Title, Group, Button, Switch, Space, TextInput, Popover, Text, Modal } from '@mantine/core';
+import { Container, Tabs } from '@mantine/core';
 import { TrendingUp, Shuffle, Box, Tool } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import ProductionTab from './ProductionTab';
@@ -8,121 +8,27 @@ import InputsTab from './InputsTab';
 import RecipesTab from './RecipesTab';
 import BuildingsTab from './BuildingsTab';
 import { usePrevious } from '../../../hooks/usePrevious';
+// The old Calculate/Auto-calc/Save&Share/Reset header is gone: WelcomeCard hosts the
+// relocated greeting and the factory switcher lives in the main body (FactorySwitcher).
+import WelcomeCard from './WelcomeCard';
 
 const PlannerOptions = () => {
   const ctx = useProductionContext();
-  const [popoverOpened, setPopoverOpened] = useState(false);
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  // Drop the container chrome around the tab sections so the section cards sit flush
+  // on the drawer surface, aligned with the Welcome card above.
+  const flush = true;
 
+  // Copy the share link to the clipboard when one is generated.
   const prevShareLink = usePrevious(ctx.shareLink.link);
   useEffect(() => {
     if (ctx.shareLink.copyToClipboard && ctx.shareLink.link && ctx.shareLink.link !== prevShareLink) {
       navigator.clipboard.writeText(ctx.shareLink.link);
-      setPopoverOpened(true);
     }
   }, [ctx.shareLink, prevShareLink]);
 
-  useEffect(() => {
-    if (!popoverOpened) return;
-    const timer = setTimeout(() => { setPopoverOpened(false); }, 3000);
-    return () => clearTimeout(timer);
-  }, [popoverOpened]);
-
-  const handleLinkInputClicked = () => {
-    if (ctx.shareLink) {
-      navigator.clipboard.writeText(ctx.shareLink.link);
-      setPopoverOpened(true);
-    }
-  }
-  
   return (
     <>
-      <Paper style={{ marginBottom: '20px', paddingTop: '10px' }}>
-        <Title order={2} style={{ marginBottom: '15px' }}>Control Panel</Title>
-        <Group style={{ marginBottom: '15px' }}>
-          <Button
-            onClick={() => { ctx.calculate(); }}
-            disabled={ctx.autoCalculate}
-            style={{ marginRight: '15px', width: '125px' }}
-          >
-            Calculate
-          </Button>
-          <Switch
-            size='md'
-            label='Auto-calculate (disable if things get laggy)'
-            checked={ctx.autoCalculate}
-            onChange={(e) => { ctx.setAutoCalculate(e.currentTarget.checked); }}
-          />
-        </Group>
-        <Group style={{ marginBottom: '15px' }}>
-          <Button
-            color='positive.8'
-            onClick={() => { ctx.generateShareLink(); }}
-            loading={ctx.shareLink.loading}
-            style={{ width: '125px' }}
-          >
-            Save & Share
-          </Button>
-          <Popover
-            opened={popoverOpened}
-            onClose={() => setPopoverOpened(false)}
-            position='right'
-            withArrow
-            withRoles={false}
-          >
-            <Popover.Target>
-              <TextInput
-                value={ctx.shareLink.link}
-                placeholder='Save factory to generate a link'
-                readOnly={true}
-                onClick={() => { handleLinkInputClicked(); }}
-                style={{ flex: '1 1 auto' }}
-              />
-            </Popover.Target>
-            <Popover.Dropdown>
-              <Text>Link copied!</Text>
-            </Popover.Dropdown>
-          </Popover>
-        </Group>
-        <Space />
-        <Group style={{ marginBottom: '15px' }} justify='flex-end'>
-          <Button
-            color='danger.8'
-            onClick={() => { setResetConfirmOpen(true); }}
-          >
-            Reset ALL Factory Options
-          </Button>
-        </Group>
-      </Paper>
-      <Modal
-        opened={resetConfirmOpen}
-        onClose={() => setResetConfirmOpen(false)}
-        title="Reset ALL Factory Options"
-        closeButtonProps={{ 'aria-label': 'Close' }}
-      >
-        <Text>Are you sure? This will clear all production goals, inputs, and recipe settings.</Text>
-        <Group justify='flex-end' style={{ marginTop: '20px' }}>
-          <Button
-            variant='default'
-            onClick={() => setResetConfirmOpen(false)}
-            // The global Button theme forces white labels (for filled colored
-            // buttons); the default variant needs the readable theme text color
-            // so it isn't white-on-light. See WCAG contrast scan in a11y.spec.ts.
-            styles={{ root: { color: 'var(--mantine-color-text)' } }}
-          >
-            Cancel
-          </Button>
-          <Button
-            color='danger.8'
-            onClick={() => {
-              ctx.dispatch({ type: 'RESET_FACTORY', gameData: ctx.gameData });
-              setResetConfirmOpen(false);
-            }}
-          >
-            Reset
-          </Button>
-        </Group>
-      </Modal>
+      <WelcomeCard />
       <Tabs defaultValue="production" variant='pills' className='segmented-tabs segmented-tabs-grow'>
         <Tabs.List grow>
           <Tabs.Tab value="production" leftSection={<TrendingUp size={16} />}>Production</Tabs.Tab>
@@ -131,22 +37,22 @@ const PlannerOptions = () => {
           <Tabs.Tab value="buildings" leftSection={<Tool size={16} />}>Buildings</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="production">
-          <TabContainer fluid>
+          <TabContainer fluid $flush={flush}>
             <ProductionTab />
           </TabContainer>
         </Tabs.Panel>
         <Tabs.Panel value="inputs">
-          <TabContainer fluid>
+          <TabContainer fluid $flush={flush}>
             <InputsTab />
           </TabContainer>
         </Tabs.Panel>
         <Tabs.Panel value="recipes">
-          <TabContainer fluid>
+          <TabContainer fluid $flush={flush}>
             <RecipesTab />
           </TabContainer>
         </Tabs.Panel>
         <Tabs.Panel value="buildings">
-          <TabContainer fluid>
+          <TabContainer fluid $flush={flush}>
             <BuildingsTab />
           </TabContainer>
         </Tabs.Panel>
@@ -157,7 +63,15 @@ const PlannerOptions = () => {
 
 export default PlannerOptions;
 
-const TabContainer = styled(Container)`
-  padding: 15px 15px;
-  background: var(--yafp-container-bg);
+const TabContainer = styled(Container)<{ $flush?: boolean }>`
+  padding: ${({ $flush }) => ($flush ? '0' : '15px 15px')};
+  background: ${({ $flush }) => ($flush ? 'transparent' : 'var(--yafp-container-bg)')};
+
+  /* Flatten the section cards' drop-shadow so they read as aligned with the flat
+     greeting card above, instead of floating/inset. */
+  ${({ $flush }) =>
+    $flush &&
+    `
+    & .mantine-Paper-root { box-shadow: none; }
+  `}
 `;

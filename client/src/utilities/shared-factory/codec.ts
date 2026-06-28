@@ -117,19 +117,25 @@ export type DecodedFactory = {
 // ---- Encode: client FactoryOptions -> wire shape ----
 
 export function encode(config: FactoryOptions, gameVersion: string): WireFactory {
+  // Drop placeholder rows that have no item selected yet: they carry no information,
+  // the solver ignores them, and the API rejects them (ItemKey must not be empty).
   return {
     gameVersion: toEnumName(gameVersion),
-    productionItems: config.productionItems.map((i) => ({
-      itemKey: i.itemKey,
-      mode: i.mode,
-      value: Number(i.value),
-    })),
-    inputItems: config.inputItems.map((i) => ({
-      itemKey: i.itemKey,
-      value: Number(i.value),
-      weight: Number(i.weight),
-      unlimited: i.unlimited,
-    })),
+    productionItems: config.productionItems
+      .filter((i) => i.itemKey)
+      .map((i) => ({
+        itemKey: i.itemKey,
+        mode: i.mode,
+        value: Number(i.value),
+      })),
+    inputItems: config.inputItems
+      .filter((i) => i.itemKey)
+      .map((i) => ({
+        itemKey: i.itemKey,
+        value: Number(i.value),
+        weight: Number(i.weight),
+        unlimited: i.unlimited,
+      })),
     inputResources: config.inputResources.map((i) => ({
       itemKey: i.itemKey,
       value: Number(i.value),

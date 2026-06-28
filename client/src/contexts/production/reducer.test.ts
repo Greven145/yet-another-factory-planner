@@ -579,12 +579,12 @@ describe('reducer', () => {
     });
   });
 
-  describe('LOAD_FROM_SESSION_STORAGE', () => {
-    it('loads state from session storage', () => {
+  describe('LOAD_FROM_LIBRARY', () => {
+    it('loads a stored library config', () => {
       const savedState = createStateWithProductionItem();
       const result = reducer(createInitialState(), {
-        type: 'LOAD_FROM_SESSION_STORAGE',
-        sessionState: savedState,
+        type: 'LOAD_FROM_LIBRARY',
+        config: savedState,
         gameData: mockGameData,
       });
       expect(result).toEqual(savedState);
