@@ -111,9 +111,13 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     // generate a shareable config; the share payload is always sent).
 
     // ------------------------------------------------------------------ share
-    const saveShareBtn = page.getByRole('button', { name: 'Save & Share' });
-    await expect(saveShareBtn).toBeVisible();
-    await expect(saveShareBtn).toBeEnabled();
+    // The old "Save & Share" header button is gone (PR #148, multi-factory
+    // library + autosave). Sharing now lives in the FactorySwitcher as a "Share"
+    // button, disabled until the factory has a product with an item selected
+    // (canShareFactory) — which we satisfied above by adding Iron Plate.
+    const shareBtn = page.getByRole('button', { name: 'Share', exact: true });
+    await expect(shareBtn).toBeVisible();
+    await expect(shareBtn).toBeEnabled();
 
     // Intercept the /share-factory request so we can assert the response key.
     const shareResponsePromise = page.waitForResponse(
@@ -121,7 +125,7 @@ test.describe('Smoke: create → share → restore (live API)', () => {
       { timeout: 30_000 },
     );
 
-    await saveShareBtn.click();
+    await shareBtn.click();
 
     // The API must respond with a 201 and a key.
     const shareResponse = await shareResponsePromise;
@@ -131,10 +135,10 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     expect(typeof shareKey).toBe('string');
     expect(shareKey.length).toBeGreaterThan(0);
 
-    // The share link input must populate with a URL containing the key.
-    const shareLinkInput = page.getByPlaceholder('Save factory to generate a link');
-    await expect(shareLinkInput).not.toHaveValue('', { timeout: 10_000 });
-    const linkValue = await shareLinkInput.inputValue();
+    // The share flow no longer populates a visible input — on success it copies
+    // the link to the clipboard. Reconstruct the exact URL the app builds
+    // (origin + path + ?factory=<key>, see SHARE_QUERY_PARAM) to drive restore.
+    const linkValue = new URL(`?factory=${shareKey}`, page.url()).toString();
     expect(linkValue, 'share link must contain the factory key').toContain(shareKey);
     expect(linkValue).toMatch(/^https?:\/\//);
 
