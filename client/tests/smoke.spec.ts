@@ -176,3 +176,43 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     await expect(selectedItem).toHaveValue(/Iron Plate/i, { timeout: 15_000 });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Suite 3: Production graph actually builds (GLPK wasm solver under prod CSP)
+// ---------------------------------------------------------------------------
+//
+// Regression guard for the CSP outage where the graph silently failed for every
+// product. The in-browser GLPK linear-programming solver runs in a Web Worker
+// and (a) instantiates WebAssembly and (b) spawns an emscripten blob: worker.
+// The production CSP (served by Azure SWA via public/staticwebapp.config.json)
+// blocked both — without 'wasm-unsafe-eval' in script-src and blob: in
+// worker-src — so the worker returned no graph. The failure was trapped inside
+// the worker, so it produced no page-level console error: the existing app-shell
+// and share-flow smokes both stayed green. Sharing only encodes the factory
+// config and never invokes the solver, which is why it never caught this.
+//
+// This test must run against the DEPLOYED preview (real CSP headers), not the
+// Vite dev server (no CSP), to be meaningful.
+test.describe('Smoke: production graph builds (solver under CSP)', () => {
+  test('adding a product renders a graph instead of "Could not build graph"', async ({ page }) => {
+    await openControlPanel(page);
+    await page.getByRole('tab', { name: 'Production', exact: true }).click();
+
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    const itemInput = page.getByPlaceholder('Select an item');
+    await itemInput.click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+    await expect(page.getByPlaceholder('Amount')).toBeVisible();
+
+    // The Production Graph tab panel holds the cytoscape <canvas> on success and
+    // the "Could not build graph" fallback when the solver returns no graph.
+    const graphPanel = page.getByRole('tabpanel').filter({ hasText: 'Fit Graph' });
+
+    // The solver must produce a graph: cytoscape renders to <canvas>. If the
+    // wasm/blob worker is blocked, no canvas is ever drawn.
+    await expect(graphPanel.locator('canvas').first()).toBeVisible({ timeout: 30_000 });
+
+    // And it must NOT fall back to the error state.
+    await expect(graphPanel.getByText('Could not build graph')).toHaveCount(0);
+  });
+});
