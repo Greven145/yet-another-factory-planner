@@ -291,10 +291,12 @@ test.describe('Factory Planner Application', () => {
     // Wait for calculation
     await page.waitForTimeout(500);
 
-    // Verify the Save & Share button exists and is clickable
-    const saveShareBtn = page.getByRole('button', { name: 'Save & Share' });
-    await expect(saveShareBtn).toBeVisible();
-    await expect(saveShareBtn).toBeEnabled();
+    // The Share control now lives in the body FactorySwitcher; close the drawer so
+    // it isn't overlapped. With a product selected it must be enabled.
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
+    const shareBtn = page.getByRole('button', { name: 'Share' });
+    await expect(shareBtn).toBeVisible();
+    await expect(shareBtn).toBeEnabled();
   });
 
   test('should send game mode multipliers in the save & share request', async ({ page }) => {
@@ -323,7 +325,9 @@ test.describe('Factory Planner Application', () => {
     await page.getByRole('combobox', { name: 'Power Multiplier' }).click();
     await page.getByRole('option', { name: '2x', exact: true }).click();
 
-    await page.getByRole('button', { name: 'Save & Share' }).click();
+    // Share moved to the body FactorySwitcher; close the drawer so it isn't overlapped.
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
+    await page.getByRole('button', { name: 'Share' }).click();
 
     await expect.poll(() => sharedBody).not.toBeNull();
     expect(sharedBody.factoryConfig.gameModeOptions).toEqual({

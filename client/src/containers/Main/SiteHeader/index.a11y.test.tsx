@@ -24,6 +24,7 @@ const gameDataValue = {
   loading: false,
   loadingError: false,
   completedThisFrame: false,
+  reinitToken: 0,
   gameVersion: DEFAULT_GAME_VERSION,
   setGameVersion: () => {},
 } as GameDataContextType;

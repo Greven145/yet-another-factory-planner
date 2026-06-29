@@ -105,18 +105,16 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('Reset-confirmation modal has no WCAG A/AA violations', async ({ page }) => {
+  test('Delete-factory modal has no WCAG A/AA violations', async ({ page }) => {
     await page.goto('/');
 
-    // Open the control panel drawer
-    const openPanelBtn = page.getByRole('button', { name: 'Open Control Panel' });
-    await openPanelBtn.click();
-
-    // Open the reset-confirmation modal
-    await page.getByRole('button', { name: 'Reset ALL Factory Options' }).click();
+    // Open the Delete dialog from the factory switcher's actions menu (the body
+    // switcher is always visible; the drawer stays closed).
+    await page.getByRole('button', { name: 'Factory actions' }).click();
+    await page.getByRole('menuitem', { name: 'Delete' }).click();
 
     // Wait for the modal dialog to be present before scanning
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Delete factory' })).toBeVisible();
 
     // Scope the scan to the dialog itself: the open Modal renders a translucent
     // overlay that dims the (inert, aria-hidden) page behind it, which would
@@ -128,16 +126,26 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
   });
 
   test('Share-link "copied" popover has no WCAG A/AA violations', async ({ page }) => {
+    // Stub the share endpoint so the popover opens without a live backend.
+    await page.route(/\/share-factory$/, async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { key: 'a11ysharekey00001' } }),
+      });
+    });
+
     await page.goto('/');
 
-    // Open the control panel drawer
-    const openPanelBtn = page.getByRole('button', { name: 'Open Control Panel' });
-    await openPanelBtn.click();
+    // Share is gated until the factory has a product, so add one first.
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    await page.getByPlaceholder('Select an item').click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
 
-    // Clicking the share input opens the "Link copied!" popover directly,
-    // avoiding the backend round-trip the "Save & Share" button performs.
-    await page.getByPlaceholder('Save factory to generate a link').click();
-
+    // Clicking Share posts the factory and opens the "Link copied!" popover.
+    await page.getByRole('button', { name: 'Share' }).click();
     await expect(page.getByText('Link copied!')).toBeVisible();
 
     const results = await buildScan(page).analyze();

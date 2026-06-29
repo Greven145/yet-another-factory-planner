@@ -1,6 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useMemo } from 'react';
 import { usePrevious } from '../../hooks/usePrevious';
-import { useSessionStorage } from '../../hooks/useSessionStorage';
 import { usePostSharedFactory } from '../../api/modules/shared-factories/usePostSharedFactory';
 import { reducer, FactoryAction, getInitialState } from './reducer';
 import { FactoryOptions } from './types';
@@ -9,6 +8,7 @@ import { GameData } from '../gameData/types';
 import { SHARE_QUERY_PARAM } from '../gameData/consts';
 import { SolverResults } from '../../utilities/production-solver/models';
 import { useSolverRun } from './useSolverRun';
+import { useLibraryContext } from '../library';
 
 
 export type ShareLinkProps = { link: string, copyToClipboard: boolean, loading: boolean };
@@ -21,8 +21,6 @@ export type ProductionContextType = {
   calculating: boolean,
   solverResults: SolverResults | null,
   calculate: () => void,
-  autoCalculate: boolean,
-  setAutoCalculate: (value: boolean) => void,
   generateShareLink: () => void,
   shareLink: ShareLinkProps,
 };
@@ -49,14 +47,13 @@ type PropTypes = {
   gameVersion: string,
   initializer: FactoryInitializer | null,
   triggerInitialize: boolean,
+  reinitToken: number,
   children: React.ReactNode,
 };
-export const ProductionProvider = ({ gameData, gameVersion, initializer, triggerInitialize, children }: PropTypes) => {
+export const ProductionProvider = ({ gameData, gameVersion, initializer, triggerInitialize, reinitToken, children }: PropTypes) => {
+  const lib = useLibraryContext();
   const [state, dispatch] = useReducer(reducer, getInitialState(gameData));
   const prevState = usePrevious(state);
-
-  const [autoCalculate, setAutoCalculate] = useSessionStorage<'false' | 'true'>({ key: 'auto-calculate', defaultValue: 'true' });
-  const autoCalculateBool = autoCalculate === 'true' ? true : false;
 
   const postSharedFactory = usePostSharedFactory();
 
@@ -64,23 +61,13 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
   // and the calculating flag) lives in useSolverRun. The provider only decides WHEN to solve.
   const { solverResults, calculating, calculate: handleCalculateFactory } = useSolverRun(state, gameData);
 
-  // Set to true in triggerInitialize effect so the state-change effect runs the solve after dispatch applies.
-  const forceCalculateRef = useRef(false);
-
-  const handleSetAutoCalculate = (checked: boolean) => {
-    setAutoCalculate(checked ? 'true' : 'false');
-    if (checked) {
-      handleCalculateFactory();
-    }
-  };
-
   const handleGenerateShareLink = () => {
     postSharedFactory.request({ factoryConfig: state, gameVersion });
   };
 
   const shareLink: ShareLinkProps = useMemo(() => {
     let link = '';
-    const key = postSharedFactory.data?.key || initializer?.shareKey;
+    const key = postSharedFactory.data?.key;
     if (key) {
       link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?${SHARE_QUERY_PARAM}=${key}`;
     }
@@ -89,40 +76,47 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
       copyToClipboard: !!postSharedFactory.data?.key,
       loading: postSharedFactory.loading,
     }
-  }, [initializer?.shareKey, postSharedFactory.data?.key, postSharedFactory.loading]);
-  
+  }, [postSharedFactory.data?.key, postSharedFactory.loading]);
+
+  // Load the active factory's content into the reducer. Shared/legacy take priority
+  // (URL imports), then a stored library config, else a fresh/empty factory.
+  const loadFromInitializer = () => {
+    if (initializer?.factoryConfig) {
+      dispatch({ type: 'LOAD_FROM_SHARED_FACTORY', config: initializer.factoryConfig, gameData });
+    } else if (initializer?.legacyEncoding) {
+      dispatch({ type: 'LOAD_FROM_LEGACY_ENCODING', encoding: initializer.legacyEncoding, gameData });
+    } else if (initializer?.libraryConfig) {
+      dispatch({ type: 'LOAD_FROM_LIBRARY', config: initializer.libraryConfig, gameData });
+    } else {
+      dispatch({ type: 'RESET_FACTORY', gameData });
+    }
+  };
+
+  // Load the active factory whenever game data tells us to: on the initial load /
+  // different-version refetch (triggerInitialize), or a same-version switch that
+  // reloads without a refetch (reinitToken).
   useEffect(() => {
-    if (triggerInitialize) {
-      if (initializer?.factoryConfig) {
-        dispatch({ type: 'LOAD_FROM_SHARED_FACTORY', config: initializer.factoryConfig, gameData });
-      } else if (initializer?.legacyEncoding) {
-        dispatch({ type: 'LOAD_FROM_LEGACY_ENCODING', encoding: initializer.legacyEncoding, gameData });
-      } else if (initializer?.sessionState) {
-        dispatch({ type: 'LOAD_FROM_SESSION_STORAGE', sessionState: initializer?.sessionState, gameData });
-      } else {
-        dispatch({ type: 'RESET_FACTORY', gameData });
-      }
-      // Don't call handleCalculateFactory() here — state hasn't updated yet (dispatch is async).
-      // Set the flag so the state-change effect below runs the solve after the new state is applied.
-      forceCalculateRef.current = true;
+    if (triggerInitialize || reinitToken > 0) {
+      loadFromInitializer();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerInitialize]);
+  }, [triggerInitialize, reinitToken]);
 
+  // Performance is good enough to always auto-solve on any state change. The initial
+  // state (prevState === undefined) is skipped; the load dispatch above produces the
+  // first real state change, which triggers the initial solve.
   useEffect(() => {
-    if (prevState !== undefined && prevState !== state && (autoCalculateBool || forceCalculateRef.current)) {
-      forceCalculateRef.current = false;
+    if (prevState !== undefined && prevState !== state) {
       handleCalculateFactory();
     }
-  }, [autoCalculateBool, handleCalculateFactory, prevState, state]);
+  }, [handleCalculateFactory, prevState, state]);
 
+  // Autosave the live reducer state into the active library slot. Skipped on the
+  // initial (pre-load) state so it never clobbers a stored config before it loads.
   useEffect(() => {
-      try {
-        window.sessionStorage.setItem('game-version', gameVersion);
-        window.sessionStorage.setItem('state', JSON.stringify(state));
-      } catch (e) {
-        console.error(e);
-      }
+    if (prevState !== undefined) {
+      lib.saveActiveConfig(state);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -134,8 +128,6 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
       calculating,
       solverResults,
       calculate: handleCalculateFactory,
-      autoCalculate: autoCalculateBool,
-      setAutoCalculate: handleSetAutoCalculate,
       generateShareLink: handleGenerateShareLink,
       shareLink,
     };
@@ -146,7 +138,6 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
     calculating,
     solverResults,
     handleCalculateFactory,
-    autoCalculateBool,
     shareLink,
   ]);
 

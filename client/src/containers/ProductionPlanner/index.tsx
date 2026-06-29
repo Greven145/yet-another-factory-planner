@@ -1,21 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Loader, Divider, Text, Title, Button } from '@mantine/core';
+import { Loader, Title, Button } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 import bgImage from '../../assets/stripe-bg.png';
 import { useGameDataContext } from '../../contexts/gameData';
-import { useGlobalContext } from '../../contexts/global';
 import { ProductionProvider } from '../../contexts/production';
-import Card from '../../components/Card';
 import ExternalLink from '../../components/ExternalLink';
 import Drawer, { TOGGLE_TAB_CLEARANCE } from '../Drawer';
 import PlannerOptions from './PlannerOptions';
 import PlannerResults from './PlannerResults';
+// The factory switcher renders as native segmented tabs at the top of the main body.
+import FactorySwitcher from './PlannerOptions/FactorySwitcher';
 import Portal from '../../components/Portal';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
 
 const ProductionPlanner = () => {
-  const globalCtx = useGlobalContext();
   const gdCtx = useGameDataContext();
   const [slowLoad, setSlowLoad] = useState(false);
   const [drawerOpen, setDrawerOpen] = useSessionStorage<'false' | 'true'>({ key: 'drawer-open', defaultValue: 'true' });
@@ -92,21 +91,16 @@ const ProductionPlanner = () => {
           gameVersion={gdCtx.gameVersion}
           initializer={gdCtx.initializer}
           triggerInitialize={gdCtx.completedThisFrame}
+          reinitToken={gdCtx.reinitToken}
         >
           <PlannerLayout>
             <Drawer open={drawerOpen === 'true'} onToggle={(value) => { setDrawerOpen(value ? 'true' : 'false'); }}>
               <PlannerOptions />
             </Drawer>
             <MainContent>
-              <WelcomeCard style={{ marginBottom: '20px' }}>
-                <Title order={2}>Welcome back &lt;Engineer ID #{globalCtx.engineerId}&gt;</Title>
-                <Text>
-                  This tool has been created to increase the efficiency of your work towards Project Assembly.<br />
-                  We hope that you will continue to be effective.
-                </Text>
-                <Divider style={{ marginTop: '10px', marginBottom: '10px' }} />
-                <Text style={{ fontSize: '13px' }}>{globalCtx.ficsitTip}</Text>
-              </WelcomeCard>
+              {/* The Welcome card is relocated into the drawer (WelcomeCard); the
+                  factory switcher takes the top of the body. */}
+              <FactorySwitcher />
               <PlannerResults />
               <FooterContent>
                 <FooterText>
@@ -143,11 +137,6 @@ const MainContent = styled.div`
   height: 100%;
   overflow-y: auto;
   padding: 0 12px 0 ${TOGGLE_TAB_CLEARANCE};
-`;
-
-const WelcomeCard = styled(Card)`
-  flex-shrink: 0;
-  margin-top: 12px;
 `;
 
 // Fills exactly the space the graph reserves below itself (GRAPH_BOTTOM_RESERVE
