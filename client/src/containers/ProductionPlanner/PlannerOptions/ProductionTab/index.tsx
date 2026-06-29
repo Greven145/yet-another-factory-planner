@@ -382,7 +382,7 @@ const ProductionTab = () => {
       </CollapsibleSection>
       <CollapsibleSection title='Weighting Options' tooltip='Tune how the solver trades off resources, power, complexity, and building count when optimizing.'>
         {renderWeightInputs()}
-        <Button color='red' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
+        <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: ctx.gameData }) }} style={{ marginTop: '15px' }}>
           Reset All Weights
         </Button>
       </CollapsibleSection>

@@ -162,7 +162,9 @@ export const theme: MantineThemeOverride = {
       // match the rest of the UI: the same steel Paper surface, squared corners, and
       // the FICSIT-orange left accent the Card component uses — instead of the plain
       // generic Mantine modal with its faint two-tone header.
-      defaultProps: { radius: 'sm', centered: true },
+      // Mantine v9 doesn't give the auto close button an accessible name; set one
+      // so the dialogs satisfy the WCAG button-name rule.
+      defaultProps: { radius: 'sm', centered: true, closeButtonProps: { 'aria-label': 'Close' } },
       styles: {
         content: {
           background: 'light-dark(#ffffff, #373b40)',

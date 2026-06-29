@@ -68,6 +68,14 @@ const FactorySwitcher = () => {
                 );
               })}
             </Tabs.List>
+            {/* The switched content (graph/report) lives below in PlannerResults, not
+                in tab panels — this Tabs is used purely as a factory selector. Mantine
+                still emits aria-controls on every tab, so render an empty, hidden panel
+                per factory (keepMounted, so inactive tabs resolve too) to keep those
+                references valid (WCAG aria-valid-attr-value). */}
+            {lib.factories.map((f) => (
+              <Tabs.Panel key={f.id} value={f.id} keepMounted style={{ display: 'none' }} />
+            ))}
           </Tabs>
         </div>
 
@@ -96,15 +104,18 @@ const FactorySwitcher = () => {
 
         {/* Share */}
         <Tooltip label="Add a product to share this factory" withArrow disabled={canShare}>
-          <Popover opened={copied && canShare} position="bottom-end" withArrow>
-            <Popover.Target>
-              {/* Span wrapper so the Tooltip still works while the Button is disabled. */}
-              <span>
+          {/* The span keeps the Tooltip working while the Button is disabled (a
+              disabled control emits no pointer events). The Popover targets the Button
+              itself — not the span — so its aria-haspopup/aria-expanded land on an
+              element that supports them (WCAG aria-allowed-attr). */}
+          <span>
+            <Popover opened={copied && canShare} position="bottom-end" withArrow>
+              <Popover.Target>
                 <Button color="positive.8" leftSection={<Share2 size={16} />} loading={ctx.shareLink.loading} disabled={!canShare} onClick={onShare}>Share</Button>
-              </span>
-            </Popover.Target>
-            <Popover.Dropdown><Text size="sm">{ctx.shareLink.link ? 'Link copied!' : 'Generating…'}</Text></Popover.Dropdown>
-          </Popover>
+              </Popover.Target>
+              <Popover.Dropdown><Text size="sm">{ctx.shareLink.link ? 'Link copied!' : 'Generating…'}</Text></Popover.Dropdown>
+            </Popover>
+          </span>
         </Tooltip>
       </Group>
 
