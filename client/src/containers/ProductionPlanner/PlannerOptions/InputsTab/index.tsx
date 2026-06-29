@@ -4,6 +4,7 @@ import { Button, Select, TextInput, Checkbox, Group, Text } from '@mantine/core'
 import { useProductionContext } from '../../../../contexts/production';
 import TrashButton from '../../../../components/TrashButton';
 import { CollapsibleSection } from '../../../../components/Section';
+import { MOBILE_MEDIA } from '../../../../theme';
 
 const InputsTab = () => {
   const ctx = useProductionContext();
@@ -166,6 +167,23 @@ export default InputsTab;
 
 const Row = styled(Group)`
   margin-bottom: 5px;
+
+  /* Mobile: stack as a card — the item picker takes the whole first line; the
+     amount field, unlimited checkbox, and trash flow onto the line beneath.
+     Drop the fixed 110px amount width so it grows; bump touch targets. */
+  ${MOBILE_MEDIA} {
+    flex-wrap: wrap;
+    & > *:first-child {
+      flex: 1 1 100% !important;
+    }
+    & .no-spinner {
+      flex: 1 1 auto;
+      width: auto !important;
+    }
+    & input {
+      min-height: 44px;
+    }
+  }
 `;
 
 const ItemContainer = styled.div`
@@ -185,6 +203,12 @@ const ResourceTableHeader = styled.div`
   padding: 4px 6px 6px;
   border-bottom: 1px solid light-dark(#dee2e6, #50565e);
   margin-bottom: 2px;
+
+  /* Mobile: the fixed-column header can't align with the stacked resource cards
+     below, so drop it entirely — each card lays out name / amount / ∞ / weight. */
+  ${MOBILE_MEDIA} {
+    display: none;
+  }
 `;
 
 const ResourceHeaderCell = styled.div`
@@ -206,6 +230,32 @@ const ResourceRow = styled.div`
 
   &:hover {
     background: light-dark(#e9ecef, #50565e);
+  }
+
+  /* Mobile: stacked card — resource name on its own line (it was being crushed to
+     invisibility in the fixed grid), then amount / ∞ / weight beneath. Grid areas
+     are mapped by child order so the JSX/desktop layout stays untouched. */
+  ${MOBILE_MEDIA} {
+    grid-template-columns: 1fr auto 96px;
+    grid-template-areas:
+      'name name name'
+      'amount unlimited weight';
+    gap: 8px;
+    padding: 10px;
+    background: light-dark(#e9ecef, #3f434a);
+
+    &:hover {
+      background: light-dark(#dee2e6, #50565e);
+    }
+
+    & > *:nth-child(1) { grid-area: name; }
+    & > *:nth-child(2) { grid-area: amount; }
+    & > *:nth-child(3) { grid-area: unlimited; }
+    & > *:nth-child(4) { grid-area: weight; }
+
+    & input {
+      min-height: 44px;
+    }
   }
 `;
 

@@ -4,6 +4,7 @@ import { Title, Text, Container, Group } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { ProducedItemInformation } from '../../../../utilities/production-solver/models';
+import { MOBILE_MEDIA } from '../../../../theme';
 
 function formatFloat(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
@@ -186,6 +187,11 @@ const StatGrid = styled.div`
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
   margin-bottom: 4px;
+
+  /* Mobile: four stat cards are too narrow on a phone — drop to two columns. */
+  ${MOBILE_MEDIA} {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `;
 
 const StatCard = styled.div<{ $accent?: boolean }>`
@@ -245,6 +251,11 @@ const ItemsGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 6px;
+
+  /* Mobile: seven columns is unreadable on a phone — collapse to two. */
+  ${MOBILE_MEDIA} {
+    grid-template-columns: repeat(2, 1fr);
+  }
 `;
 
 const ItemCell = styled.div`

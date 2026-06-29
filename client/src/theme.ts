@@ -3,6 +3,28 @@ import { MantineThemeOverride } from '@mantine/core';
 
 const defaultFont = "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif";
 
+// ── Responsive breakpoint — single source of truth ────────────────────────────
+// Use this everywhere instead of hardcoding the query: JS structural switches via
+// `useMediaQuery(MOBILE_MEDIA_QUERY)` (Mantine), styled-components CSS via the
+// `MOBILE_MEDIA` block string, e.g.
+//   const Foo = styled.div`
+//     display: flex;
+//     ${MOBILE_MEDIA} { display: block; }
+//   `;
+// The mobile shell is "phone-shaped," not just "narrow": portrait phones are caught
+// by the 768px width, but landscape phones are WIDER than 768 (e.g. 844–932) while
+// staying short — so OR-in a short-and-landscape clause to catch them too. Tablets in
+// landscape (e.g. 1024×768) are tall enough to stay on the desktop layout.
+export const MOBILE_BREAKPOINT = 768;
+// Landscape phones top out around ~430px tall; 480 leaves headroom without catching
+// tablets (≥768 tall) or typical desktop windows.
+export const LANDSCAPE_PHONE_MAX_HEIGHT = 480;
+// The bare condition (no `@media` prefix) — for Mantine `useMediaQuery`. A
+// comma-separated media-query list is an OR in both matchMedia and CSS.
+export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_BREAKPOINT}px), (max-height: ${LANDSCAPE_PHONE_MAX_HEIGHT}px) and (orientation: landscape)`;
+// The full `@media (...)` prefix — interpolate directly into a styled template.
+export const MOBILE_MEDIA = `@media ${MOBILE_MEDIA_QUERY}`;
+
 const baseSat = '77%';
 const baseLight = '63%';
 const selectSat = '58%';

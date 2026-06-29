@@ -9,6 +9,7 @@ import { MAX_PRIORITY, MaximizeBalanceMode } from '../../../../contexts/producti
 import { CollapsibleSection } from '../../../../components/Section';
 import TrashButton from '../../../../components/TrashButton';
 import LabelWithTooltip from '../../../../components/LabelWithTooltip';
+import { MOBILE_MEDIA } from '../../../../theme';
 import { ProductionItemOptions, TransportOptions } from '../../../../contexts/production/types';
 
 
@@ -389,7 +390,7 @@ const ProductionTab = () => {
       {gameVersion === GV_1_2 && (
         <CollapsibleSection title='Game Mode' tooltip='Match the cost multipliers from your save&apos;s Game Mode so the plan reflects your in-game resource and power costs.'>
           {renderGameModeInputs()}
-          <Button color='red' onClick={() => { ctx.dispatch({ type: 'UPDATE_GAME_MODE_OPTIONS', data: { recipePartsCost: '1', powerConsumption: '1' } }) }} style={{ marginTop: '15px' }}>
+          <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'UPDATE_GAME_MODE_OPTIONS', data: { recipePartsCost: '1', powerConsumption: '1' } }) }} style={{ marginTop: '15px' }}>
             Reset Game Mode
           </Button>
         </CollapsibleSection>
@@ -405,6 +406,25 @@ export default ProductionTab;
 
 const Row = styled(Group)`
   margin-bottom: 5px;
+
+  /* Mobile: stacked card. The item dropdown was crushed to a sliver between the
+     fixed-width amount and the 150px-min mode select. Wrap so the item picker gets
+     the whole first line; amount + mode + trash drop to the next. Drop the fixed
+     110px amount width so it flows, and bump touch targets. (!important beats the
+     inline flex/width on the Select.) */
+  ${MOBILE_MEDIA} {
+    flex-wrap: wrap;
+    & > *:first-child {
+      flex: 1 1 100% !important;
+    }
+    & > *:nth-child(2) {
+      flex: 1 1 90px !important;
+      width: auto !important;
+    }
+    & input {
+      min-height: 44px;
+    }
+  }
 `;
 
 const ItemContainer = styled.div`

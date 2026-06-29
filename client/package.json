@@ -27,7 +27,9 @@
         "lint": "eslint \"src/**/*.{ts,tsx}\"",
         "a11y:lhci": "lhci autorun",
         "pretest:smoke": "npm run playwright:install",
-        "test:smoke": "node scripts/smoke-runner.js"
+        "test:smoke": "node scripts/smoke-runner.js",
+        "pretest:responsive": "npm run playwright:install",
+        "test:responsive": "playwright test -c playwright.responsive.config.ts"
     },
     "browserslist": {
         "production": [
