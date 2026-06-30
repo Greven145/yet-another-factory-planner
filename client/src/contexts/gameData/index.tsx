@@ -110,7 +110,13 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       const params = new URLSearchParams(window.location.search);
       const shareKey = params.get(SHARE_QUERY_PARAM);
       const legacyEncoding = params.get('f');
-      window.history.replaceState(null, '', `${window.location.pathname}`);
+      // Clear only the share keys we just imported — leave any other query params
+      // (e.g. the prototype's ?variant=) intact so a refresh doesn't re-import the
+      // shared factory while still preserving the rest of the URL.
+      params.delete(SHARE_QUERY_PARAM);
+      params.delete('f');
+      const rest = params.toString();
+      window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
 
       // Resolve the version this load landed on.
       let version: string;
