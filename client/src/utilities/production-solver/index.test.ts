@@ -493,3 +493,57 @@ describe('ProductionSolver game mode multipliers (recipe cost)', () => {
     expect(oreNode.multiplier).toBeCloseTo(60, 2);
   });
 });
+
+describe('ProductionSolver belt/pipe capacity (issue #130)', () => {
+  // Iron Ingot recipe produces 30 ingots/min per building, so the recipe node's total
+  // output for iron ingot is `multiplier * 30`. A rate target (rate pass) plus a maximize
+  // target for the same item (a second, summed pass) both touch Recipe_IronIngot_C — the bug
+  // was that each pass capped independently and the per-pass results were summed, letting the
+  // node's total output exceed one belt.
+
+  it('enforces the belt cap on a recipe node total output across the rate + maximize passes', async () => {
+    const options = createValidOptions({
+      productionItems: [
+        { key: 'prod-1', itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: '10' },
+        { key: 'prod-2', itemKey: 'Desc_IronIngot_C', mode: 'maximize', value: '1' },
+      ],
+      transportOptions: { beltCapacity: '60', pipeCapacity: null },
+    });
+    const { productionGraph, error } = await new ProductionSolver(options, mockGameData).exec();
+
+    expect(error).toBeNull();
+    const ingotRecipeNode = productionGraph!.nodes['Recipe_IronIngot_C'];
+    // Total iron-ingot output of the node must fit on a single 60/min belt.
+    expect(ingotRecipeNode.multiplier * 30).toBeLessThanOrEqual(60 + 1e-6);
+  });
+
+  it('does not cap output when no belt capacity is configured', async () => {
+    const options = createValidOptions({
+      productionItems: [
+        { key: 'prod-1', itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: '10' },
+        { key: 'prod-2', itemKey: 'Desc_IronIngot_C', mode: 'maximize', value: '1' },
+      ],
+      transportOptions: { beltCapacity: null, pipeCapacity: null },
+    });
+    const { productionGraph, error } = await new ProductionSolver(options, mockGameData).exec();
+
+    expect(error).toBeNull();
+    const ingotRecipeNode = productionGraph!.nodes['Recipe_IronIngot_C'];
+    // Uncapped: maximize pushes iron ingot well past what one 60/min belt could carry.
+    expect(ingotRecipeNode.multiplier * 30).toBeGreaterThan(60);
+  });
+
+  it('reports a belt/pipe-capacity error when a target needs more than one belt', async () => {
+    const options = createValidOptions({
+      productionItems: [
+        { key: 'prod-1', itemKey: 'Desc_IronIngot_C', mode: 'per-minute', value: '100' },
+      ],
+      transportOptions: { beltCapacity: '60', pipeCapacity: null },
+    });
+    const { error } = await new ProductionSolver(options, mockGameData).exec();
+
+    expect(error).not.toBeNull();
+    expect(error!.message).toBe('BELT/PIPE CAPACITY TOO LOW');
+    expect(error!.helpText).toMatch(/belt 60\/min/);
+  });
+});
