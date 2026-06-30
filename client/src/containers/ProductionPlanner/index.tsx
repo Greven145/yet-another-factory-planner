@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Loader, Title, Button } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { AnimatePresence, motion } from 'framer-motion';
 import styled from 'styled-components';
 import bgImage from '../../assets/stripe-bg.png';
+import { MOBILE_MEDIA_QUERY } from '../../theme';
 import { useGameDataContext } from '../../contexts/gameData';
 import { ProductionProvider } from '../../contexts/production';
 import ExternalLink from '../../components/ExternalLink';
 import Drawer, { TOGGLE_TAB_CLEARANCE } from '../Drawer';
 import PlannerOptions from './PlannerOptions';
 import PlannerResults from './PlannerResults';
+import MobileShell from './MobileShell';
 // The factory switcher renders as native segmented tabs at the top of the main body.
 import FactorySwitcher from './PlannerOptions/FactorySwitcher';
 import Portal from '../../components/Portal';
@@ -18,6 +21,10 @@ const ProductionPlanner = () => {
   const gdCtx = useGameDataContext();
   const [slowLoad, setSlowLoad] = useState(false);
   const [drawerOpen, setDrawerOpen] = useSessionStorage<'false' | 'true'>({ key: 'drawer-open', defaultValue: 'true' });
+  // Below the breakpoint, swap the desktop drawer + main-content layout for the
+  // full-viewport mobile shell. Resolve the match on first render (no effect delay)
+  // so phones don't flash the desktop layout.
+  const isMobile = useMediaQuery(MOBILE_MEDIA_QUERY, false, { getInitialValueInEffect: false });
 
   const loaded = !!gdCtx.gameData;
   useEffect(() => {
@@ -93,6 +100,7 @@ const ProductionPlanner = () => {
           triggerInitialize={gdCtx.completedThisFrame}
           reinitToken={gdCtx.reinitToken}
         >
+          {isMobile ? <MobileShell /> : (
           <PlannerLayout>
             <Drawer open={drawerOpen === 'true'} onToggle={(value) => { setDrawerOpen(value ? 'true' : 'false'); }}>
               <PlannerOptions />
@@ -111,6 +119,7 @@ const ProductionPlanner = () => {
               </FooterContent>
             </MainContent>
           </PlannerLayout>
+          )}
         </ProductionProvider>
       )}
     </>

@@ -6,7 +6,7 @@ import GraphVisualizer from 'react-cytoscapejs';
 import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { GraphNode, GraphEdge, NODE_TYPE, ProductionGraph } from '../../../../utilities/production-solver/models';
-import { graphColors } from '../../../../theme';
+import { graphColors, MOBILE_MEDIA } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
 import GraphContextMenu, { ContextMenuState } from '../../../../components/GraphContextMenu';
 import { truncateFloat } from '../../../../utilities/number';
@@ -54,6 +54,15 @@ const layout = {
   },
 };
 
+// Coarse pointer = touch (phone/tablet). Used to bump label legibility and to make
+// nodes ungrabbable so a single finger pans the graph instead of dragging a node.
+const IS_COARSE_POINTER = typeof window !== 'undefined'
+  && window.matchMedia('(pointer: coarse)').matches;
+
+// Larger labels read better on small, high-DPI touch screens.
+const NODE_FONT_SIZE = IS_COARSE_POINTER ? '18px' : '14px';
+const EDGE_FONT_SIZE = IS_COARSE_POINTER ? '17px' : '14px';
+
 const stylesheet: Cytoscape.StylesheetStyle[] = [
   {
     // ====== BASE ====== //
@@ -83,7 +92,7 @@ const stylesheet: Cytoscape.StylesheetStyle[] = [
       'overlay-padding': 0,
       'overlay-opacity': 0,
       'text-wrap': 'wrap',
-      'font-size': '14px',
+      'font-size': NODE_FONT_SIZE,
     },
   },
   {
@@ -98,7 +107,7 @@ const stylesheet: Cytoscape.StylesheetStyle[] = [
       'overlay-padding': 0,
       'overlay-opacity': 0,
       'text-wrap': 'wrap',
-      'font-size': '14px',
+      'font-size': EDGE_FONT_SIZE,
       'color': graphColors.edge.label,
       'line-color': graphColors.edge.line,
       'target-arrow-color': graphColors.edge.line,
@@ -251,6 +260,13 @@ const GraphButtonGroup = styled(Group)`
   top: 10px;
   right: 10px;
   z-index: 100;
+
+  /* Keep the controls clear of the notch/rounded corners in landscape and give
+     them comfortable touch targets on phones. */
+  ${MOBILE_MEDIA} {
+    top: calc(10px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
+  }
 `;
 
 //Extend the mantine/core button component to add a custom style
@@ -262,6 +278,11 @@ const GraphButton = styled(Button)<ButtonProps & React.ComponentPropsWithoutRef<
   border: 1px solid light-dark(rgba(0,0,0,0.15), rgba(255,255,255,0.1));
   border-radius: 5px;
   padding: 5px;
+
+  ${MOBILE_MEDIA} {
+    min-height: 44px;
+    padding: 5px 12px;
+  }
 `;
 
 function getNodeLabel(node: GraphNode, gameData: GameData) {
@@ -363,6 +384,9 @@ const ProductionGraphTab = () => {
     return pos;
   }
   layout.transform = modifyNodePositions;
+  // Lay the chain out vertically on portrait (tall, narrow phone) and horizontally on
+  // landscape/desktop. Mutating the shared layout const here mirrors the line above.
+  layout.klay.direction = window.matchMedia('(orientation: portrait)').matches ? 'DOWN' : 'RIGHT';
 
   const setGraphRef = useCallback((instance: HTMLDivElement | null) => {
     if (instance) {
@@ -382,6 +406,12 @@ const ProductionGraphTab = () => {
   }
 
   function setCyListeners(cy: Cytoscape.Core) {
+    // On touch devices, make every node ungrabbable so a single finger pans the
+    // whole graph instead of accidentally dragging a node out of the layout.
+    if (IS_COARSE_POINTER) {
+      cy.autoungrabify(true);
+    }
+
     cy.on('select', 'node', function (e) {
       e.target.addClass('selected');
       e.target.outgoers('edge').addClass('selected').addClass('selected-outgoing');
@@ -525,6 +555,18 @@ const ProductionGraphTab = () => {
     };
   }, []);
 
+  // Re-run the layout when the device rotates so the graph flips between vertical
+  // (portrait) and horizontal (landscape).
+  useEffect(() => {
+    const mq = window.matchMedia('(orientation: portrait)');
+    const onChange = () => {
+      layout.klay.direction = mq.matches ? 'DOWN' : 'RIGHT';
+      cyRef.current?.layout(layout).run();
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   useEffect(() => {
     function resizeListener() {
       _resizeListener(graphRef);
@@ -597,8 +639,8 @@ const ProductionGraphTab = () => {
     <>
       <GraphContainer fluid ref={setGraphRef}>
         <GraphButtonGroup>
-          <GraphButton onClick={() => { cyRef.current?.fit(); }}>Fit Graph</GraphButton>
-          <GraphButton onClick={() => { resetNodePositions(); }}>Reset positions</GraphButton>
+          <GraphButton aria-label='Fit graph to screen' onClick={() => { cyRef.current?.fit(); }}>Fit Graph</GraphButton>
+          <GraphButton aria-label='Reset node positions' onClick={() => { resetNodePositions(); }}>Reset positions</GraphButton>
         </GraphButtonGroup>
         {
           (isLoading || !pluginsReady) && (
