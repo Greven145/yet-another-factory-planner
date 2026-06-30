@@ -163,6 +163,11 @@ export const theme: MantineThemeOverride = {
       },
     },
     Tooltip: {
+      defaultProps: {
+        // Mantine defaults to hover-only; touch devices never hover, so the info
+        // icons were dead on mobile. Enable touch (tap to open) and focus (keyboard).
+        events: { hover: true, focus: true, touch: true },
+      },
       styles: {
         tooltip: {
           background: 'light-dark(#fff, #3f434a)',
