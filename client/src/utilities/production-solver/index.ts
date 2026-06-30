@@ -385,11 +385,11 @@ export class ProductionSolver {
         }
         let solution: ProductionSolution;
         if (groupTargetKeys.length === 1) {
-          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk);
+          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, undefined, productionSolution);
         } else {
           const maxima = new Map<string, number>();
           for (const targetKey of groupTargetKeys) {
-            const individualSol = await this.productionSolverPass([targetKey], remainingInputs, glpk);
+            const individualSol = await this.productionSolverPass([targetKey], remainingInputs, glpk, undefined, productionSolution);
             const tempGraph = assembleGraph(individualSol, this.graphContext());
             const node = Object.values(tempGraph.nodes).find(n => n.key === targetKey && n.type === NODE_TYPE.FINAL_PRODUCT);
             maxima.set(targetKey, node?.multiplier ?? 0);
@@ -397,7 +397,7 @@ export class ProductionSolver {
           const balancedMaxima = this.maximizeBalanceMode === 'equal'
             ? new Map([...maxima.entries()].map(([k, v]) => [k, v > EPSILON ? 1 : 0]))
             : maxima;
-          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, balancedMaxima);
+          solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, balancedMaxima, productionSolution);
         }
         for (const [key, multiplier] of Object.entries(solution)) {
           if (productionSolution[key]) {
@@ -442,7 +442,7 @@ export class ProductionSolver {
     };
   }
 
-  private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK, maxima?: Map<string, number>): Promise<ProductionSolution> {
+  private async productionSolverPass(targetKeys: string[], remainingInputs: Inputs, glpk: GLPK, maxima?: Map<string, number>, priorSolution?: ProductionSolution): Promise<ProductionSolution> {
     const isRateTargetPass = targetKeys.length === 1 && targetKeys[0] === RATE_TARGET_KEY;
     const targetItemVars = new Map<string, Var[]>();
     const model: LP = {
@@ -488,10 +488,14 @@ export class ProductionSolver {
           const isFluid = this.gameData.items[product.itemClass]?.isFluid ?? false;
           const capacity = isFluid ? this.pipeCapacity : this.beltCapacity;
           if (capacity !== null) {
+            // Tighten the cap by output already allocated to this recipe in prior passes, so the
+            // cumulative total across all summed passes stays within a single belt/pipe (issue #130).
+            const priorMultiplier = priorSolution?.[recipeKey] ?? 0;
+            const ub = Math.max(0, capacity - priorMultiplier * product.perMinute);
             model.subjectTo.push({
               name: `${recipeKey}_${product.itemClass}_capacity`,
               vars: [{ name: recipeKey, coef: product.perMinute }],
-              bnds: { type: glpk.GLP_UP, ub: capacity, lb: NaN },
+              bnds: { type: glpk.GLP_UP, ub, lb: NaN },
             });
           }
         }
@@ -698,6 +702,22 @@ export class ProductionSolver {
       throw new GraphError('TIMED OUT', 'Try setting the complexity weight to 0. Unfortunately it is currently very slow for large factories. For complex factories, you might try the Buildings optimizer instead.');
     }
     if (solution.result.status !== glpk.GLP_OPT && solution.result.status !== glpk.GLP_FEAS) {
+      // If a belt/pipe capacity limit is set, check whether it is what made the solve infeasible by
+      // re-solving without the capacity constraints. If that succeeds, the cap is the culprit and we
+      // can explain exactly why instead of throwing a generic error (issue #130).
+      if (this.beltCapacity !== null || this.pipeCapacity !== null) {
+        const probe = { ...model, subjectTo: model.subjectTo.filter((c) => !c.name.endsWith('_capacity')) };
+        const probeSolution = await glpk.solve(probe, { msglev: glpk.GLP_MSG_OFF, tmlim: TIME_LIMIT });
+        if (probeSolution.result.status === glpk.GLP_OPT || probeSolution.result.status === glpk.GLP_FEAS) {
+          const limits: string[] = [];
+          if (this.beltCapacity !== null) limits.push(`belt ${this.beltCapacity}/min`);
+          if (this.pipeCapacity !== null) limits.push(`pipe ${this.pipeCapacity}/min`);
+          throw new GraphError(
+            'BELT/PIPE CAPACITY TOO LOW',
+            `Your transport capacity limit (${limits.join(', ')}) is too low to satisfy this factory. A single recipe's output for one item cannot exceed one belt/pipe, so a target needs more throughput than one belt can carry. Raise or clear the belt/pipe capacity in the Production tab.`,
+          );
+        }
+      }
       if (isRateTargetPass) {
         throw new GraphError('NO SOLUTION', 'This could be due to missing recipes, impossible demands, or any number of reasons. Double check your factory settings.');
       } else {
