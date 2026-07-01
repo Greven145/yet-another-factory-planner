@@ -5,8 +5,10 @@ import { join } from 'path';
 
 const fixtureResponse = readFileSync(join(__dirname, 'fixtures/initialize-response.json'), 'utf-8');
 
-// Builds the standard WCAG 2.0 A/AA axe scan (canvas excluded — the graph is a
-// separate tracked follow-up). Headless WebKit's colour management diverges
+// Builds the standard WCAG 2.0 A/AA axe scan. The `<canvas>` element itself is
+// excluded because a canvas is inherently opaque to assistive tech; the accessible
+// equivalent of the graph is the Flow tab (issue #92, ADR 0002), which IS scanned and
+// positively asserted below. Headless WebKit's colour management diverges
 // from real sRGB and produces non-deterministic color-contrast results on
 // borderline brand colours that pass reliably on Chromium + Firefox (which are
 // authoritative for contrast here), so that single rule is dropped on WebKit
@@ -147,6 +149,34 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     // Clicking Share posts the factory and opens the "Link copied!" popover.
     await page.getByRole('button', { name: 'Share' }).click();
     await expect(page.getByText('Link copied!')).toBeVisible();
+
+    const results = await buildScan(page).analyze();
+
+    expect(results.violations).toEqual([]);
+  });
+
+  test('Flow tab is an accessible equivalent of the graph (no WCAG A/AA violations)', async ({ page }) => {
+    await page.goto('/');
+
+    // Open the control panel and add a product so the results area is populated
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    await page.getByPlaceholder('Select an item').click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+
+    // Wait for the solver to compute a plan
+    await page.waitForTimeout(1000);
+
+    // Close the drawer so the results tabs are reachable
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
+
+    // Switch to the Flow tab — the DOM equivalent of the canvas graph
+    await page.getByRole('tab', { name: 'Flow' }).click();
+
+    // Positive assertion: the production-steps table is present and reachable, so the
+    // plan's structure is available without the canvas.
+    await expect(page.getByRole('columnheader', { name: 'Recipe' })).toBeVisible();
+    await expect(page.getByRole('rowheader', { name: 'Iron Plate' }).first()).toBeVisible();
 
     const results = await buildScan(page).analyze();
 
