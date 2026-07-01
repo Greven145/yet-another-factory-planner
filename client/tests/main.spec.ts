@@ -99,10 +99,10 @@ test.describe('Factory Planner Application', () => {
     await closeBtn.click();
 
     // Click Factory Report tab (now in main content area, not blocked by drawer)
-    await page.getByRole('tab', { name: 'Factory Report' }).click();
+    await page.getByRole('tab', { name: 'Report' }).click();
 
     // Verify tab is active
-    const reportTab = page.getByRole('tab', { name: 'Factory Report' });
+    const reportTab = page.getByRole('tab', { name: 'Report' });
     await expect(reportTab).toHaveAttribute('aria-selected', 'true');
   });
 

@@ -67,7 +67,7 @@ async function showGraphAndReport(page: Page): Promise<boolean> {
   }
 
   // Make sure we're on the Production Graph tab (default, but be explicit).
-  await page.getByRole('tab', { name: 'Production Graph' }).click();
+  await page.getByRole('tab', { name: 'Graph' }).click();
 
   let graphRendered = false;
   try {
@@ -96,8 +96,8 @@ test.describe('Responsive core flow', () => {
     const graphRendered = await showGraphAndReport(page);
 
     // Open the Factory Report (same tab control in both layouts).
-    await page.getByRole('tab', { name: 'Factory Report' }).click();
-    await expect(page.getByRole('tab', { name: 'Factory Report' })).toHaveAttribute(
+    await page.getByRole('tab', { name: 'Report' }).click();
+    await expect(page.getByRole('tab', { name: 'Report' })).toHaveAttribute(
       'aria-selected',
       'true',
     );
@@ -152,7 +152,7 @@ test.describe('Responsive core flow', () => {
 
       // 5. Fit-to-screen control exists and is clickable (Results / graph view).
       await page.getByRole('button', { name: 'Results' }).click();
-      await page.getByRole('tab', { name: 'Production Graph' }).click();
+      await page.getByRole('tab', { name: 'Graph' }).click();
       const fitBtn = page.getByRole('button', { name: 'Fit graph to screen' });
       await expect(fitBtn).toBeVisible();
       await fitBtn.click();
