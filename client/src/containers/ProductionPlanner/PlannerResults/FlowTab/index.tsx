@@ -4,7 +4,7 @@ import { Container, Group, Text, VisuallyHidden } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { buildFlowModel } from '../../../../utilities/production-solver/flow-model';
-import FlowTable from './FlowTable';
+import FlowCards from './FlowCards';
 
 // Accessible, non-canvas equivalent of the production graph (issue #92, ADR 0002).
 // Renders the solved plan as a semantic table and announces recomputes via an ARIA
@@ -48,7 +48,7 @@ const FlowTab = () => {
                 ⚠️ Warning: A loop was detected — these values may not be reliable.
               </LoopWarning>
             )}
-            <FlowTable model={model} />
+            <FlowCards model={model} />
           </>
         )
       }

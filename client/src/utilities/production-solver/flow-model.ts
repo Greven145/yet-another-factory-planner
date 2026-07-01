@@ -126,11 +126,54 @@ export function buildFlowModel(graph: ProductionGraph, gameData: GameData): Flow
     }
   }
 
-  const byName = (a: { itemName: string }, b: { itemName: string }) => a.itemName.localeCompare(b.itemName);
-  rawInputs.sort(byName);
-  finalProducts.sort(byName);
+  const byItemName = (a: { itemName: string }, b: { itemName: string }) => a.itemName.localeCompare(b.itemName);
+  rawInputs.sort(byItemName);
+  finalProducts.sort(byItemName);
 
-  const recipes = Array.from(rows.values()).sort((a, b) => a.recipeName.localeCompare(b.recipeName));
+  const recipes = orderByDependency(Array.from(rows.values()), graph);
 
   return { recipes, rawInputs, finalProducts };
+}
+
+// Orders recipe rows so producers come before the recipes that consume them
+// (raw → intermediate → final), reading top-to-bottom the way the graph flows
+// left-to-right. A recipe→recipe edge means the source feeds the target. Uses
+// Kahn's algorithm, tie-broken by recipe name for determinism; any recipes left
+// in a cycle (loop warning) are appended by name so output is always stable.
+function orderByDependency(rows: FlowRecipeRow[], graph: ProductionGraph): FlowRecipeRow[] {
+  const rowById = new Map(rows.map((r) => [r.id, r]));
+  const consumers = new Map<string, Set<string>>(rows.map((r) => [r.id, new Set<string>()]));
+  const inDegree = new Map<string, number>(rows.map((r) => [r.id, 0]));
+
+  for (const edge of graph.edges) {
+    if (edge.from === edge.to) continue;
+    if (!rowById.has(edge.from) || !rowById.has(edge.to)) continue;
+    const feeds = consumers.get(edge.from)!;
+    if (!feeds.has(edge.to)) {
+      feeds.add(edge.to);
+      inDegree.set(edge.to, inDegree.get(edge.to)! + 1);
+    }
+  }
+
+  const byName = (a: FlowRecipeRow, b: FlowRecipeRow) => a.recipeName.localeCompare(b.recipeName);
+  const ready = rows.filter((r) => inDegree.get(r.id) === 0).sort(byName);
+  const ordered: FlowRecipeRow[] = [];
+  const seen = new Set<string>();
+
+  while (ready.length > 0) {
+    const node = ready.shift()!;
+    if (seen.has(node.id)) continue;
+    seen.add(node.id);
+    ordered.push(node);
+    for (const consumerId of consumers.get(node.id)!) {
+      inDegree.set(consumerId, inDegree.get(consumerId)! - 1);
+      if (inDegree.get(consumerId) === 0) ready.push(rowById.get(consumerId)!);
+    }
+    ready.sort(byName);
+  }
+
+  if (ordered.length < rows.length) {
+    ordered.push(...rows.filter((r) => !seen.has(r.id)).sort(byName));
+  }
+  return ordered;
 }

@@ -173,17 +173,17 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     // Switch to the Flow tab — the DOM equivalent of the canvas graph
     await page.getByRole('tab', { name: 'Flow' }).click();
 
-    // Positive assertion: the production-steps table is present and reachable, so the
-    // plan's structure is available without the canvas.
-    await expect(page.getByRole('columnheader', { name: 'Recipe' })).toBeVisible();
-    await expect(page.getByRole('rowheader', { name: 'Iron Plate' }).first()).toBeVisible();
+    // Positive assertion: the production-steps section and per-recipe cards are present
+    // and reachable, so the plan's structure is available without the canvas.
+    await expect(page.getByRole('heading', { name: 'Production steps' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Iron Plate' }).first()).toBeVisible();
 
     const results = await buildScan(page).analyze();
 
     expect(results.violations).toEqual([]);
   });
 
-  test('Factory Report tab has no WCAG A/AA violations', async ({ page }) => {
+  test('Report tab has no WCAG A/AA violations', async ({ page }) => {
     await page.goto('/');
 
     // Open the control panel and add a product so the results area is populated
@@ -200,12 +200,12 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     // Wait a moment for computation
     await page.waitForTimeout(1000);
 
-    // Close the drawer so Factory Report tab is accessible
+    // Close the drawer so the Report tab is accessible
     const closeBtn = page.getByRole('button', { name: 'Close Control Panel' });
     await closeBtn.click();
 
-    // Switch to the Factory Report tab
-    await page.getByRole('tab', { name: 'Factory Report' }).click();
+    // Switch to the Report tab
+    await page.getByRole('tab', { name: 'Report' }).click();
 
     const results = await buildScan(page).analyze();
 

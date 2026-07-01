@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { MantineProvider } from '@mantine/core';
-import FlowTable from './FlowTable';
+import FlowCards from './FlowCards';
 import { FlowModel } from '../../../../utilities/production-solver/flow-model';
 
 const model: FlowModel = {
@@ -36,22 +36,26 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return <MantineProvider>{children}</MantineProvider>;
 }
 
-describe('FlowTable — accessibility', () => {
-  it('renders a column-headed table of the production steps', () => {
-    render(<Wrapper><FlowTable model={model} /></Wrapper>);
+describe('FlowCards — accessibility', () => {
+  it('renders section and per-recipe headings so the plan is navigable', () => {
+    render(<Wrapper><FlowCards model={model} /></Wrapper>);
 
-    expect(screen.getByRole('columnheader', { name: 'Recipe' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Building' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Inputs' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Outputs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Raw inputs' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Production steps' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Final products' })).toBeInTheDocument();
 
-    // recipe names are row headers (scope="row")
-    expect(screen.getByRole('rowheader', { name: 'Iron Ingot' })).toBeInTheDocument();
-    expect(screen.getByRole('rowheader', { name: 'Iron Plate' })).toBeInTheDocument();
+    // each recipe is its own labelled card (region) with a heading
+    expect(screen.getByRole('heading', { name: 'Iron Ingot' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Iron Plate' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Iron Plate' })).toBeInTheDocument();
+
+    // consumes/produces content is present
+    expect(screen.getAllByText('Consumes').length).toBe(2);
+    expect(screen.getAllByText('Produces').length).toBe(2);
   });
 
   it('has no axe violations', async () => {
-    const { container } = render(<Wrapper><FlowTable model={model} /></Wrapper>);
+    const { container } = render(<Wrapper><FlowCards model={model} /></Wrapper>);
     const results = await axe(container);
     expect(results).toHaveNoViolations();
   });

@@ -36,9 +36,52 @@ const graph: ProductionGraph = {
 };
 
 describe('buildFlowModel', () => {
-  it('produces one row per recipe node, sorted by name', () => {
+  it('produces one row per recipe node, in dependency order (producers first)', () => {
     const model = buildFlowModel(graph, gameData);
     expect(model.recipes.map((r) => r.recipeName)).toEqual(['Iron Ingot', 'Iron Plate']);
+  });
+
+  it('orders producers before consumers even when that contradicts alphabetical order', () => {
+    // "Zzz Ingot" feeds "Aaa Plate": dependency order must put Zzz first despite the name.
+    const gd = {
+      buildings: { B: { name: 'Building' } },
+      recipes: {
+        Recipe_Z: { name: 'Zzz Ingot', producedIn: 'B' },
+        Recipe_A: { name: 'Aaa Plate', producedIn: 'B' },
+      },
+      items: { Desc_Mid: { name: 'Mid' } },
+    } as unknown as GameData;
+    const g: ProductionGraph = {
+      nodes: {
+        z: { id: 'z', key: 'Recipe_Z', type: NODE_TYPE.RECIPE, multiplier: 1 },
+        a: { id: 'a', key: 'Recipe_A', type: NODE_TYPE.RECIPE, multiplier: 1 },
+      },
+      edges: [{ key: 'Desc_Mid', from: 'z', to: 'a', productionRate: 10 }],
+    };
+    expect(buildFlowModel(g, gd).recipes.map((r) => r.recipeName)).toEqual(['Zzz Ingot', 'Aaa Plate']);
+  });
+
+  it('still returns every recipe when the graph contains a cycle', () => {
+    // a → b → a (loop). No recipe has in-degree 0; all must still appear.
+    const gd = {
+      buildings: { B: { name: 'Building' } },
+      recipes: {
+        Recipe_A: { name: 'A', producedIn: 'B' },
+        Recipe_B: { name: 'B', producedIn: 'B' },
+      },
+      items: { Desc_X: { name: 'X' }, Desc_Y: { name: 'Y' } },
+    } as unknown as GameData;
+    const g: ProductionGraph = {
+      nodes: {
+        a: { id: 'a', key: 'Recipe_A', type: NODE_TYPE.RECIPE, multiplier: 1 },
+        b: { id: 'b', key: 'Recipe_B', type: NODE_TYPE.RECIPE, multiplier: 1 },
+      },
+      edges: [
+        { key: 'Desc_X', from: 'a', to: 'b', productionRate: 1 },
+        { key: 'Desc_Y', from: 'b', to: 'a', productionRate: 1 },
+      ],
+    };
+    expect(buildFlowModel(g, gd).recipes.map((r) => r.recipeName).sort()).toEqual(['A', 'B']);
   });
 
   it('maps building, count, inputs and outputs for a recipe', () => {
