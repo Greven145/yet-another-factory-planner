@@ -58,9 +58,12 @@ than trying to make the canvas itself navigable. Specifically:
      Graph and Factory Report — not a visually-hidden region. A visible surface stays
      maintained (hidden equivalents silently drift out of sync) and also helps
      keyboard-only and low-vision sighted users, not only screen-reader users.
-   - **Shape:** a **per-recipe table**. One row per recipe node; columns for the recipe,
-     its building × count, its inputs (item + rate + source node), and its outputs
-     (item + rate + consuming node).
+   - **Shape:** **per-recipe cards in dependency order** (raw → final, via a topological
+     sort of the recipe nodes). Each card names the recipe, its building × count, and a
+     Consumes / Produces split of its item flows. (Started as a per-recipe table; changed
+     to cards during mobile review — a 4-column table overflowed on phones and the
+     double-entry/alphabetical rows were hard to follow. Cards stack cleanly on mobile
+     and read top-to-bottom the way the graph flows.)
    - **Data:** a fresh `buildFlowModel(productionGraph, gameData)` view-model derived
      directly from `productionGraph.nodes` + `edges`. The Factory Report tab is left
      untouched (no shared-derivation refactor for now).
