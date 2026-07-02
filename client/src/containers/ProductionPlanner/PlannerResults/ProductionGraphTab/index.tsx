@@ -7,7 +7,7 @@ import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } fr
 import { AlertCircle } from 'react-feather';
 import { GraphNode, GraphEdge, NODE_TYPE, ProductionGraph } from '../../../../utilities/production-solver/models';
 import { decomposeGraph } from '../../../../utilities/production-solver/decompose-graph';
-import { describeTransport, formatTransport, TransportCapacities } from '../../../../utilities/production-solver/transport';
+import { describeTransport, formatTransport, resolveTransportCaps, TransportCapacities } from '../../../../utilities/production-solver/transport';
 import { graphColors, MOBILE_MEDIA } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
 import GraphContextMenu, { ContextMenuState } from '../../../../components/GraphContextMenu';
@@ -370,12 +370,6 @@ type ProductionGraphTabProps = {
   showTransport?: boolean,
 };
 
-function parseCapacity(value: string | null): number | null {
-  if (value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
 const ProductionGraphTab = ({ dedicatedLines = false, showTransport = false }: ProductionGraphTabProps) => {
   const [doFirstRender, setDoFirstRender] = useState(false);
   const [pluginsReady, setPluginsReady] = useState(false);
@@ -623,12 +617,7 @@ const ProductionGraphTab = ({ dedicatedLines = false, showTransport = false }: P
 
   const transportOptions = ctx.state.transportOptions;
   const transportCaps = useMemo<TransportCapacities | undefined>(
-    () => (showTransport
-      ? {
-        beltCapacity: parseCapacity(transportOptions.beltCapacity),
-        pipeCapacity: parseCapacity(transportOptions.pipeCapacity),
-      }
-      : undefined),
+    () => resolveTransportCaps(showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity),
     [showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity],
   );
 

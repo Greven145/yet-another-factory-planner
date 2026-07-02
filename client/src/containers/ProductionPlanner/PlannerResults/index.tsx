@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useState } from 'react';
-import { Center, Group, Loader, Switch, Tabs, Tooltip } from '@mantine/core';
+import { Center, Group, Loader, Switch, Tabs, Tooltip, VisuallyHidden } from '@mantine/core';
 import { Share2, Edit, List } from 'react-feather';
 import Card from '../../../components/Card';
 import { useExperimentalFlag } from '../../../contexts/experimental';
@@ -7,6 +7,13 @@ import { useExperimentalFlag } from '../../../contexts/experimental';
 const ProductionGraphTab = lazy(() => import('./ProductionGraphTab'));
 const FlowTab = lazy(() => import('./FlowTab'));
 const ReportTab = lazy(() => import('./ReportTab'));
+
+// Shared by each Switch's Tooltip (sighted hover) and a VisuallyHidden element wired
+// via aria-describedby (so assistive tech gets the same explanation, not just the label).
+const DEDICATED_LINES_DESC = 'Split each production step into dedicated lines that feed a single consumer, duplicating shared intermediates. Affects the Graph and Flow tabs only.';
+const DEDICATED_LINES_DESC_ID = 'balancer-dedicated-lines-desc';
+const BELT_PIPE_DESC = "Label each flow with the belts/pipes it needs, counted against the Belt/Pipe Capacity option (or the smallest tier that fits when it's disabled).";
+const BELT_PIPE_DESC_ID = 'balancer-belt-pipe-desc';
 
 const TabLoader = () => (
   <Center py="xl">
@@ -39,30 +46,26 @@ const PlannerResults = () => {
         </Tabs.List>
         {balancerView && (
           <Group align="center" wrap="nowrap" gap="md" style={{ flexShrink: 0 }}>
-            <Tooltip
-              multiline
-              w={260}
-              label="Split each production step into dedicated lines that feed a single consumer, duplicating shared intermediates. Affects the Graph and Flow tabs only."
-            >
+            <Tooltip multiline w={260} label={DEDICATED_LINES_DESC}>
               <Switch
                 checked={dedicatedLines}
                 onChange={(e) => setDedicatedLines(e.currentTarget.checked)}
                 label="Dedicated lines"
                 size="sm"
+                aria-describedby={DEDICATED_LINES_DESC_ID}
               />
             </Tooltip>
-            <Tooltip
-              multiline
-              w={260}
-              label="Label each flow with the belts/pipes it needs, counted against the Belt/Pipe Capacity option (or the smallest tier that fits when it's disabled)."
-            >
+            <Tooltip multiline w={260} label={BELT_PIPE_DESC}>
               <Switch
                 checked={showTransport}
                 onChange={(e) => setShowTransport(e.currentTarget.checked)}
                 label="Belt/pipe needs"
                 size="sm"
+                aria-describedby={BELT_PIPE_DESC_ID}
               />
             </Tooltip>
+            <VisuallyHidden id={DEDICATED_LINES_DESC_ID}>{DEDICATED_LINES_DESC}</VisuallyHidden>
+            <VisuallyHidden id={BELT_PIPE_DESC_ID}>{BELT_PIPE_DESC}</VisuallyHidden>
           </Group>
         )}
       </Group>

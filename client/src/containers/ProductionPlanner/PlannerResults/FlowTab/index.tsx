@@ -5,6 +5,7 @@ import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { buildFlowModel } from '../../../../utilities/production-solver/flow-model';
 import { decomposeGraph } from '../../../../utilities/production-solver/decompose-graph';
+import { resolveTransportCaps } from '../../../../utilities/production-solver/transport';
 import FlowCards from './FlowCards';
 
 type FlowTabProps = {
@@ -13,12 +14,6 @@ type FlowTabProps = {
   // When true, annotate each flow with its belt/pipe requirement (see transport.ts).
   showTransport?: boolean,
 };
-
-function parseCapacity(value: string | null): number | null {
-  if (value == null) return null;
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
 
 // Accessible, non-canvas equivalent of the production graph (issue #92, ADR 0002).
 // Renders the solved plan as a semantic table and announces recomputes via an ARIA
@@ -36,12 +31,7 @@ const FlowTab = ({ dedicatedLines = false, showTransport = false }: FlowTabProps
   );
 
   const transportCaps = useMemo(
-    () => (showTransport
-      ? {
-        beltCapacity: parseCapacity(transportOptions.beltCapacity),
-        pipeCapacity: parseCapacity(transportOptions.pipeCapacity),
-      }
-      : undefined),
+    () => resolveTransportCaps(showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity),
     [showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity],
   );
 

@@ -31,6 +31,28 @@ export type TransportCapacities = {
   pipeCapacity: number | null,
 };
 
+// Parses a raw capacity option (a string from state, or null when disabled) into a
+// positive number, or null when disabled/invalid.
+export function parseCapacity(value: string | null): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Resolves the raw belt/pipe capacity options into TransportCapacities, or undefined
+// when the "belt/pipe needs" view is off (so callers skip transport annotation).
+export function resolveTransportCaps(
+  showTransport: boolean,
+  beltCapacity: string | null,
+  pipeCapacity: string | null,
+): TransportCapacities | undefined {
+  if (!showTransport) return undefined;
+  return {
+    beltCapacity: parseCapacity(beltCapacity),
+    pipeCapacity: parseCapacity(pipeCapacity),
+  };
+}
+
 export type TransportInfo = {
   medium: 'belt' | 'pipe',
   tierLabel: string,   // e.g. 'Mk.4'
