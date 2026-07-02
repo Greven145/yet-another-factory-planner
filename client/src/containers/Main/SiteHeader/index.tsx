@@ -1,12 +1,14 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Title, Container, Group, Select, ActionIcon, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithub } from '@fortawesome/free-brands-svg-icons';
 import logo from '../../../assets/satisfactory_logo_full_color_small.png';
 import SocialIcon from '../../../components/SocialIcon';
 import { DEFAULT_GAME_VERSION, GAME_VERSION_OPTIONS } from '../../../contexts/gameData/consts';
 import { useGameDataContext } from '../../../contexts/gameData';
+import ExperimentalModal, { FlaskIcon } from './ExperimentalModal';
 
 const SunIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -26,6 +28,8 @@ const SiteHeader = () => {
   const { setColorScheme } = useMantineColorScheme();
   const computedColorScheme = useComputedColorScheme('dark');
 
+  const [experimentalOpened, { open: openExperimental, close: closeExperimental }] = useDisclosure(false);
+
   const toggleColorScheme = () => {
     setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark');
   };
@@ -44,6 +48,15 @@ const SiteHeader = () => {
           style={{ width: '200px' }}
         />
         <ActionIcon
+          onClick={openExperimental}
+          variant="transparent"
+          size="lg"
+          aria-label="Experimental features"
+          color="white"
+        >
+          <FlaskIcon />
+        </ActionIcon>
+        <ActionIcon
           onClick={toggleColorScheme}
           variant="transparent"
           size="lg"
@@ -54,6 +67,7 @@ const SiteHeader = () => {
         </ActionIcon>
         <SocialIcon href='https://github.com/greven145/yet-another-factory-planner' label='View source on GitHub' icon={<FontAwesomeIcon icon={faGithub} fontSize={32} />} />
       </RightAlign>
+      <ExperimentalModal opened={experimentalOpened} onClose={closeExperimental} />
     </HeaderContainer>
   );
 };

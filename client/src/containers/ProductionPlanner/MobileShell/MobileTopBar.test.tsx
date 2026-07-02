@@ -8,6 +8,7 @@ import { theme } from '../../../theme';
 import { GameDataContext, GameDataContextType } from '../../../contexts/gameData';
 import { LibraryContext, LibraryContextType } from '../../../contexts/library';
 import { ProductionContext, ProductionContextType } from '../../../contexts/production';
+import { ExperimentalProvider } from '../../../contexts/experimental';
 import { DEFAULT_GAME_VERSION } from '../../../contexts/gameData/consts';
 
 // Minimal context values: MobileTopBar reads the active factory label
@@ -36,13 +37,15 @@ const productionValue = { gameData } as unknown as ProductionContextType;
 function renderBar(onOpenFactories = vi.fn()) {
   const utils = render(
     <MantineProvider theme={theme}>
-      <GameDataContext.Provider value={gameDataValue}>
-        <LibraryContext.Provider value={libraryValue}>
-          <ProductionContext.Provider value={productionValue}>
-            <MobileTopBar onOpenFactories={onOpenFactories} />
-          </ProductionContext.Provider>
-        </LibraryContext.Provider>
-      </GameDataContext.Provider>
+      <ExperimentalProvider>
+        <GameDataContext.Provider value={gameDataValue}>
+          <LibraryContext.Provider value={libraryValue}>
+            <ProductionContext.Provider value={productionValue}>
+              <MobileTopBar onOpenFactories={onOpenFactories} />
+            </ProductionContext.Provider>
+          </LibraryContext.Provider>
+        </GameDataContext.Provider>
+      </ExperimentalProvider>
     </MantineProvider>
   );
   return { ...utils, onOpenFactories };
@@ -71,5 +74,17 @@ describe('MobileTopBar', () => {
     expect(screen.getByText(/(Dark|Light) theme/)).toBeInTheDocument();
     const source = screen.getByText('View source').closest('a');
     expect(source).toHaveAttribute('href', 'https://github.com/greven145/yet-another-factory-planner');
+  });
+
+  it('opens the experimental features modal from the overflow menu', async () => {
+    const user = userEvent.setup();
+    renderBar();
+
+    await user.click(screen.getByRole('button', { name: 'More options' }));
+    const item = await screen.findByText('Experimental features…');
+    await user.click(item);
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /Balancer view/ })).toBeInTheDocument();
   });
 });

@@ -7,8 +7,10 @@ import {
   Menu, ActionIcon, Select, Group,
   useMantineColorScheme, useComputedColorScheme,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { MoreVertical, Sun, Moon, GitHub, ChevronDown } from 'react-feather';
 import logo from '../../../assets/satisfactory_logo_full_color_small.png';
+import ExperimentalModal, { FlaskIcon } from '../../Main/SiteHeader/ExperimentalModal';
 import { useGameDataContext } from '../../../contexts/gameData';
 import { useLibraryContext } from '../../../contexts/library';
 import { useProductionContext } from '../../../contexts/production';
@@ -30,7 +32,9 @@ const OverflowMenu = () => {
   const gd = useGameDataContext();
   const { setColorScheme } = useMantineColorScheme();
   const scheme = useComputedColorScheme('dark');
+  const [experimentalOpened, { open: openExperimental, close: closeExperimental }] = useDisclosure(false);
   return (
+    <>
     <Menu position="bottom-end" withArrow shadow="md" closeOnItemClick={false}>
       <Menu.Target>
         <ActionIcon variant="transparent" color="white" size="lg" aria-label="More options">
@@ -64,8 +68,14 @@ const OverflowMenu = () => {
         >
           View source
         </Menu.Item>
+        <Menu.Divider />
+        <Menu.Item leftSection={<FlaskIcon size={16} />} onClick={openExperimental}>
+          Experimental features…
+        </Menu.Item>
       </Menu.Dropdown>
     </Menu>
+    <ExperimentalModal opened={experimentalOpened} onClose={closeExperimental} />
+    </>
   );
 };
 
