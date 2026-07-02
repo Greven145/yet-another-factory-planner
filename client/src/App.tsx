@@ -5,6 +5,7 @@ import Main from './containers/Main';
 import { theme } from './theme';
 import GlobalStylesheet from './global-stylesheet';
 import { GlobalContextProvider } from './contexts/global';
+import { ExperimentalProvider } from './contexts/experimental';
 import { LibraryProvider } from './contexts/library';
 import { GameDataProvider } from './contexts/gameData';
 
@@ -27,11 +28,13 @@ const ThemeTransfer = () => {
     <ThemeProvider theme={mergedTheme}>
       <GlobalStylesheet />
       <GlobalContextProvider>
-        <LibraryProvider>
-          <GameDataProvider>
-            <Main />
-          </GameDataProvider>
-        </LibraryProvider>
+        <ExperimentalProvider>
+          <LibraryProvider>
+            <GameDataProvider>
+              <Main />
+            </GameDataProvider>
+          </LibraryProvider>
+        </ExperimentalProvider>
       </GlobalContextProvider>
     </ThemeProvider>
   );

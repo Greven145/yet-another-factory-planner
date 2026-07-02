@@ -119,6 +119,10 @@ export const theme: MantineThemeOverride = {
     },
     Switch: {
       styles: {
+        // The off-state track is otherwise near-identical to the dark Modal body
+        // (#373b40), making it invisible. A border defines the track in both
+        // states without overriding the checked accent colour.
+        track: { border: '1px solid light-dark(#adb5bd, #6c757d)' },
         label: { cursor: 'pointer', color: 'light-dark(#212529, #eee)' },
       },
     },

@@ -6,6 +6,7 @@ import { ThemeProvider } from 'styled-components';
 import SiteHeader from './index';
 import { theme } from '../../../theme';
 import { GameDataContext, GameDataContextType } from '../../../contexts/gameData';
+import { ExperimentalProvider } from '../../../contexts/experimental';
 import { DEFAULT_GAME_VERSION } from '../../../contexts/gameData/consts';
 
 // Minimal styled-components theme matching the shape SiteHeader's CSS expects
@@ -33,9 +34,11 @@ function Wrapper({ children }: { children: React.ReactNode }) {
   return (
     <MantineProvider theme={theme}>
       <ThemeProvider theme={scTheme}>
-        <GameDataContext.Provider value={gameDataValue}>
-          {children}
-        </GameDataContext.Provider>
+        <ExperimentalProvider>
+          <GameDataContext.Provider value={gameDataValue}>
+            {children}
+          </GameDataContext.Provider>
+        </ExperimentalProvider>
       </ThemeProvider>
     </MantineProvider>
   );

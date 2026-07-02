@@ -1,5 +1,6 @@
 import { GameData } from '../../contexts/gameData/types';
 import { GraphNode, NODE_TYPE, ProductionGraph } from './models';
+import { describeTransport, formatTransport, TransportCapacities } from './transport';
 
 // An accessible, DOM-friendly view-model of the production graph (issue #92, ADR 0002).
 // Derived purely from `ProductionGraph` (nodes + edges) so the Flow tab can render a
@@ -14,6 +15,9 @@ export type FlowConnection = {
   rate: number,
   endpointKind: FlowEndpointKind,
   endpointLabel: string,
+  // Belt/pipe requirement label (e.g. "1× Mk.4"), present only when transport
+  // capacities are supplied to buildFlowModel. See transport.ts (balancer mode B1).
+  transport?: string,
 };
 
 // One row of the Flow table: a recipe node, its building, and its item flows.
@@ -70,10 +74,22 @@ function itemName(itemKey: string, gameData: GameData): string {
 // recipe node is attached as an output of its source recipe and/or an input of its
 // target recipe. Terminal item nodes (raw inputs / final products) are summarised
 // separately so the table has clear "from raw" / "to final" anchors.
-export function buildFlowModel(graph: ProductionGraph, gameData: GameData): FlowModel {
+export function buildFlowModel(
+  graph: ProductionGraph,
+  gameData: GameData,
+  transportCaps?: TransportCapacities,
+): FlowModel {
   const rows = new Map<string, FlowRecipeRow>();
   const rawInputs: FlowTerminal[] = [];
   const finalProducts: FlowTerminal[] = [];
+
+  // When capacities are supplied, label each connection with its belt/pipe need.
+  const transportFor = (itemKey: string, rate: number): string | undefined => {
+    if (!transportCaps) return undefined;
+    const isFluid = gameData.items[itemKey]?.isFluid ?? false;
+    const info = describeTransport(rate, isFluid, transportCaps);
+    return info ? formatTransport(info) : undefined;
+  };
 
   for (const node of Object.values(graph.nodes)) {
     if (node.type === NODE_TYPE.RECIPE) {
@@ -103,6 +119,8 @@ export function buildFlowModel(graph: ProductionGraph, gameData: GameData): Flow
 
     const name = itemName(edge.key, gameData);
 
+    const transport = transportFor(edge.key, edge.productionRate);
+
     const sourceRow = rows.get(edge.from);
     if (sourceRow) {
       sourceRow.outputs.push({
@@ -111,6 +129,7 @@ export function buildFlowModel(graph: ProductionGraph, gameData: GameData): Flow
         rate: edge.productionRate,
         endpointKind: endpointKind(toNode),
         endpointLabel: endpointLabel(toNode, gameData),
+        transport,
       });
     }
 
@@ -122,6 +141,7 @@ export function buildFlowModel(graph: ProductionGraph, gameData: GameData): Flow
         rate: edge.productionRate,
         endpointKind: endpointKind(fromNode),
         endpointLabel: endpointLabel(fromNode, gameData),
+        transport,
       });
     }
   }

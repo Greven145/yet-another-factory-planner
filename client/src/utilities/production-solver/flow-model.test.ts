@@ -128,4 +128,19 @@ describe('buildFlowModel', () => {
     // the ghost edge is skipped, so the plate still has exactly its one real input
     expect(plate.inputs).toHaveLength(1);
   });
+
+  it('leaves connections without a transport label when no capacities are supplied', () => {
+    const model = buildFlowModel(graph, gameData);
+    const ingot = model.recipes.find((r) => r.recipeKey === 'Recipe_IronIngot')!;
+    expect(ingot.outputs[0].transport).toBeUndefined();
+  });
+
+  it('annotates connections with belt requirements when capacities are supplied', () => {
+    // Ingot flows 30/min; against Mk.4 (480) belts that's one line.
+    const model = buildFlowModel(graph, gameData, { beltCapacity: 480, pipeCapacity: null });
+    const ingot = model.recipes.find((r) => r.recipeKey === 'Recipe_IronIngot')!;
+    const plate = model.recipes.find((r) => r.recipeKey === 'Recipe_IronPlate')!;
+    expect(ingot.outputs[0].transport).toBe('1× Mk.4');
+    expect(plate.inputs[0].transport).toBe('1× Mk.4');
+  });
 });

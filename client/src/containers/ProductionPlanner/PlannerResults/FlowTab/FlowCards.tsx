@@ -13,7 +13,10 @@ function renderConnections(connections: FlowConnection[]) {
   return (
     <List spacing={2} size="sm" withPadding>
       {connections.map((c, i) => (
-        <List.Item key={`${c.itemKey}-${i}`}>{c.itemName} — {formatRate(c.rate)}</List.Item>
+        <List.Item key={`${c.itemKey}-${i}`}>
+          {c.itemName} — {formatRate(c.rate)}
+          {c.transport && <Text span c="dimmed"> · {c.transport}</Text>}
+        </List.Item>
       ))}
     </List>
   );
