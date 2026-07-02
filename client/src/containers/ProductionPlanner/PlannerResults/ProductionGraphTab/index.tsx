@@ -6,6 +6,8 @@ import GraphVisualizer from 'react-cytoscapejs';
 import { Text, Container, Center, Group, Stack, Loader, Button, ButtonProps } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { GraphNode, GraphEdge, NODE_TYPE, ProductionGraph } from '../../../../utilities/production-solver/models';
+import { decomposeGraph } from '../../../../utilities/production-solver/decompose-graph';
+import { describeTransport, formatTransport, TransportCapacities } from '../../../../utilities/production-solver/transport';
 import { graphColors, MOBILE_MEDIA } from '../../../../theme';
 import GraphTooltip from '../../../../components/GraphTooltip';
 import GraphContextMenu, { ContextMenuState } from '../../../../components/GraphContextMenu';
@@ -321,11 +323,16 @@ function getNodeClasses(node: GraphNode, gameData: GameData) {
   return classes;
 }
 
-function getEdgeLabel(edge: GraphEdge, gameData: GameData) {
+function getEdgeLabel(edge: GraphEdge, gameData: GameData, transportCaps?: TransportCapacities) {
   const item = gameData.items[edge.key];
   const label = item.name;
   const amountText = `${truncateFloat(edge.productionRate)} / min`;
-  return `${label}\n${amountText}`;
+  let transportText = '';
+  if (transportCaps) {
+    const info = describeTransport(edge.productionRate, item.isFluid ?? false, transportCaps);
+    if (info) transportText = `\n${formatTransport(info)}`;
+  }
+  return `${label}\n${amountText}${transportText}`;
 }
 
 // Room left below the graph for the planner footer (FooterContent in
@@ -356,7 +363,20 @@ export interface EdgeData extends GraphEdge {
   label: string,
 }
 
-const ProductionGraphTab = () => {
+type ProductionGraphTabProps = {
+  // When true, show dedicated lines: each step feeds a single consumer (see decompose-graph.ts).
+  dedicatedLines?: boolean,
+  // When true, annotate each edge with its belt/pipe requirement (see transport.ts).
+  showTransport?: boolean,
+};
+
+function parseCapacity(value: string | null): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+const ProductionGraphTab = ({ dedicatedLines = false, showTransport = false }: ProductionGraphTabProps) => {
   const [doFirstRender, setDoFirstRender] = useState(false);
   const [pluginsReady, setPluginsReady] = useState(false);
   const graphRef = useRef<HTMLDivElement | null>(null);
@@ -370,7 +390,11 @@ const ProductionGraphTab = () => {
   const [popupNode, setPopupNode] = useState<NodeData | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const ctx = useProductionContext();
-  const resultsGraph = ctx.solverResults?.productionGraph || null;
+  const rawResultsGraph = ctx.solverResults?.productionGraph || null;
+  const resultsGraph = useMemo(
+    () => (rawResultsGraph && dedicatedLines ? decomposeGraph(rawResultsGraph, ctx.gameData) : rawResultsGraph),
+    [rawResultsGraph, dedicatedLines, ctx.gameData],
+  );
   const graphError = ctx.solverResults?.error || null;
   const isLoading = ctx.calculating;
   const nodesPositions = ctx.state.nodesPositions;
@@ -597,6 +621,17 @@ const ProductionGraphTab = () => {
     }
   }, [resultsGraph]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const transportOptions = ctx.state.transportOptions;
+  const transportCaps = useMemo<TransportCapacities | undefined>(
+    () => (showTransport
+      ? {
+        beltCapacity: parseCapacity(transportOptions.beltCapacity),
+        pipeCapacity: parseCapacity(transportOptions.pipeCapacity),
+      }
+      : undefined),
+    [showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity],
+  );
+
   const graphProps = useMemo<any>(() => {
     if (resultsGraph == null) {
       return null;
@@ -626,14 +661,14 @@ const ProductionGraphTab = () => {
           id: edgeId,
           source: edge.from,
           target: edge.to,
-          label: getEdgeLabel(edge, ctx.gameData),
+          label: getEdgeLabel(edge, ctx.gameData, transportCaps),
         },
         classes: edge.from === edge.to ? ['loop'] : undefined,
       });
     });
 
     return { key: graphKey, elements };
-  }, [resultsGraph, ctx.gameData, graphKey]);
+  }, [resultsGraph, ctx.gameData, graphKey, transportCaps]);
 
   return (
     <>

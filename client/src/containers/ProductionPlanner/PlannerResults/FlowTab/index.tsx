@@ -4,20 +4,50 @@ import { Container, Group, Text, VisuallyHidden } from '@mantine/core';
 import { AlertCircle } from 'react-feather';
 import { useProductionContext } from '../../../../contexts/production';
 import { buildFlowModel } from '../../../../utilities/production-solver/flow-model';
+import { decomposeGraph } from '../../../../utilities/production-solver/decompose-graph';
 import FlowCards from './FlowCards';
+
+type FlowTabProps = {
+  // When true, show dedicated lines: each step feeds a single consumer (see decompose-graph.ts).
+  dedicatedLines?: boolean,
+  // When true, annotate each flow with its belt/pipe requirement (see transport.ts).
+  showTransport?: boolean,
+};
+
+function parseCapacity(value: string | null): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
 
 // Accessible, non-canvas equivalent of the production graph (issue #92, ADR 0002).
 // Renders the solved plan as a semantic table and announces recomputes via an ARIA
 // live region so screen-reader and keyboard users can read the plan without the canvas.
-const FlowTab = () => {
+const FlowTab = ({ dedicatedLines = false, showTransport = false }: FlowTabProps) => {
   const ctx = useProductionContext();
-  const graph = ctx.solverResults?.productionGraph ?? null;
+  const rawGraph = ctx.solverResults?.productionGraph ?? null;
   const timestamp = ctx.solverResults?.timestamp ?? null;
   const loopWarning = ctx.solverResults?.report?.loopWarning ?? false;
+  const transportOptions = ctx.state.transportOptions;
+
+  const graph = useMemo(
+    () => (rawGraph && dedicatedLines ? decomposeGraph(rawGraph, ctx.gameData) : rawGraph),
+    [rawGraph, dedicatedLines, ctx.gameData],
+  );
+
+  const transportCaps = useMemo(
+    () => (showTransport
+      ? {
+        beltCapacity: parseCapacity(transportOptions.beltCapacity),
+        pipeCapacity: parseCapacity(transportOptions.pipeCapacity),
+      }
+      : undefined),
+    [showTransport, transportOptions.beltCapacity, transportOptions.pipeCapacity],
+  );
 
   const model = useMemo(
-    () => (graph ? buildFlowModel(graph, ctx.gameData) : null),
-    [graph, ctx.gameData],
+    () => (graph ? buildFlowModel(graph, ctx.gameData, transportCaps) : null),
+    [graph, ctx.gameData, transportCaps],
   );
 
   // Announce each recompute (new solver timestamp) once the plan has data.
