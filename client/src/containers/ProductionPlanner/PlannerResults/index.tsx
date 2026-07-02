@@ -26,6 +26,8 @@ const PlannerResults = () => {
   // the flag is off the switches are absent from the DOM and the effect is
   // forced off, so a stale `true` state can't leak into the tabs.
   const balancerView = useExperimentalFlag('balancer-view');
+  const activeDedicatedLines = balancerView && dedicatedLines;
+  const activeShowTransport = balancerView && showTransport;
 
   return (
     <Tabs defaultValue="graph" variant='pills' className='segmented-tabs'>
@@ -67,14 +69,14 @@ const PlannerResults = () => {
       <Tabs.Panel value="graph" keepMounted>
         <Card style={{ padding: '0px', marginBottom: '0px', background: 'var(--yafp-container-bg)' }}>
           <Suspense fallback={<TabLoader />}>
-            <ProductionGraphTab dedicatedLines={balancerView && dedicatedLines} showTransport={balancerView && showTransport} />
+            <ProductionGraphTab dedicatedLines={activeDedicatedLines} showTransport={activeShowTransport} />
           </Suspense>
         </Card>
       </Tabs.Panel>
       <Tabs.Panel value="flow">
         <Card style={{ paddingLeft: '10px', background: 'var(--yafp-container-bg)' }}>
           <Suspense fallback={<TabLoader />}>
-            <FlowTab dedicatedLines={balancerView && dedicatedLines} showTransport={balancerView && showTransport} />
+            <FlowTab dedicatedLines={activeDedicatedLines} showTransport={activeShowTransport} />
           </Suspense>
         </Card>
       </Tabs.Panel>

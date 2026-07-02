@@ -5,7 +5,6 @@ export type ExperimentalFlagState = Record<ExperimentalFlagKey, boolean>;
 
 export type ExperimentalContextType = {
   flags: readonly ExperimentalFlagDefinition[];
-  state: ExperimentalFlagState;
   isEnabled: (key: ExperimentalFlagKey) => boolean;
   setEnabled: (key: ExperimentalFlagKey, value: boolean) => void;
 };

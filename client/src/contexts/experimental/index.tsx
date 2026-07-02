@@ -52,10 +52,9 @@ export const ExperimentalProvider = ({ children }: PropTypes) => {
 
   const ctxValue = useMemo<ExperimentalContextType>(() => ({
     flags: EXPERIMENTAL_FLAGS,
-    state,
     isEnabled,
     setEnabled,
-  }), [state, isEnabled, setEnabled]);
+  }), [isEnabled, setEnabled]);
 
   return (
     <ExperimentalContext.Provider value={ctxValue}>
