@@ -34,6 +34,15 @@ resource env_law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
     sku: {
       name: 'PerGB2018'
     }
+    // Free 30-day retention (PerGB2018 default); anything longer bills per GB-month.
+    retentionInDays: 30
+    // Safety ceiling on ingestion so a runaway log loop can't blow the subscription
+    // spending limit again. June averaged ~0.2 GB/day, so 1 GB/day is ~5x headroom for
+    // legitimate spikes while capping worst case at ~30 GB/mo. Tune down once log levels
+    // are trimmed. Note: on hitting the cap, ingestion stops for the rest of the UTC day.
+    workspaceCapping: {
+      dailyQuotaGb: 1
+    }
   }
   tags: tags
 }

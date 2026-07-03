@@ -168,7 +168,11 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
         }
       ]
       scale: {
-        minReplicas: 1
+        // Scale to zero when idle. The app does all solving client-side, so the API sees
+        // low, bursty traffic (/initialize + share/get-factory) and has no reason to hold a
+        // warm replica 24/7 on the Consumption profile. Cold start (~27s) is absorbed by the
+        // CosmosWarmupService + startup probe window. Trade-off: first request after idle is slow.
+        minReplicas: 0
         maxReplicas: 3
       }
     }
