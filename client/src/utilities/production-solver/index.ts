@@ -38,6 +38,16 @@ export type {
 
 const MIN_RESOURCE_WEIGHT = 0.0001;
 
+// A solved recipe multiplier (building count) below the cull threshold is GLPK numerical noise
+// rather than a real production step, so it is dropped from the solution. The threshold is
+// scale-relative because LP noise magnitude tracks the problem's variable magnitudes: a large
+// factory can leave a whole degenerate chain sitting at ~1e-5 buildings (e.g. a trace of a
+// resource routed through pure-iron -> wire -> cable -> computer). MIN_RECIPE_MULTIPLIER is the
+// absolute floor for tiny factories; RECIPE_NOISE_SCALE_FACTOR * scale dominates for larger ones.
+// Both sit an order of magnitude above GLPK's tolerances yet far below any meaningful recipe.
+const MIN_RECIPE_MULTIPLIER = 1e-6;
+const RECIPE_NOISE_SCALE_FACTOR = 1e-6;
+
 // GCD helpers used to derive per-cycle ingredient quantities from stored perMinute rates.
 // perMinute = 60 * quantity / craftTime, so GCD(all perMinutes) = 60 / craftTime,
 // and quantity = perMinute / GCD. We scale to integers to avoid floating-point drift.
@@ -383,6 +393,15 @@ export class ProductionSolver {
             };
           }
         }
+        // Feed leftover byproducts from prior passes forward as zero-cost inputs so a
+        // resource-wasteful earlier pass doesn't strand a precursor a maximize goal could
+        // consume (e.g. Heavy Oil Residue -> Fuel). Otherwise these side products are simply
+        // discarded between passes and the maximize target can be starved to zero.
+        for (const [itemKey, info] of Object.entries(this.surplusByproducts(productionSolution))) {
+          if (!remainingInputs[itemKey]) {
+            remainingInputs[itemKey] = info;
+          }
+        }
         let solution: ProductionSolution;
         if (groupTargetKeys.length === 1) {
           solution = await this.productionSolverPass(groupTargetKeys, remainingInputs, glpk, undefined, productionSolution);
@@ -430,6 +449,34 @@ export class ProductionSolver {
         error: e as GraphError,
       };
     }
+  }
+
+  // Net leftover byproducts of a cumulative solution, exposed as zero-cost, finite inputs
+  // for subsequent maximize passes. Only genuine side products are recyclable: primary
+  // inputs, delivered rate/maximize targets, and the points item are excluded so we never
+  // feed a final product back into the factory to be re-consumed.
+  private surplusByproducts(solution: ProductionSolution): Inputs {
+    const net: { [key: string]: number } = {};
+    for (const [recipeKey, multiplier] of Object.entries(solution)) {
+      const recipeInfo = this.gameData.recipes[recipeKey];
+      if (!recipeInfo) continue;
+      for (const product of recipeInfo.products) {
+        net[product.itemClass] = (net[product.itemClass] ?? 0) + multiplier * product.perMinute;
+      }
+      for (const ingredient of recipeInfo.ingredients) {
+        net[ingredient.itemClass] = (net[ingredient.itemClass] ?? 0) - multiplier * ingredient.perMinute;
+      }
+    }
+    const surplus: Inputs = {};
+    for (const [itemKey, amount] of Object.entries(net)) {
+      if (amount <= EPSILON) continue;
+      if (this.inputs[itemKey]) continue;
+      if (this.rateTargets[itemKey]) continue;
+      if (this.maximizeTargets.some((t) => t.key === itemKey)) continue;
+      if (itemKey === POINTS_ITEM_KEY) continue;
+      surplus[itemKey] = { amount, weight: 0, type: NODE_TYPE.SIDE_PRODUCT };
+    }
+    return surplus;
   }
 
   private graphContext() {
@@ -726,9 +773,13 @@ export class ProductionSolver {
     }
 
 
+    // Cull solver numerical noise: GLPK leaves tiny nonzero values on variables that are really 0.
+    // Keeping them spawns phantom recipe/side-product nodes (a lone Heavy Oil Residue recipe at
+    // ~8e-7 buildings, or a whole degenerate iron -> wire -> cable -> computer chain at ~1e-5).
+    const cullThreshold = Math.max(MIN_RECIPE_MULTIPLIER, this.scale * RECIPE_NOISE_SCALE_FACTOR);
     const result: ProductionSolution = {};
     Object.entries(solution.result.vars).forEach(([key, val]) => {
-      if (val > EPSILON) {
+      if (val > cullThreshold) {
         if (this.gameData.recipes[key]) {
           result[key] = val;
         }

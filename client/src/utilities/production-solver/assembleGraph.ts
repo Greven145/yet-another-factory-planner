@@ -1,6 +1,7 @@
 import { NODE_TYPE, ProductionGraph } from './models';
 import {
   EPSILON,
+  RESIDUAL_BALANCE_TOLERANCE,
   GraphContext,
   ItemProductionTotals,
   ProductionSolution,
@@ -57,6 +58,12 @@ export function assembleGraph(
 
   for (const [itemKey, productionTotals] of Object.entries(itemProductionTotals)) {
     const { producedBy, usedBy } = productionTotals;
+    // A near-balanced intermediate (produced ≈ consumed) leaves a tiny residual after matching
+    // because the LP solution is only balanced to ~1e-6 relative precision. Emitting that as a
+    // side product spawns a phantom "0.00" node, so cull leftovers that are negligible relative
+    // to the item's total production. (Absolute EPSILON alone is far too loose for large flows.)
+    const totalProduced = producedBy.reduce((sum, p) => sum + p.amount, 0);
+    const sideProductThreshold = Math.max(EPSILON, totalProduced * RESIDUAL_BALANCE_TOLERANCE);
     let i = 0, j = 0;
     nextDemand:
     while (i < usedBy.length) {
@@ -160,7 +167,7 @@ export function assembleGraph(
     while (j < producedBy.length) {
       const productionInfo = producedBy[j];
       const productionNode = graph.nodes[productionInfo.recipeKey];
-      if (productionInfo.amount > EPSILON) {
+      if (productionInfo.amount > sideProductThreshold) {
         let itemNode = graph.nodes[itemKey];
         if (!itemNode) {
           let nodeType = NODE_TYPE.SIDE_PRODUCT;

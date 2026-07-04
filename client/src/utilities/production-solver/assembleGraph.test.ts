@@ -101,6 +101,26 @@ describe('assembleGraph', () => {
     expect(graph.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(30);
   });
 
+  it('discards a negligible leftover from a near-balanced intermediate (solver noise)', () => {
+    // Ingot production (30.00003/min) all but exactly matches plate consumption (30/min): the
+    // 0.00003/min residual is LP rounding noise, not a real side product, so no node is emitted.
+    const solution: ProductionSolution = { 'Recipe_IronIngot_C': 1.000001, 'Recipe_IronPlate_C': 1 };
+    const graph = assembleGraph(solution, context);
+    expect(graph.nodes['Desc_IronIngot_C']).toBeUndefined();
+    // The real output is unaffected.
+    expect(graph.nodes['Desc_IronPlate_C'].type).toBe(NODE_TYPE.FINAL_PRODUCT);
+    expect(graph.nodes['Desc_IronPlate_C'].multiplier).toBeCloseTo(20);
+  });
+
+  it('keeps a leftover that is meaningful relative to total production', () => {
+    // 30.3/min produced, 30/min consumed → 0.3/min genuine surplus (1% of production), well above
+    // the residual-noise tolerance, so it is still surfaced as a side product.
+    const solution: ProductionSolution = { 'Recipe_IronIngot_C': 1.01, 'Recipe_IronPlate_C': 1 };
+    const graph = assembleGraph(solution, context);
+    expect(graph.nodes['Desc_IronIngot_C'].type).toBe(NODE_TYPE.SIDE_PRODUCT);
+    expect(graph.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(0.3);
+  });
+
   it('marks leftover production as FINAL_PRODUCT when it is a points target item', () => {
     const solution: ProductionSolution = { 'Recipe_IronIngot_C': 1 };
     const graph = assembleGraph(solution, {
