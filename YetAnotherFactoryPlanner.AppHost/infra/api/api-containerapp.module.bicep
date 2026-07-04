@@ -118,7 +118,7 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
             // stable per-resource hostname (SWA default name + "-staging").
             {
               name: 'AllowedOrigins__1'
-              value: 'https://thankful-dune-099ce8c0f-staging.eastus2.7.azurestaticapps.net'
+              value: 'https://calm-island-0bc976c0f-staging.7.azurestaticapps.net'
             }
           ]
           // ACA health probes. Cold start is ~27s (measured), so the startup probe
