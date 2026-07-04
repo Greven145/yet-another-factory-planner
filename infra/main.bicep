@@ -50,17 +50,9 @@ module env 'env/env.module.bicep' = {
   name: 'env'
   scope: rg
   params: {
-    env_acr_outputs_name: env_acr.outputs.name
     environmentName: environmentName
     location: location
     userPrincipalId: principalId
-  }
-}
-module env_acr 'env-acr/env-acr.module.bicep' = {
-  name: 'env-acr'
-  scope: rg
-  params: {
-    location: location
   }
 }
 module swa 'app/swa.bicep' = {
@@ -95,11 +87,8 @@ output ENV_APPLICATIONINSIGHTS_CONNECTION_STRING string = env.outputs.APPLICATIO
 output API_IDENTITY_CLIENTID string = api_identity.outputs.clientId
 output API_IDENTITY_ID string = api_identity.outputs.id
 output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = env.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT
 output AZURE_STATIC_WEB_APP_HOSTNAME string = swa.outputs.defaultHostname
 output AZURE_STATIC_WEB_APP_NAME string = swa.outputs.name
 output COSMOS_DB_CONNECTIONSTRING string = cosmos_db.outputs.connectionString
 output ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN
 output ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_ID
-output ENV_AZURE_CONTAINER_REGISTRY_ENDPOINT string = env.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT
-output ENV_AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID string = env.outputs.AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID

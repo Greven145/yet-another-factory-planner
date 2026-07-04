@@ -139,9 +139,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      # Pull the prebuilt frontend-ci image (Playwright browsers baked in) from
-      # GHCR for the client smoke step below.
-      packages: read
+      # write: push the API container image to GHCR (replaces ACR); also covers
+      # pulling the prebuilt frontend-ci image (Playwright browsers baked in) for
+      # the client smoke step below.
+      packages: write
     env:
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -214,11 +215,49 @@ jobs:
           azd env set BLUE_REVISION "$blue"
           echo "BLUE_REVISION=$blue" >> "$GITHUB_ENV"
 
-      # azd deploy creates a new ACA revision. Traffic stays pinned to blue (above), so the
-      # new revision lands at 0%; smoke validates it before any shift.
-      - name: Deploy API
+      # Build the API image with the .NET SDK container target (no Dockerfile — the same
+      # mechanism azd used under the hood) and push it to PUBLIC GHCR. This replaces both
+      # `azd deploy api` and the ~$5/mo Basic ACR: ACA now pulls the image anonymously.
+      - name: Log in to GHCR (API image push)
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build & push API image to GHCR
+        id: build_api_image
+        run: |
+          set -euo pipefail
+          image="ghcr.io/greven145/yet-another-factory-planner/api:${{ github.sha }}"
+          dotnet publish api.web/api.web.csproj \
+            --configuration Release \
+            --os linux --arch x64 \
+            /t:PublishContainer \
+            -p:ContainerRegistry=ghcr.io \
+            -p:ContainerRepository=greven145/yet-another-factory-planner/api \
+            -p:ContainerImageTag=${{ github.sha }}
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      # Deploy the API container-app module directly with the az CLI (not `azd deploy`),
+      # feeding the freshly-pushed GHCR image and the pinned blue revision. This applies the
+      # exact committed bicep that encodes the blue-green traffic pin, so the new (green)
+      # revision lands at 0% and smoke validates it before any shift — identical semantics to
+      # the old `azd deploy api`. The module params that azd's bicepparam templating used to
+      # supply are read from the azd env (captured from the `azd provision` outputs above).
+      - name: Deploy API (green revision at 0%)
         id: deploy_api
-        run: azd deploy api --no-prompt
+        run: |
+          set -euo pipefail
+          az deployment group create \
+            --resource-group "$ACA_RESOURCE_GROUP" \
+            --template-file YetAnotherFactoryPlanner.AppHost/infra/api/api-containerapp.module.bicep \
+            --parameters \
+              api_containerimage="${{ steps.build_api_image.outputs.image }}" \
+              api_blue_revision="${BLUE_REVISION:-}" \
+              api_containerport=8080 \
+              api_identity_outputs_clientid="$(azd env get-value API_IDENTITY_CLIENTID)" \
+              api_identity_outputs_id="$(azd env get-value API_IDENTITY_ID)" \
+              cosmos_db_outputs_connectionstring="$(azd env get-value COSMOS_DB_CONNECTIONSTRING)" \
+              env_outputs_azure_container_apps_environment_default_domain="$(azd env get-value ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)" \
+              env_outputs_azure_container_apps_environment_id="$(azd env get-value ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_ID)" \
+              env_outputs_applicationinsights_connection_string="$(azd env get-value ENV_APPLICATIONINSIGHTS_CONNECTION_STRING)"
 
       # Verify a new (green) revision exists and differs from blue. No traffic change.
       - name: Verify green revision
