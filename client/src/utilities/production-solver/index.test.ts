@@ -381,6 +381,85 @@ describe('ProductionSolver.exec', () => {
   });
 });
 
+// A rate-target recipe whose only route emits a byproduct, plus a maximize target that can
+// only be made from that byproduct. Before byproduct forwarding, the rate-target pass consumed
+// all the raw resource and discarded the byproduct, starving the maximize goal to zero even
+// though the byproduct it produced could satisfy it. See the weight-swap 0-fuel investigation.
+const byproductGameData: GameData = {
+  buildings: {
+    'Build_Refinery_C': { slug: 'refinery', name: 'Refinery', power: 30, area: 50, buildCost: [], isFicsmas: false },
+    // Referenced by buildReport's resource-extraction power estimate for non-water/oil resources.
+    'Desc_MinerMk3_C': { slug: 'miner_mk3', name: 'Miner Mk.3', power: 110, area: 100, buildCost: [], isFicsmas: false },
+  },
+  recipes: {
+    // 1 Crude -> 1 Packaged (rate target) + 1 Residue (byproduct)
+    'Recipe_Package_C': {
+      slug: 'package', name: 'Package', isAlternate: false,
+      ingredients: [{ itemClass: 'Desc_Crude_C', perMinute: 60 }],
+      products: [{ itemClass: 'Desc_Packaged_C', perMinute: 60 }, { itemClass: 'Desc_Residue_C', perMinute: 60 }],
+      producedIn: 'Build_Refinery_C', isFicsmas: false,
+    },
+    // 1 Residue -> 1 Fuel (maximize target); the only consumer of Residue
+    'Recipe_Fuel_C': {
+      slug: 'fuel', name: 'Fuel', isAlternate: false,
+      ingredients: [{ itemClass: 'Desc_Residue_C', perMinute: 60 }],
+      products: [{ itemClass: 'Desc_Fuel_C', perMinute: 60 }],
+      producedIn: 'Build_Refinery_C', isFicsmas: false,
+    },
+  },
+  resources: {
+    'Desc_Crude_C': { itemClass: 'Desc_Crude_C', maxExtraction: 1000, relativeValue: 1 },
+  },
+  items: {
+    'Desc_Crude_C': { slug: 'crude', name: 'Crude', sinkPoints: 0, isFluid: true, usedInRecipes: ['Recipe_Package_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_Packaged_C': { slug: 'packaged', name: 'Packaged', sinkPoints: 0, isFluid: false, usedInRecipes: [], producedFromRecipes: ['Recipe_Package_C'], isFicsmas: false },
+    'Desc_Residue_C': { slug: 'residue', name: 'Residue', sinkPoints: 0, isFluid: true, usedInRecipes: ['Recipe_Fuel_C'], producedFromRecipes: ['Recipe_Package_C'], isFicsmas: false },
+    'Desc_Fuel_C': { slug: 'fuel_item', name: 'Fuel', sinkPoints: 0, isFluid: true, usedInRecipes: [], producedFromRecipes: ['Recipe_Fuel_C'], isFicsmas: false },
+  },
+  handGatheredItems: {},
+};
+
+function byproductOptions(): FactoryOptions {
+  return {
+    key: 'byproduct',
+    productionItems: [
+      { key: 'p1', itemKey: 'Desc_Packaged_C', mode: 'per-minute', value: '60' },
+      { key: 'p2', itemKey: 'Desc_Fuel_C', mode: 'maximize', value: '1' },
+    ],
+    inputItems: [],
+    inputResources: [{ key: 'r1', itemKey: 'Desc_Crude_C', value: '60', weight: '1', unlimited: false }],
+    allowHandGatheredItems: false,
+    weightingOptions: { resources: '1', power: '1', complexity: '0', buildings: '0' },
+    gameModeOptions: { recipePartsCost: '1', powerConsumption: '1' },
+    allowedRecipes: { 'Recipe_Package_C': true, 'Recipe_Fuel_C': true },
+    allowedBuildings: { 'Build_Refinery_C': true },
+    nodesPositions: [],
+    maximizeBalanceMode: 'proportional',
+    transportOptions: { beltCapacity: null, pipeCapacity: null },
+  };
+}
+
+describe('ProductionSolver byproduct forwarding', () => {
+  it('recycles a prior pass byproduct into a maximize target instead of stranding it at zero', async () => {
+    const results = await new ProductionSolver(byproductOptions(), byproductGameData).exec();
+    expect(results.error).toBeNull();
+
+    const packaged = results.productionGraph!.nodes['Desc_Packaged_C'];
+    const fuel = results.productionGraph!.nodes['Desc_Fuel_C'];
+    // Rate target still delivered exactly.
+    expect(packaged.multiplier).toBeCloseTo(60, 4);
+    // The 60/min Residue byproduct of the rate-target pass is now consumed to make Fuel,
+    // rather than discarded (which previously left the maximize goal at 0).
+    expect(fuel).toBeDefined();
+    expect(fuel.type).toBe(NODE_TYPE.FINAL_PRODUCT);
+    expect(fuel.multiplier).toBeCloseTo(60, 4);
+
+    // The byproduct should be fully consumed, so no Residue side product remains.
+    const residue = results.productionGraph!.nodes['Desc_Residue_C'];
+    expect(residue === undefined || residue.multiplier < 1e-6).toBe(true);
+  });
+});
+
 describe('NODE_TYPE', () => {
   it('exports expected node types', () => {
     expect(NODE_TYPE.FINAL_PRODUCT).toBe('FINAL_PRODUCT');

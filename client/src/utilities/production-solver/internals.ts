@@ -2,6 +2,10 @@ import { GameData } from '../../contexts/gameData/types';
 
 // Shared constants used by the solver and the extracted graph/report modules.
 export const EPSILON = 1e-8;
+// Relative tolerance for treating a near-balanced intermediate's leftover as solver noise rather
+// than a real side product. The LP solution balances production against consumption only to ~1e-6
+// relative precision, so a residual below this fraction of an item's total production is discarded.
+export const RESIDUAL_BALANCE_TOLERANCE = 1e-4;
 export const RATE_TARGET_KEY = 'RATE_TARGET_PASS';
 
 // Shared types used across the solver pass, graph assembly, and report building.
