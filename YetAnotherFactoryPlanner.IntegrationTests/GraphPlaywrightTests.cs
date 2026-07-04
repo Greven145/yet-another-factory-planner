@@ -62,8 +62,8 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 		// Close the drawer so its backdrop no longer intercepts clicks on the main content
 		await CloseDrawerAsync(page);
 
-		// Switch to the "Production Graph" tab to mount the graph for the first time
-		await page.GetByRole(AriaRole.Tab, new PageGetByRoleOptions { Name = "Production Graph" }).ClickAsync();
+		// Switch to the "Graph" view tab to mount the graph for the first time
+		await page.GetByRole(AriaRole.Tab, new PageGetByRoleOptions { Name = "Graph" }).ClickAsync();
 		await WaitForGraphAsync(page);
 
 		// Capture the identity of the canvas element after the first render
@@ -98,7 +98,10 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 
 	private async Task WaitForControlPanelAsync(IPage page)
 	{
-		await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Control Panel" })
+		// The "+ Add Product" button (in the default-open control panel's Production tab)
+		// renders only once game data has loaded — a stable readiness signal. The old
+		// "Control Panel" heading was removed by the multi-factory redesign (#148).
+		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "+ Add Product" })
 			.WaitForAsync(new LocatorWaitForOptions { Timeout = (float)AppReadyTimeout.TotalMilliseconds });
 	}
 
@@ -116,16 +119,17 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 
 	private static async Task CloseDrawerAsync(IPage page)
 	{
-		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Close Control Panel" }).ClickAsync();
-		// Wait for the drawer animation to finish — the heading becomes hidden once fully closed
-		await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Control Panel" })
-			.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Hidden, Timeout = 3_000 });
+		// The drawer toggle is a text control that flips between "Close Control Panel"
+		// (open) and "Open Control Panel" (closed) — the readiness signal for each state.
+		await page.GetByText("Close Control Panel").ClickAsync();
+		await page.GetByText("Open Control Panel")
+			.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 3_000 });
 	}
 
 	private static async Task OpenDrawerAsync(IPage page)
 	{
-		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Open Control Panel" }).ClickAsync();
-		await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Control Panel" })
+		await page.GetByText("Open Control Panel").ClickAsync();
+		await page.GetByText("Close Control Panel")
 			.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 3_000 });
 	}
 
