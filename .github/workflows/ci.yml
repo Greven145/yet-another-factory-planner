@@ -201,11 +201,10 @@ jobs:
         run: azd provision --no-prompt
 
       # ── API blue-green ────────────────────────────────────────────────────────
-      # Resolve the current production ("blue") revision and pin it for the deploy. The API
-      # bicep keeps 100% of ingress traffic on api_blue_revision (fed via BLUE_REVISION), so
-      # `azd deploy api` lands the new ("green") revision at 0% instead of letting ACA reset
-      # traffic to 100%→latest. Empty on a greenfield deploy → bicep falls back to
-      # latestRevision. Also exported to the env for the rollback step's target.
+      # Record the current production ("blue") revision so the rollback step has an explicit
+      # target. `az containerapp update` (deploy step below) creates the new ("green") revision
+      # at 0% without shifting traffic, so blue keeps serving until the explicit shift — no
+      # traffic pin is needed. Empty on a greenfield deploy (no revisions yet).
       - name: Resolve production (blue) revision
         id: resolve_blue
         run: |
@@ -235,29 +234,22 @@ jobs:
             -p:ContainerImageTag=${{ github.sha }}
           echo "image=$image" >> "$GITHUB_OUTPUT"
 
-      # Deploy the API container-app module directly with the az CLI (not `azd deploy`),
-      # feeding the freshly-pushed GHCR image and the pinned blue revision. This applies the
-      # exact committed bicep that encodes the blue-green traffic pin, so the new (green)
-      # revision lands at 0% and smoke validates it before any shift — identical semantics to
-      # the old `azd deploy api`. The module params that azd's bicepparam templating used to
-      # supply are read from the azd env (captured from the `azd provision` outputs above).
+      # Deploy the new image with `az containerapp update`, which swaps ONLY the image and
+      # creates a new revision — it does NOT touch the registries list or traffic weights.
+      # That matters for the ACR→GHCR migration: a full bicep apply that sets registries: []
+      # is rejected (ContainerAppRegistryInUse) while older revisions still pull from ACR, and
+      # applying traffic is what forced the api_blue_revision pin in the first place. In
+      # Multiple-revision mode a new revision lands at 0% and existing traffic stays on blue,
+      # so deploy-green → smoke → shift still gate the promotion. All env vars/probes/scale are
+      # preserved from the current template. (The api module bicep remains for greenfield.)
       - name: Deploy API (green revision at 0%)
         id: deploy_api
         run: |
           set -euo pipefail
-          az deployment group create \
+          az containerapp update \
+            --name "$ACA_APP_NAME" \
             --resource-group "$ACA_RESOURCE_GROUP" \
-            --template-file YetAnotherFactoryPlanner.AppHost/infra/api/api-containerapp.module.bicep \
-            --parameters \
-              api_containerimage="${{ steps.build_api_image.outputs.image }}" \
-              api_blue_revision="${BLUE_REVISION:-}" \
-              api_containerport=8080 \
-              api_identity_outputs_clientid="$(azd env get-value API_IDENTITY_CLIENTID)" \
-              api_identity_outputs_id="$(azd env get-value API_IDENTITY_ID)" \
-              cosmos_db_outputs_connectionstring="$(azd env get-value COSMOS_DB_CONNECTIONSTRING)" \
-              env_outputs_azure_container_apps_environment_default_domain="$(azd env get-value ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)" \
-              env_outputs_azure_container_apps_environment_id="$(azd env get-value ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_ID)" \
-              env_outputs_applicationinsights_connection_string="$(azd env get-value ENV_APPLICATIONINSIGHTS_CONNECTION_STRING)"
+            --image "${{ steps.build_api_image.outputs.image }}"
 
       # Verify a new (green) revision exists and differs from blue. No traffic change.
       - name: Verify green revision
