@@ -83,6 +83,19 @@ current_serving_revision() {
   echo "$rev"
 }
 
+# Revision explicitly pinned to serve traffic by revisionName, or empty. Unlike
+# current_serving_revision, this does NOT fall back to the latest revision: on a
+# greenfield deploy traffic is on the latestRevision pointer (no revisionName), so
+# this correctly returns empty — i.e. "there is no pinned blue yet".
+pinned_serving_revision() {
+  az containerapp ingress traffic show \
+    "${AZ_FLAGS[@]}" \
+    --resource-group "$ACA_RESOURCE_GROUP" \
+    --name "$ACA_APP_NAME" \
+    --query "sort_by([?revisionName!=null], &weight)[-1].revisionName" \
+    -o tsv 2>/dev/null || true
+}
+
 # Default ingress FQDN for the container app (used to derive the env domain).
 app_fqdn() {
   az containerapp show \
@@ -112,17 +125,26 @@ cmd_current_revision() {
 cmd_deploy_green() {
   echo "[deploy-green] Identifying blue and green revisions..."
   local blue green
-  blue=$(current_serving_revision)
+  # Guard against a pinned blue only. On greenfield (no revisionName pinned) this is
+  # empty, so blue==green on the single revision is expected, not an error.
+  blue=$(pinned_serving_revision)
   green=$(latest_revision)
 
   if [ -z "$green" ]; then
     echo "ERROR: Could not determine the latest (green) revision." >&2
     exit 1
   fi
-  echo "[deploy-green] Current production (blue) revision: ${blue:-<none>}"
+  echo "[deploy-green] Current production (blue) revision: ${blue:-<none / greenfield>}"
   echo "[deploy-green] New (green) revision: $green"
 
-  if [ -n "$blue" ] && [ "$green" = "$blue" ]; then
+  if [ -z "$blue" ]; then
+    # Greenfield / pre-pin: no blue revision is pinned to traffic. The single latest
+    # revision IS green; smoke will validate it and shift will pin traffic to it.
+    echo "[deploy-green] No pinned blue revision (greenfield) — '$green' is green. Run 'smoke' next."
+    return 0
+  fi
+
+  if [ "$green" = "$blue" ]; then
     echo "ERROR: The latest revision equals the current production revision — no new" >&2
     echo "  revision was deployed. Run 'azd deploy api' first." >&2
     exit 1
