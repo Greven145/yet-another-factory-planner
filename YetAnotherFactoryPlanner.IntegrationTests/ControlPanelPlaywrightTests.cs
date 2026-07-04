@@ -4,16 +4,19 @@ using static Microsoft.Playwright.Assertions;
 namespace YetAnotherFactoryPlanner.IntegrationTests;
 
 /// <summary>
-/// Playwright integration tests covering Bug 4 and Bug 5.
+/// Playwright integration tests for the factory control panel.
 ///
-/// Bug 4 — "Link copied!" tooltip never auto-dismisses.
-///          It should disappear after ~2–3 seconds.
+/// Share — clicking "Share" copies a link and shows a "Link copied!" popover that
+///         auto-dismisses after a couple of seconds (FactorySwitcher.onShare).
 ///
-/// Bug 5 — "Reset ALL Factory Options" clears everything immediately with no confirmation.
-///          A confirmation dialog should appear before the reset is applied.
+/// Reset — the "Reset to empty" item in the factory-actions (⋯) menu clears the
+///         current factory's production items.
 ///
-/// Both tests assert the EXPECTED (fixed) behaviour and therefore fail against the
-/// current implementation (TDD-style).
+/// NOTE: the pre-multi-factory UI (removed in #148) had a "Control Panel" heading, a
+/// "Save &amp; Share" button, and a "Reset ALL Factory Options" button with a
+/// confirmation dialog. Those elements no longer exist; these tests target the current
+/// FactorySwitcher UI. The share/factory-action controls live in the MAIN content
+/// column, so the drawer is closed first (its backdrop otherwise intercepts the click).
 /// </summary>
 [Collection(AppHostCollection.Name)]
 public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserFixture browser)
@@ -32,12 +35,10 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 	public Task DisposeAsync() => Task.CompletedTask;
 
 	/// <summary>
-	/// Bug 4 — reproducer.
-	/// Clicking "Save &amp; Share" shows a "Link copied!" tooltip. That tooltip should
-	/// auto-dismiss after a few seconds. Currently it stays visible forever.
+	/// Clicking "Share" shows a "Link copied!" popover that auto-dismisses after ~2.5 s.
 	/// </summary>
 	[Fact]
-	public async Task SaveAndShare_LinkCopiedTooltipDismissesAutomatically()
+	public async Task Share_LinkCopiedTooltipDismissesAutomatically()
 	{
 		// Arrange
 		await using var context = await browser.Browser.NewContextAsync();
@@ -46,30 +47,29 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 		await page.GotoAsync(_clientBaseUri.ToString());
 		await WaitForControlPanelAsync(page);
 
-		// Add a production item so Save & Share is valid
+		// Add a production item so Share is enabled (canShareFactory)
 		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "+ Add Product" }).ClickAsync();
 		await SelectItemAsync(page, "Iron Ingot");
 		await SetAmountAsync(page, "30");
 
-		// Click Save & Share to generate a link and trigger the tooltip
-		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Save & Share" }).ClickAsync();
+		// Share lives in the main-content FactorySwitcher; close the drawer so its
+		// backdrop no longer intercepts the click.
+		await CloseDrawerAsync(page);
+		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Share" }).ClickAsync();
 
 		var tooltip = page.GetByText("Link copied!", new PageGetByTextOptions { Exact = true });
 		await Expect(tooltip).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 10_000 });
 
-		// Assert
-		// BUG 4: tooltip never dismisses — this assertion will fail until auto-dismiss is implemented.
-		// Allow up to 5 s for the tooltip to disappear (it should auto-dismiss after 2–3 s).
+		// Assert — the popover auto-dismisses (onShare clears `copied` after 2.5 s).
 		await Expect(tooltip).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 5_000 });
 	}
 
 	/// <summary>
-	/// Bug 5 — reproducer.
-	/// Clicking "Reset ALL Factory Options" should prompt the user for confirmation
-	/// before clearing all data. Currently it resets immediately with no dialog.
+	/// The factory-actions (⋯) menu's "Reset to empty" clears the current factory's
+	/// production items.
 	/// </summary>
 	[Fact]
-	public async Task ResetAllFactoryOptions_ShowsConfirmationDialogBeforeResetting()
+	public async Task ResetToEmpty_ClearsProductionItems()
 	{
 		// Arrange
 		await using var context = await browser.Browser.NewContextAsync();
@@ -78,25 +78,22 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 		await page.GotoAsync(_clientBaseUri.ToString());
 		await WaitForControlPanelAsync(page);
 
-		// Add a production item so there is data to lose
+		// Add a production item so there is data to clear
 		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "+ Add Product" }).ClickAsync();
 		await SelectItemAsync(page, "Iron Ingot");
 		await SetAmountAsync(page, "30");
-
-		// Verify the item row is present before the reset (check the Select input value)
 		await Expect(page.GetByPlaceholder("Select an item").First).ToHaveValueAsync("Iron Ingot");
 
-		// Act — click the reset button
-		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Reset ALL Factory Options" }).ClickAsync();
+		// The factory-actions menu lives in the main-content FactorySwitcher; close the
+		// drawer so its backdrop no longer intercepts the click.
+		await CloseDrawerAsync(page);
 
-		// Assert
-		// BUG 5: no confirmation dialog exists — this assertion will fail until one is added.
-		// We look for a modal/dialog with a confirmation-style message.
-		var confirmDialog = page.GetByRole(AriaRole.Dialog);
-		await Expect(confirmDialog).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 3_000 });
+		// Act — open the ⋯ menu and choose "Reset to empty"
+		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Factory actions" }).ClickAsync();
+		await page.GetByRole(AriaRole.Menuitem, new PageGetByRoleOptions { Name = "Reset to empty" }).ClickAsync();
 
-		// Data should NOT yet have been cleared — the user has not confirmed
-		await Expect(page.GetByPlaceholder("Select an item").First).ToHaveValueAsync("Iron Ingot");
+		// Assert — the production item is gone (the Select field no longer exists)
+		await Expect(page.GetByPlaceholder("Select an item")).ToHaveCountAsync(0);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -105,9 +102,20 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 
 	private async Task WaitForControlPanelAsync(IPage page)
 	{
-		// "Control Panel" heading is rendered only once game data has loaded
-		await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Control Panel" })
+		// The "+ Add Product" button (in the default-open control panel's Production tab)
+		// renders only once game data has loaded — a stable readiness signal. The old
+		// "Control Panel" heading was removed by the multi-factory redesign (#148).
+		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "+ Add Product" })
 			.WaitForAsync(new LocatorWaitForOptions { Timeout = (float)AppReadyTimeout.TotalMilliseconds });
+	}
+
+	private static async Task CloseDrawerAsync(IPage page)
+	{
+		// The drawer toggle is a text control that flips between "Close Control Panel"
+		// (open) and "Open Control Panel" (closed).
+		await page.GetByText("Close Control Panel").ClickAsync();
+		await page.GetByText("Open Control Panel").WaitForAsync(
+			new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 3_000 });
 	}
 
 	private static async Task SelectItemAsync(IPage page, string itemName)
@@ -121,10 +129,6 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 
 	private static async Task SetAmountAsync(IPage page, string amount)
 	{
-		// The production-goal row's amount field only has a placeholder, not a <label>
-		// or aria-label — GetByLabel("Amount") instead substring-matches the Inputs tab's
-		// item-specific aria-labels (e.g. "Iron Ore amount"), which live on a different,
-		// inactive tab.
 		var amountInput = page.GetByPlaceholder("Amount").First;
 		await amountInput.ClickAsync();
 		await amountInput.FillAsync(amount);

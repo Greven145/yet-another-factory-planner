@@ -108,7 +108,10 @@ public sealed class ProductionTabPlaywrightTests(AppHostFixture appHost, Browser
 
 	private async Task WaitForControlPanelAsync(IPage page)
 	{
-		await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Control Panel" })
+		// The "+ Add Product" button (in the default-open control panel's Production tab)
+		// renders only once game data has loaded — a stable readiness signal. The old
+		// "Control Panel" heading was removed by the multi-factory redesign (#148).
+		await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "+ Add Product" })
 			.WaitForAsync(new LocatorWaitForOptions { Timeout = (float)AppReadyTimeout.TotalMilliseconds });
 	}
 }
