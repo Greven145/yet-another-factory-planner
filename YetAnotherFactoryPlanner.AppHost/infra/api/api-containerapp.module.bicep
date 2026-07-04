@@ -18,10 +18,6 @@ param cosmos_db_outputs_connectionstring string
 
 param api_identity_outputs_clientid string
 
-param env_outputs_azure_container_registry_endpoint string
-
-param env_outputs_azure_container_registry_managed_identity_id string
-
 param env_outputs_applicationinsights_connection_string string
 
 resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
@@ -56,12 +52,9 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
           }
         ]
       }
-      registries: [
-        {
-          server: env_outputs_azure_container_registry_endpoint
-          identity: env_outputs_azure_container_registry_managed_identity_id
-        }
-      ]
+      // No registries block: the API image is a PUBLIC GHCR package
+      // (ghcr.io/greven145/yet-another-factory-planner/api), which ACA pulls
+      // anonymously. Nothing to authenticate, so no registry credential/identity.
       runtime: {
         dotnet: {
           autoConfigureDataProtection: true
@@ -179,9 +172,10 @@ resource api 'Microsoft.App/containerApps@2025-02-02-preview' = {
   }
   identity: {
     type: 'UserAssigned'
+    // Only the API's own identity (used for the data-plane Cosmos DB connection).
+    // The ACR-pull identity is gone: the image is pulled anonymously from public GHCR.
     userAssignedIdentities: {
       '${api_identity_outputs_id}': { }
-      '${env_outputs_azure_container_registry_managed_identity_id}': { }
     }
   }
 }

@@ -8,8 +8,6 @@ param tags object = { }
 @description('The azd environment name (e.g. production). Names containing "dev" are treated as development environments and keep full console-log ingestion.')
 param environmentName string = ''
 
-param env_acr_outputs_name string
-
 // In non-development environments, drop ContainerAppConsoleLogs from the diagnostic export:
 // the same application stdout already reaches this workspace as App Insights AppTraces via
 // OpenTelemetry (UseAzureMonitor), so exporting the console category doubles ingestion.
@@ -22,25 +20,9 @@ var consoleLogCategory = isDevelopment ? [
   }
 ] : []
 
-resource env_mi 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
-  name: take('env_mi-${uniqueString(resourceGroup().id)}', 128)
-  location: location
-  tags: tags
-}
-
-resource env_acr 'Microsoft.ContainerRegistry/registries@2025-04-01' existing = {
-  name: env_acr_outputs_name
-}
-
-resource env_acr_env_mi_AcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(env_acr.id, env_mi.id, subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d'))
-  properties: {
-    principalId: env_mi.properties.principalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalType: 'ServicePrincipal'
-  }
-  scope: env_acr
-}
+// No container registry or ACR-pull managed identity: the API image is a public
+// GHCR package (ghcr.io/greven145/yet-another-factory-planner/api) that ACA pulls
+// anonymously. Removing the Basic ACR (~$5/mo flat) is the whole point of this module.
 
 resource env_law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: take('envlaw-${uniqueString(resourceGroup().id)}', 63)
@@ -123,12 +105,6 @@ output APPLICATIONINSIGHTS_CONNECTION_STRING string = env_appinsights.properties
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = env_law.name
 
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = env_law.id
-
-output AZURE_CONTAINER_REGISTRY_NAME string = env_acr.name
-
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = env_acr.properties.loginServer
-
-output AZURE_CONTAINER_REGISTRY_MANAGED_IDENTITY_ID string = env_mi.id
 
 output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = env.name
 
