@@ -51,6 +51,7 @@ module env 'env/env.module.bicep' = {
   scope: rg
   params: {
     env_acr_outputs_name: env_acr.outputs.name
+    environmentName: environmentName
     location: location
     userPrincipalId: principalId
   }

@@ -91,7 +91,17 @@ public static class Extensions
         if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
         {
             builder.Services.AddOpenTelemetry()
-               .UseAzureMonitor();
+               .UseAzureMonitor(options =>
+               {
+                   // The Azure Monitor distro (v1.3.0) exports ~100% of spans by default, which
+                   // dominates Log Analytics ingestion. Sample 20% of traces outside development
+                   // to cut that volume; development keeps full tracing for debugging. Metrics
+                   // are never sampled, so runtime/HTTP metrics are unaffected.
+                   if (!builder.Environment.IsDevelopment())
+                   {
+                       options.SamplingRatio = 0.2f;
+                   }
+               });
         }
 
         return builder;

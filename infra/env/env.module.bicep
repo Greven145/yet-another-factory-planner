@@ -5,7 +5,22 @@ param userPrincipalId string = ''
 
 param tags object = { }
 
+@description('The azd environment name (e.g. production). Names containing "dev" are treated as development environments and keep full console-log ingestion.')
+param environmentName string = ''
+
 param env_acr_outputs_name string
+
+// In non-development environments, drop ContainerAppConsoleLogs from the diagnostic export:
+// the same application stdout already reaches this workspace as App Insights AppTraces via
+// OpenTelemetry (UseAzureMonitor), so exporting the console category doubles ingestion.
+// Development environments keep it so the full portal/aspire log view stays available.
+var isDevelopment = contains(toLower(environmentName), 'dev')
+var consoleLogCategory = isDevelopment ? [
+  {
+    category: 'ContainerAppConsoleLogs'
+    enabled: true
+  }
+] : []
 
 resource env_mi 'Microsoft.ManagedIdentity/userAssignedIdentities@2024-11-30' = {
   name: take('env_mi-${uniqueString(resourceGroup().id)}', 128)
@@ -88,16 +103,12 @@ resource env_diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-previ
   scope: env
   properties: {
     workspaceId: env_law.id
-    logs: [
-      {
-        category: 'ContainerAppConsoleLogs'
-        enabled: true
-      }
+    logs: concat(consoleLogCategory, [
       {
         category: 'ContainerAppSystemLogs'
         enabled: true
       }
-    ]
+    ])
     metrics: [
       {
         category: 'AllMetrics'
