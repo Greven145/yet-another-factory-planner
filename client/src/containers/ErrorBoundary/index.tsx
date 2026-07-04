@@ -34,7 +34,7 @@ class ErrorBoundary extends React.Component<Props, State> {
           <Title>Oh no...</Title>
           <Text>
             Something broke horribly... Sorry about that...<br />
-            If you don't mind, you can <ExternalLink href='https://github.com/lydianlights/yet-another-factory-planner/issues'>file an issue on github</ExternalLink> letting me know what you were doing, that way I can fix this crash.<br />
+            If you don't mind, you can <ExternalLink href='https://github.com/greven145/yet-another-factory-planner/issues'>file an issue on github</ExternalLink> letting me know what you were doing, that way I can fix this crash.<br />
             In the meantime, refreshing the page should reset everything and let you get back to work :D
           </Text>
         </Card>

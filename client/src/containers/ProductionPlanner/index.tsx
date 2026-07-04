@@ -17,9 +17,18 @@ import FactorySwitcher from './PlannerOptions/FactorySwitcher';
 import Portal from '../../components/Portal';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
 
+// Staged reassurance while the Azure Container App cold-starts. Each entry fires
+// once the loader has been up for `after` seconds; the last one just sticks.
+const LOAD_STAGES: { after: number, message: string }[] = [
+  { after: 3, message: 'Trying real hard!' },
+  { after: 10, message: 'Waking the server up — it powers down to save on our electricity bill.' },
+  { after: 20, message: 'Still spinning up the machines... the Coal Generators are warming up.' },
+  { after: 30, message: 'Almost online — FICSIT thanks you for your patience, pioneer.' },
+];
+
 const ProductionPlanner = () => {
   const gdCtx = useGameDataContext();
-  const [slowLoad, setSlowLoad] = useState(false);
+  const [loadStage, setLoadStage] = useState(-1);
   const [drawerOpen, setDrawerOpen] = useSessionStorage<'false' | 'true'>({ key: 'drawer-open', defaultValue: 'true' });
   // Below the breakpoint, swap the desktop drawer + main-content layout for the
   // full-viewport mobile shell. Resolve the match on first render (no effect delay)
@@ -28,12 +37,12 @@ const ProductionPlanner = () => {
 
   const loaded = !!gdCtx.gameData;
   useEffect(() => {
-    setSlowLoad(false);
+    setLoadStage(-1);
     if (!loaded) {
-      const timer = setTimeout(() => {
-        setSlowLoad(true);
-      }, 3000);
-      return () => clearTimeout(timer);
+      const timers = LOAD_STAGES.map((stage, idx) =>
+        setTimeout(() => setLoadStage(idx), stage.after * 1000)
+      );
+      return () => timers.forEach(clearTimeout);
     }
   }, [loaded]);
 
@@ -67,15 +76,17 @@ const ProductionPlanner = () => {
                   <Title style={{ marginTop: '15px' }}>
                     Loading game data...
                   </Title>
-                  <AnimatePresence>
-                    {slowLoad && (
+                  <AnimatePresence mode='wait'>
+                    {loadStage >= 0 && (
                       <motion.div
+                        key={loadStage}
                         initial={{ opacity: 0.0, y: 20 }}
                         animate={{ opacity: 1.0, y: 0 }}
+                        exit={{ opacity: 0.0, y: -20 }}
                         transition={{ duration: 1.0, type: 'tween' }}
                       >
                         <Title style={{ marginTop: '15px' }}>
-                          Trying real hard!
+                          {LOAD_STAGES[loadStage].message}
                         </Title>
                       </motion.div>
                     )}
