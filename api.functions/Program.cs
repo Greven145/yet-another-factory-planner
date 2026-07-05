@@ -19,12 +19,13 @@ var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 builder.Services.AddSingleton(jsonOptions);
 
 // Raw Cosmos SDK (no EF Core, no CosmosWarmupService). The Aspire client integration reads the
-// connection string named "cosmos-db" (config key ConnectionStrings:cosmos-db, env
-// ConnectionStrings__cosmos-db) — injected locally by the AppHost's .WithReference(cosmosDb) and,
-// in production, supplied by the SWA app settings (key-based; see Step 3 infra). It also transparently
-// trusts the local preview emulator's self-signed certificate.
+// connection string named "cosmosdb" (config key ConnectionStrings:cosmosdb, env
+// ConnectionStrings__cosmosdb) — injected locally by the AppHost's .WithReference(cosmosDb) and,
+// in production, supplied by the SWA app settings (key-based; see Step 3 infra). The name is
+// hyphen-free because SWA app-setting keys reject '-'. It also transparently trusts the local
+// preview emulator's self-signed certificate.
 builder.AddAzureCosmosClient(
-    "cosmos-db",
+    "cosmosdb",
     configureClientOptions: options =>
     {
         options.UseSystemTextJsonSerializerWithOptions = jsonOptions;

@@ -3,7 +3,7 @@ using Azure.Provisioning.CosmosDB;
 var builder = DistributedApplication.CreateBuilder(args);
 
 #pragma warning disable ASPIRECOSMOSDB001
-var cosmosDb = builder.AddAzureCosmosDB("cosmos-db")
+var cosmosDb = builder.AddAzureCosmosDB("cosmosdb")
     .RunAsPreviewEmulator(emulator =>
     {
         emulator.WithDataExplorer();
@@ -33,7 +33,7 @@ cosmosDb.ConfigureInfrastructure(infra =>
 // Azure Functions (.NET 9 isolated) API. Replaces the ACA-hosted api.web: in production this is
 // deployed as Azure Static Web Apps managed functions (served same-origin at /api/*), which removes
 // the scale-from-zero cold start on the share path. Locally, Aspire's Functions integration runs it
-// via the Azure Functions Core Tools and injects the Cosmos connection string (ConnectionStrings__cosmos-db)
+// via the Azure Functions Core Tools and injects the Cosmos connection string (ConnectionStrings__cosmosdb)
 // plus a host-storage (Azurite) connection for AzureWebJobsStorage. The ACA publish/probe/blue-green
 // config is gone — SWA owns hosting now (see Step 3 for the infra/CI teardown).
 var api = builder.AddAzureFunctionsProject<Projects.api_functions>("api")
