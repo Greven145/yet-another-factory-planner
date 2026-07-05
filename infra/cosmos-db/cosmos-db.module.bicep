@@ -22,7 +22,7 @@ resource cosmos_db 'Microsoft.DocumentDB/databaseAccounts@2024-08-15' = {
     databaseAccountOfferType: 'Standard'
     // Key-based (local) auth is ENABLED for the SWA managed-functions API. SWA managed functions
     // have no managed identity and no Key Vault refs, so they authenticate to Cosmos with an
-    // account key supplied via a SWA app setting (ConnectionStrings__cosmos-db). Accepted
+    // account key supplied via a SWA app setting (ConnectionStrings__cosmosdb). Accepted
     // security-posture trade-off: the `factories` container holds only publicly-shareable factory
     // configs with a 7-day TTL. (Was `disableLocalAuth: true` under the retired ACA managed-identity
     // setup — see infra/api-identity + infra/api-roles-cosmos-db, both deleted with ACA.)
@@ -64,7 +64,7 @@ resource factories 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/container
 }
 
 // Key-based (AccountEndpoint=…;AccountKey=…) connection string consumed by the SWA managed
-// functions' AddAzureCosmosClient("cosmos-db"). Marked @secure() so it is not logged and never
+// functions' AddAzureCosmosClient("cosmosdb"). Marked @secure() so it is not logged and never
 // surfaces in deployment output history; main.bicep passes it straight into the SWA app settings.
 @secure()
 output connectionString string = cosmos_db.listConnectionStrings().connectionStrings[0].connectionString
