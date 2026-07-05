@@ -15,6 +15,6 @@
 		</PackageReference>
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\api.web\api.web.csproj" />
+		<ProjectReference Include="..\api.Core\api.Core.csproj" />
 	</ItemGroup>
 </Project>

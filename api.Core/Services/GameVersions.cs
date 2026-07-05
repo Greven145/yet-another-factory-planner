@@ -1,6 +1,6 @@
 using api.Models;
 
-namespace api.web.Services;
+namespace api.Services;
 
 /// <summary>
 /// The single source of truth for the share-factory game-version vocabulary.
