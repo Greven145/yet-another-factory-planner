@@ -1,8 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-const fixtureResponse = readFileSync(join(__dirname, 'fixtures/initialize-response.json'), 'utf-8');
 
 test.describe('Factory Planner Application', () => {
   test.beforeEach(async ({ page }) => {
@@ -11,15 +7,7 @@ test.describe('Factory Planner Application', () => {
     await page.addInitScript(() => {
       sessionStorage.setItem('drawer-open', '"false"');
     });
-
-    // Mock the /initialize API so tests run without the Aspire backend.
-    await page.route(/\/initialize(\?.*)?$/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: fixtureResponse,
-      });
-    });
+    // Game data now ships as static bundles, so a normal load needs no API mock.
   });
 
   test('should load application with default 1.2 game version', async ({ page }) => {
@@ -337,23 +325,31 @@ test.describe('Factory Planner Application', () => {
   });
 
   test('should restore game mode multipliers from a shared link', async ({ page }) => {
-    // When a factoryKey is present, return a saved config carrying non-default multipliers.
-    await page.route(/\/initialize(\?.*)?$/, async (route) => {
-      const body = JSON.parse(fixtureResponse);
-      if (route.request().url().includes('factoryKey=')) {
-        body.data.factory_config = {
-          gameVersion: 'V1_2',
-          productionItems: [{ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 10 }],
-          inputItems: [],
-          inputResources: [],
-          allowHandGatheredItems: false,
-          weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
-          gameModeOptions: { recipePartsCost: 0.5, powerConsumption: 2 },
-          allowedRecipes: [],
-          nodesPositions: [],
-        };
-      }
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    // The share path resolves the saved config via GET /shared-factories/:key.
+    // Return a config carrying non-default multipliers. (The live endpoint is
+    // built in a later step; the mock stands in for it.)
+    // Anchor to the endpoint path so it doesn't also match the Vite dev-server
+    // module request for src/api/modules/shared-factories/*.
+    await page.route(/\/\/[^/]+\/(?:api\/)?shared-factories\//, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            factory_config: {
+              gameVersion: 'V1_2',
+              productionItems: [{ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 10 }],
+              inputItems: [],
+              inputResources: [],
+              allowHandGatheredItems: false,
+              weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
+              gameModeOptions: { recipePartsCost: 0.5, powerConsumption: 2 },
+              allowedRecipes: [],
+              nodesPositions: [],
+            },
+          },
+        }),
+      });
     });
 
     await page.goto('/?factory=e2ekey0000000000');

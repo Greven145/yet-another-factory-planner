@@ -1,10 +1,4 @@
 import { test, expect, Page } from '@playwright/test';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-// Reuse the same canned /initialize payload the main e2e suite uses, so these
-// tests run against the dev server with no Aspire backend.
-const fixtureResponse = readFileSync(join(__dirname, 'fixtures/initialize-response.json'), 'utf-8');
 
 // Factory tabs share the app's `segmented-tabs` look with the drawer/view tabs, so
 // they're disambiguated by their title attribute ("<label> · edited <time>"), set in
@@ -12,10 +6,12 @@ const fixtureResponse = readFileSync(join(__dirname, 'fixtures/initialize-respon
 const FACTORY_TAB = '[role="tab"][title*="edited"]';
 const LOADING = 'Loading game data...';
 
-async function mockInitialize(page: Page, opts: { delayMs?: number } = {}) {
-  await page.route(/\/initialize(\?.*)?$/, async (route) => {
-    if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
-    await route.fulfill({ status: 200, contentType: 'application/json', body: fixtureResponse });
+// Game data ships as static ESM/JSON chunks (no API call). Slow those chunks so
+// the loading overlay is observable when a test switches game versions.
+async function delayGameData(page: Page, ms: number) {
+  await page.route('**/data/1.*/**', async (route) => {
+    await new Promise((r) => setTimeout(r, ms));
+    await route.continue();
   });
 }
 
@@ -46,7 +42,6 @@ test.describe('Multi-factory library', () => {
     await page.addInitScript(() => {
       sessionStorage.setItem('drawer-open', '"false"');
     });
-    await mockInitialize(page);
   });
 
   test('persists a factory across reloads via localStorage', async ({ page }) => {
@@ -145,7 +140,7 @@ test.describe('Multi-factory library', () => {
 
   test('switching to a different-version factory shows the loading overlay', async ({ page }) => {
     // Add latency so the refetch overlay is observable.
-    await mockInitialize(page, { delayMs: 600 });
+    await delayGameData(page, 600);
     await gotoApp(page);
 
     const tabs = page.locator(FACTORY_TAB);
@@ -168,23 +163,29 @@ test.describe('Multi-factory library', () => {
   });
 
   test('imports a ?factory= share link as a new slot and strips the URL', async ({ page }) => {
-    // Return a saved config when the share key is present (mirrors the API).
-    await page.route(/\/initialize(\?.*)?$/, async (route) => {
-      const body = JSON.parse(fixtureResponse);
-      if (route.request().url().includes('factoryKey=')) {
-        body.data.factory_config = {
-          gameVersion: 'V1_2',
-          productionItems: [{ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 10 }],
-          inputItems: [],
-          inputResources: [],
-          allowHandGatheredItems: false,
-          weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
-          gameModeOptions: { recipePartsCost: 1, powerConsumption: 1 },
-          allowedRecipes: [],
-          nodesPositions: [],
-        };
-      }
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    // The share path resolves the saved config via GET /shared-factories/:key.
+    // Anchor to the endpoint path so it doesn't also match the Vite dev-server
+    // module request for src/api/modules/shared-factories/*.
+    await page.route(/\/\/[^/]+\/(?:api\/)?shared-factories\//, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            factory_config: {
+              gameVersion: 'V1_2',
+              productionItems: [{ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 10 }],
+              inputItems: [],
+              inputResources: [],
+              allowHandGatheredItems: false,
+              weightingOptions: { resources: 1000, power: 1, complexity: 0, buildings: 0 },
+              gameModeOptions: { recipePartsCost: 1, powerConsumption: 1 },
+              allowedRecipes: [],
+              nodesPositions: [],
+            },
+          },
+        }),
+      });
     });
 
     await gotoApp(page, '/?factory=e2eimportkey0001');

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useGetInitialize } from '../../api/modules/initialize/useGetInitialize';
+import { useGetSharedFactory } from '../../api/modules/shared-factories/useGetSharedFactory';
 import { GameData } from './types';
+import { loadGameData } from './loadGameData';
 import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
 import { toDisplay } from '../../utilities/shared-factory/codec';
 import { usePrevious } from '../../hooks/usePrevious';
@@ -66,7 +67,9 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   // switch observer below only fires when the active id drifts from this.
   const handledActiveIdRef = useRef<string>(lib.activeId);
 
-  const getInitialize = useGetInitialize();
+  // Only used for the ?factory=<key> share path — resolves the saved config.
+  // Game data itself now comes from static bundles (loadGameData), never the API.
+  const sharedFactory = useGetSharedFactory();
 
   const pageTitle = useMemo(() => {
     const base = 'Another... Yet Another Factory Planner';
@@ -74,6 +77,56 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   }, [gameVersion]);
 
   usePageTitle(pageTitle);
+
+  // Load the static game-data bundle for `version` and finalize the load:
+  // strip the share params from the URL, import/select the library slot, and
+  // publish the resolved gameData + initializer. `factoryConfig` is the decoded
+  // share payload for the ?factory= path (null for legacy/library loads).
+  const finalizeLoad = async ({ version, factoryConfig }: { version: string, factoryConfig: any | null }) => {
+    let newGameData: GameData;
+    try {
+      newGameData = await loadGameData(version);
+    } catch {
+      setLoadingError(true);
+      setLoading(false);
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const shareKey = params.get(SHARE_QUERY_PARAM);
+    const legacyEncoding = params.get('f');
+    // Clear only the share keys we just imported — leave any other query params
+    // (e.g. the prototype's ?variant=) intact so a refresh doesn't re-import the
+    // shared factory while still preserving the rest of the URL.
+    params.delete(SHARE_QUERY_PARAM);
+    params.delete('f');
+    const rest = params.toString();
+    window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
+
+    let libraryConfig: FactoryOptions | null = null;
+    if (shareKey || legacyEncoding) {
+      // Import the incoming URL factory as a new library slot (no dedupe). Its
+      // config is filled in by autosave once the reducer loads the share payload.
+      const imported = lib.importFactory({ gameVersion: version, sourceKey: shareKey ?? undefined });
+      handledActiveIdRef.current = imported.id;
+    } else {
+      libraryConfig = lib.activeFactory?.config ?? null;
+      handledActiveIdRef.current = lib.activeId;
+    }
+
+    // Keep setLoading(false) last: `completedThisFrame` fires the frame loading
+    // clears, and gameData must already be present when it does (it gates the
+    // ProductionProvider mount that consumes triggerInitialize).
+    setGameVersion(version);
+    setGameData(newGameData);
+    setInitializer({
+      factoryConfig: (shareKey || legacyEncoding) ? factoryConfig : null,
+      shareKey,
+      legacyEncoding,
+      libraryConfig,
+    });
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (needToFetchGameData) {
@@ -87,70 +140,34 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       const legacyEncoding = params.get('f');
 
       if (shareKey) {
-        getInitialize.request({ factoryKey: shareKey });
+        // Resolve the saved config first; finalizeLoad runs once it arrives so we
+        // can load the bundle for the share's own game version (below).
+        sharedFactory.request({ factoryKey: shareKey });
       } else if (legacyEncoding) {
-        getInitialize.request({ gameVersion: DEFAULT_GAME_VERSION });
+        // Legacy ?f= links never carried a server config; default the version.
+        void finalizeLoad({ version: DEFAULT_GAME_VERSION, factoryConfig: null });
       } else {
-        // Library-driven: fetch the active factory's game version.
+        // Library-driven: load the active factory's game version.
         const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
-        getInitialize.request({ gameVersion: version });
+        void finalizeLoad({ version, factoryConfig: null });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needToFetchGameData]);
 
   useEffect(() => {
-    if (getInitialize.completedThisFrame) {
-      if (getInitialize.error) {
+    if (sharedFactory.completedThisFrame) {
+      if (sharedFactory.error) {
         setLoadingError(true);
+        setLoading(false);
+        return;
       }
-      const newGameData = getInitialize.data?.game_data || null;
-      const factoryConfig = getInitialize.data?.factory_config || null;
-
-      const params = new URLSearchParams(window.location.search);
-      const shareKey = params.get(SHARE_QUERY_PARAM);
-      const legacyEncoding = params.get('f');
-      // Clear only the share keys we just imported — leave any other query params
-      // (e.g. the prototype's ?variant=) intact so a refresh doesn't re-import the
-      // shared factory while still preserving the rest of the URL.
-      params.delete(SHARE_QUERY_PARAM);
-      params.delete('f');
-      const rest = params.toString();
-      window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
-
-      // Resolve the version this load landed on.
-      let version: string;
-      if (factoryConfig?.gameVersion) {
-        version = toDisplay(factoryConfig.gameVersion);
-      } else if (legacyEncoding) {
-        version = DEFAULT_GAME_VERSION;
-      } else {
-        version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
-      }
-
-      let libraryConfig: FactoryOptions | null = null;
-      if (shareKey || legacyEncoding) {
-        // Import the incoming URL factory as a new library slot (no dedupe). Its
-        // config is filled in by autosave once the reducer loads the share payload.
-        const imported = lib.importFactory({ gameVersion: version, sourceKey: shareKey ?? undefined });
-        handledActiveIdRef.current = imported.id;
-      } else {
-        libraryConfig = lib.activeFactory?.config ?? null;
-        handledActiveIdRef.current = lib.activeId;
-      }
-
-      setGameVersion(version);
-      setGameData(newGameData);
-      setInitializer({
-        factoryConfig: (shareKey || legacyEncoding) ? factoryConfig : null,
-        shareKey,
-        legacyEncoding,
-        libraryConfig,
-      });
-      setLoading(false);
+      const factoryConfig = sharedFactory.data?.factory_config || null;
+      const version = factoryConfig?.gameVersion ? toDisplay(factoryConfig.gameVersion) : DEFAULT_GAME_VERSION;
+      void finalizeLoad({ version, factoryConfig });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getInitialize]);
+  }, [sharedFactory]);
 
   // Observe active-factory switches that don't go through a refetch. Same version
   // => reload the config into the reducer (instant); different version => refetch.
