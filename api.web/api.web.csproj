@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\YetAnotherFactoryPlanner.ServiceDefaults\YetAnotherFactoryPlanner.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\api.Core\api.Core.csproj" />
   </ItemGroup>
 
 </Project>

@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using api.Models;
 
-namespace api.web.Services;
+namespace api.Services;
 
 /// <summary>
 /// The single agreed rule for turning a factory config into its share id.

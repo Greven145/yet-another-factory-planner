@@ -1,5 +1,6 @@
 using FluentValidation;
 using api.Models;
+using api.Services;
 using api.Validation;
 using api.web.Services;
 using api.web.Data;

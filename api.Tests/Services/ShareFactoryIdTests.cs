@@ -1,5 +1,5 @@
 using api.Models;
-using api.web.Services;
+using api.Services;
 using Xunit;
 
 namespace api.Tests.Services;
