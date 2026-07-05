@@ -1,9 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { readFileSync } from 'fs';
-import { join } from 'path';
-
-const fixtureResponse = readFileSync(join(__dirname, 'fixtures/initialize-response.json'), 'utf-8');
 
 // Builds the standard WCAG 2.0 A/AA axe scan. The `<canvas>` element itself is
 // excluded because a canvas is inherently opaque to assistive tech; the accessible
@@ -43,15 +39,7 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
         '*,*::before,*::after{transition:none!important;animation:none!important;}';
       document.documentElement.appendChild(style);
     });
-
-    // Mock the /initialize API so tests run without the Aspire backend.
-    await page.route(/\/initialize(\?.*)?$/, async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: fixtureResponse,
-      });
-    });
+    // Game data ships as static bundles now, so no API mock is needed to load the app.
   });
 
   test('initial page load has no WCAG A/AA violations', async ({ page }) => {

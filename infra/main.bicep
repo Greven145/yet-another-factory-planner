@@ -9,10 +9,6 @@ param environmentName string
 @description('The location used for all deployed resources')
 param location string
 
-@description('Id of the user or app to assign application roles')
-param principalId string = ''
-
-
 var tags = {
   'azd-env-name': environmentName
 }
@@ -23,22 +19,6 @@ resource rg 'Microsoft.Resources/resourceGroups@2022-09-01' = {
   tags: tags
 }
 
-module api_identity 'api-identity/api-identity.module.bicep' = {
-  name: 'api-identity'
-  scope: rg
-  params: {
-    location: location
-  }
-}
-module api_roles_cosmos_db 'api-roles-cosmos-db/api-roles-cosmos-db.module.bicep' = {
-  name: 'api-roles-cosmos-db'
-  scope: rg
-  params: {
-    cosmos_db_outputs_name: cosmos_db.outputs.name
-    location: location
-    principalId: api_identity.outputs.principalId
-  }
-}
 module cosmos_db 'cosmos-db/cosmos-db.module.bicep' = {
   name: 'cosmos-db'
   scope: rg
@@ -50,9 +30,8 @@ module env 'env/env.module.bicep' = {
   name: 'env'
   scope: rg
   params: {
-    environmentName: environmentName
     location: location
-    userPrincipalId: principalId
+    tags: tags
   }
 }
 module swa 'app/swa.bicep' = {
@@ -62,6 +41,11 @@ module swa 'app/swa.bicep' = {
     location: location
     appName: 'stapp-${environmentName}'
     tags: tags
+    // Key-based Cosmos connection string + App Insights connection string flow straight into the
+    // SWA managed-functions app settings; both are @secure() end-to-end so no key lands in a
+    // plaintext deployment output.
+    cosmosConnectionString: cosmos_db.outputs.connectionString
+    appInsightsConnectionString: env.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING
   }
 }
 
@@ -82,13 +66,9 @@ module swaDomain 'app/swa-domain.bicep' = {
   }
 }
 
-output ENV_APPLICATIONINSIGHTS_CONNECTION_STRING string = env.outputs.APPLICATIONINSIGHTS_CONNECTION_STRING
-
-output API_IDENTITY_CLIENTID string = api_identity.outputs.clientId
-output API_IDENTITY_ID string = api_identity.outputs.id
-output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN
+// ACA teardown: the API_IDENTITY_*, AZURE_CONTAINER_APPS_ENVIRONMENT_*, ENV_APPLICATIONINSIGHTS_*
+// and COSMOS_DB_CONNECTIONSTRING outputs are gone. The Cosmos connection string is now a @secure()
+// value wired directly into the SWA app settings inside bicep (never a plaintext deployment output),
+// and the client build uses a same-origin /api base rather than an ACA-domain lookup.
 output AZURE_STATIC_WEB_APP_HOSTNAME string = swa.outputs.defaultHostname
 output AZURE_STATIC_WEB_APP_NAME string = swa.outputs.name
-output COSMOS_DB_CONNECTIONSTRING string = cosmos_db.outputs.connectionString
-output ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN
-output ENV_AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = env.outputs.AZURE_CONTAINER_APPS_ENVIRONMENT_ID

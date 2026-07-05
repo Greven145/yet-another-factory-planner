@@ -113,11 +113,10 @@ jobs:
   # succeed, and only on a push to main or a manual run. A red CI therefore
   # blocks the deploy. Manual runs (workflow_dispatch) still run CI first.
   #
-  # Blue-green strategy:
-  #   API  — ACA Multiple-revision mode; azd deploys green at 0% traffic;
-  #           smoke passes → shift 100%; smoke fails → rollback, job fails.
-  #   Client — SWA Free tier preview environment; smoke passes → promote to
-  #             production (no rebuild); smoke fails → keep old production.
+  # Deploy strategy (post-ACA): the client and the .NET 9 managed functions both ship to a SWA Free
+  # tier preview environment ("staging"); the Playwright smoke drives the create → share → restore
+  # flow against that live preview; on success the same built artifacts are promoted to production
+  # (no rebuild); on failure production keeps the old version. There is no container app to blue-green.
   deploy:
     name: Deploy to Azure
     needs: [build-and-test, build-frontend]
@@ -128,8 +127,8 @@ jobs:
       && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     # Hard cap so a hung step (e.g. a wedged smoke test) can never run for hours and
-    # hold the deploy-production concurrency lock. Generous enough for provision + both
-    # blue-green deploys.
+    # hold the deploy-production concurrency lock. Generous enough for provision + the
+    # preview/promote SWA deploys.
     timeout-minutes: 30
     # Serialize production deploys so overlapping merges to main don't run
     # concurrent azd provision/deploy against the same environment.
@@ -139,23 +138,15 @@ jobs:
     permissions:
       id-token: write
       contents: read
-      # write: push the API container image to GHCR (replaces ACR); also covers
-      # pulling the prebuilt frontend-ci image (Playwright browsers baked in) for
-      # the client smoke step below.
-      packages: write
+      # read: pull the prebuilt frontend-ci image (Playwright browsers baked in) for the client
+      # smoke step below. No image is pushed anymore — the ACA GHCR API image is gone.
+      packages: read
     env:
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
       AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-      # scripts/aca-bluegreen.sh reads ACA_RESOURCE_GROUP and ACA_APP_NAME.
-      # The container-app name is hardcoded to "api" in the bicep (name: 'api');
-      # the resource group is the rg-<AZURE_ENV_NAME> that infra/main.bicep
-      # creates (resourceGroups name: 'rg-${environmentName}'), so this default
-      # is exact — azd does not expose AZURE_RESOURCE_GROUP as an output.
-      ACA_APP_NAME: api
-      ACA_RESOURCE_GROUP: rg-${{ vars.AZURE_ENV_NAME }}
       DOTNET_NOLOGO: true
       DOTNET_CLI_TELEMETRY_OPTOUT: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -186,117 +177,37 @@ jobs:
             --federated-credential-provider "github" \
             --tenant-id "$AZURE_TENANT_ID"
 
-      # azd and the az CLI keep separate auth contexts. scripts/aca-bluegreen.sh
-      # drives blue-green traffic with `az containerapp`, so the az CLI needs its
-      # own OIDC login (same federated credential; uses the job's id-token: write).
-      - name: Log in to Azure CLI (Federated Credentials)
-        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
       # ── Infra ────────────────────────────────────────────────────────────────
+      # Provision the trimmed subscription-scoped infra (Cosmos + Log Analytics/App Insights + the
+      # Static Web App, which now hosts the managed functions and their app settings). No container
+      # app, user-assigned identity, or ACA environment remains. The Cosmos key and App Insights
+      # connection string are wired into the SWA app settings inside the bicep — never surfaced as
+      # CI-visible outputs. The az CLI login and az/containerapp deployments are gone with ACA.
       - name: Provision Infrastructure
         run: azd provision --no-prompt
 
-      # ── API blue-green ────────────────────────────────────────────────────────
-      # Record the current production ("blue") revision so the rollback step has an explicit
-      # target. `az containerapp update` (deploy step below) creates the new ("green") revision
-      # at 0% without shifting traffic, so blue keeps serving until the explicit shift — no
-      # traffic pin is needed. Empty on a greenfield deploy (no revisions yet).
-      - name: Resolve production (blue) revision
-        id: resolve_blue
-        run: |
-          set -euo pipefail
-          blue=$(bash scripts/aca-bluegreen.sh current-revision)
-          echo "Current production (blue) revision: ${blue:-<none / greenfield>}"
-          azd env set BLUE_REVISION "$blue"
-          echo "BLUE_REVISION=$blue" >> "$GITHUB_ENV"
-
-      # Build the API image with the .NET SDK container target (no Dockerfile — the same
-      # mechanism azd used under the hood) and push it to PUBLIC GHCR. This replaces both
-      # `azd deploy api` and the ~$5/mo Basic ACR: ACA now pulls the image anonymously.
-      - name: Log in to GHCR (API image push)
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-
-      - name: Build & push API image to GHCR
-        id: build_api_image
-        run: |
-          set -euo pipefail
-          image="ghcr.io/greven145/yet-another-factory-planner/api:${{ github.sha }}"
-          dotnet publish api.web/api.web.csproj \
-            --configuration Release \
-            --os linux --arch x64 \
-            /t:PublishContainer \
-            -p:ContainerRegistry=ghcr.io \
-            -p:ContainerRepository=greven145/yet-another-factory-planner/api \
-            -p:ContainerImageTag=${{ github.sha }}
-          echo "image=$image" >> "$GITHUB_OUTPUT"
-
-      # Deploy the new image with `az containerapp update`, which swaps ONLY the image and
-      # creates a new revision — it does NOT touch the registries list or traffic weights.
-      # That matters for the ACR→GHCR migration: a full bicep apply that sets registries: []
-      # is rejected (ContainerAppRegistryInUse) while older revisions still pull from ACR, and
-      # applying traffic is what forced the api_blue_revision pin in the first place. In
-      # Multiple-revision mode a new revision lands at 0% and existing traffic stays on blue,
-      # so deploy-green → smoke → shift still gate the promotion. All env vars/probes/scale are
-      # preserved from the current template. (The api module bicep remains for greenfield.)
-      - name: Deploy API (green revision at 0%)
-        id: deploy_api
-        run: |
-          set -euo pipefail
-          az containerapp update \
-            --name "$ACA_APP_NAME" \
-            --resource-group "$ACA_RESOURCE_GROUP" \
-            --image "${{ steps.build_api_image.outputs.image }}"
-
-      # Verify a new (green) revision exists and differs from blue. No traffic change.
-      - name: Verify green revision
-        id: green_check
-        run: bash scripts/aca-bluegreen.sh deploy-green
-
-      # Smoke-test the green revision. The script resolves green's revision-specific FQDN and
-      # runs scripts/smoke-api.sh against it internally, exiting non-zero on failure.
-      - name: Smoke-test API (green revision)
-        id: api_smoke
-        run: bash scripts/aca-bluegreen.sh smoke
-
-      # Promote green: set 100% of traffic to the new revision. Only on smoke success.
-      - name: Shift API traffic to green
-        id: shift_api
-        if: success()
-        run: bash scripts/aca-bluegreen.sh shift
-
-      # Failure safety net, scoped to the API stage. Rollback runs only when the traffic
-      # shift did NOT succeed (shift_api.outcome != 'success' covers a failed/skipped shift,
-      # i.e. any failure at or before deploy/verify/smoke/shift). Once the shift succeeds the
-      # green revision is live and validated, so a LATER failure in the client stage
-      # (preview/smoke/promote) must NOT revert the API — hence we exclude shift success here.
-      # Also requires resolve_blue so a blue revision is known. Job still exits red.
-      - name: Rollback API to blue on failure
-        if: failure() && steps.resolve_blue.outcome == 'success' && steps.shift_api.outcome != 'success'
-        run: bash scripts/aca-bluegreen.sh rollback
-
-      # ── Client blue-green (SWA Free tier) ─────────────────────────────────────
-      # Build the client ONCE here; it is uploaded twice (preview → production)
-      # without a second build.
+      # ── Build artifacts ──────────────────────────────────────────────────────
+      # Client: same-origin /api base — SWA serves the app and its managed functions from one origin,
+      # so axios get('/share-factory') resolves to /api/share-factory. No ACA-domain lookup. Built
+      # ONCE here; uploaded twice (preview → production) without a second build.
       - name: Build web client
         run: |
           set -euo pipefail
-          caDomain=$(azd env get-value AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN)
-          if [ -z "$caDomain" ]; then
-            echo "ERROR: AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN is empty — provision must run first" >&2
-            exit 1
-          fi
-          apiUrl="https://api.$caDomain"
-          echo "VITE_API_BASE_URL=$apiUrl" > client/.env.production
+          echo "VITE_API_BASE_URL=/api" > client/.env.production
           npm ci --prefix client
           npm run build --prefix client
 
-      # Upload to a named SWA preview environment ("staging").  The action's
-      # static_web_app_url output exposes the preview URL for smoke testing.
-      - name: Deploy client to SWA preview (staging)
+      # Functions: pre-publish the .NET 9 isolated worker so the SWA action deploys the built output
+      # (skip_api_build) rather than asking Oryx to build a .NET 9 isolated project it can't reliably
+      # build. staticwebapp.config.json pins platform.apiRuntime to dotnet-isolated:9.0.
+      - name: Publish managed functions
+        run: dotnet publish api.functions/api.functions.csproj --configuration Release --output ./api-publish
+
+      # Upload the built client + managed functions to a named SWA preview environment ("staging").
+      # The action's static_web_app_url output exposes the preview URL for smoke testing. Both
+      # app_location and api_location point at pre-built output, so skip_app_build/skip_api_build
+      # are set (the SDK on the runner built them; Oryx doesn't rebuild).
+      - name: Deploy client + functions to SWA preview (staging)
         id: swa_preview
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
         with:
@@ -305,6 +216,8 @@ jobs:
           action: upload
           app_location: client/dist
           skip_app_build: true
+          api_location: api-publish
+          skip_api_build: true
           deployment_environment: staging
 
       # Readiness gate: cheap HTTP poll until the SWA preview serves the app shell
@@ -335,11 +248,11 @@ jobs:
       - name: Log in to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      # Functional smoke against the REAL deployed preview + live API: drives the
-      # create -> share -> restore flow (client/tests/smoke.spec.ts) in a browser,
-      # asserting /share-factory returns a key and the share link restores via
-      # /initialize. This is the post-deploy validation the pre-deploy e2e suite
-      # (local dev server, mocked) and the API smoke can't give us.
+      # Functional smoke against the REAL deployed preview + live managed functions: drives the
+      # create -> share -> restore flow (client/tests/smoke.spec.ts) in a browser, asserting
+      # POST /api/share-factory returns a key and the share link restores via
+      # GET /api/shared-factories/{key}. This is the post-deploy validation the pre-deploy e2e suite
+      # (local dev server, mocked) can't give us — and it exercises the functions end-to-end.
       #
       # It runs inside the SAME prebuilt frontend-ci image build-frontend uses
       # (Playwright browsers + system libs baked in) via `docker run`, so browsers
@@ -370,11 +283,11 @@ jobs:
             "$CI_IMAGE" \
             sh -c 'rm -rf ./node_modules && cp -a /opt/ci/node_modules ./node_modules && npm run test:smoke'
 
-      # Promote the already-built client/dist to production by re-uploading
+      # Promote the already-built client/dist + functions to production by re-uploading
       # WITHOUT the deployment_environment input.  No rebuild occurs.
       # Explicitly gated on the client smoke succeeding so production keeps the
       # old version on a smoke failure.
-      - name: Promote client to SWA production
+      - name: Promote client + functions to SWA production
         if: steps.client_smoke.outcome == 'success'
         uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
         with:
@@ -383,4 +296,6 @@ jobs:
           action: upload
           app_location: client/dist
           skip_app_build: true
+          api_location: api-publish
+          skip_api_build: true
           # No deployment_environment → targets the production slot.

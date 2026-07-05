@@ -1,28 +1,14 @@
 @description('The location for the resource(s) to be deployed.')
 param location string = resourceGroup().location
 
-param userPrincipalId string = ''
-
 param tags object = { }
 
-@description('The azd environment name (e.g. production). Names containing "dev" are treated as development environments and keep full console-log ingestion.')
-param environmentName string = ''
-
-// In non-development environments, drop ContainerAppConsoleLogs from the diagnostic export:
-// the same application stdout already reaches this workspace as App Insights AppTraces via
-// OpenTelemetry (UseAzureMonitor), so exporting the console category doubles ingestion.
-// Development environments keep it so the full portal/aspire log view stays available.
-var isDevelopment = contains(toLower(environmentName), 'dev')
-var consoleLogCategory = isDevelopment ? [
-  {
-    category: 'ContainerAppConsoleLogs'
-    enabled: true
-  }
-] : []
-
-// No container registry or ACR-pull managed identity: the API image is a public
-// GHCR package (ghcr.io/greven145/yet-another-factory-planner/api) that ACA pulls
-// anonymously. Removing the Basic ACR (~$5/mo flat) is the whole point of this module.
+// Telemetry-only module. The Azure Container Apps managed environment, the aspire-dashboard
+// dotNetComponent, and the ACA diagnostic-settings export (ContainerAppConsoleLogs /
+// ContainerAppSystemLogs categories) were removed with the ACA teardown — the API now runs as
+// SWA managed functions. What remains is the Log Analytics workspace + Application Insights that
+// the functions/SWA telemetry (APPLICATIONINSIGHTS_CONNECTION_STRING app setting) reports into.
+// The module directory is still named `env` to keep the azd/main.bicep module path stable.
 
 resource env_law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   name: take('envlaw-${uniqueString(resourceGroup().id)}', 63)
@@ -44,31 +30,6 @@ resource env_law 'Microsoft.OperationalInsights/workspaces@2025-02-01' = {
   tags: tags
 }
 
-resource env 'Microsoft.App/managedEnvironments@2025-01-01' = {
-  name: take('env${uniqueString(resourceGroup().id)}', 24)
-  location: location
-  properties: {
-    appLogsConfiguration: {
-      destination: 'azure-monitor'
-    }
-    workloadProfiles: [
-      {
-        name: 'consumption'
-        workloadProfileType: 'Consumption'
-      }
-    ]
-  }
-  tags: tags
-}
-
-resource aspireDashboard 'Microsoft.App/managedEnvironments/dotNetComponents@2024-10-02-preview' = {
-  name: 'aspire-dashboard'
-  properties: {
-    componentType: 'AspireDashboard'
-  }
-  parent: env
-}
-
 resource env_appinsights 'Microsoft.Insights/components@2020-02-02' = {
   name: take('envaiz-${uniqueString(resourceGroup().id)}', 63)
   location: location
@@ -80,34 +41,8 @@ resource env_appinsights 'Microsoft.Insights/components@2020-02-02' = {
   tags: tags
 }
 
-resource env_diagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  name: 'env-diagnostics'
-  scope: env
-  properties: {
-    workspaceId: env_law.id
-    logs: concat(consoleLogCategory, [
-      {
-        category: 'ContainerAppSystemLogs'
-        enabled: true
-      }
-    ])
-    metrics: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-      }
-    ]
-  }
-}
-
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = env_appinsights.properties.ConnectionString
 
 output AZURE_LOG_ANALYTICS_WORKSPACE_NAME string = env_law.name
 
 output AZURE_LOG_ANALYTICS_WORKSPACE_ID string = env_law.id
-
-output AZURE_CONTAINER_APPS_ENVIRONMENT_NAME string = env.name
-
-output AZURE_CONTAINER_APPS_ENVIRONMENT_ID string = env.id
-
-output AZURE_CONTAINER_APPS_ENVIRONMENT_DEFAULT_DOMAIN string = env.properties.defaultDomain

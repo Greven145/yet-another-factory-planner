@@ -1,6 +1,0 @@
-@api.web_HostAddress = http://localhost:5121
-
-GET {{api.web_HostAddress}}/ping
-Accept: application/json
-
-###

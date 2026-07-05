@@ -1,8 +1,10 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 
 name: yet-another-factory-planner
-services:
-  api:
-    project: ./YetAnotherFactoryPlanner.AppHost/YetAnotherFactoryPlanner.AppHost.csproj
-    language: dotnet
-    host: containerapp
+
+# No `services:` block: there is no azd-deployed service anymore. The API runs as Azure Static Web
+# Apps managed functions (deployed by the Azure/static-web-apps-deploy GitHub Action, not azd), and
+# the ACA container app was removed. CI uses azd only for `azd provision`, which applies the committed
+# subscription-scoped infra/main.bicep directly (plain bicep provider). Keeping a
+# `host: containerapp` service pointed at the AppHost — which no longer publishes a container app —
+# would make azd try to reconcile a non-existent compute resource from the Aspire manifest.

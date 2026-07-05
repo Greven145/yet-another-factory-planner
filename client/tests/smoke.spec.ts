@@ -3,7 +3,8 @@
  *
  * These tests run against an already-deployed URL (no local dev server).
  * They exercise the live API — no route mocking — so both the client and the
- * backend /share-factory + /initialize endpoints must be reachable.
+ * backend /api/share-factory + /api/shared-factories/{key} endpoints (SWA
+ * managed functions, same-origin) must be reachable.
  *
  * URL configuration
  * -----------------
@@ -143,10 +144,12 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     expect(linkValue).toMatch(/^https?:\/\//);
 
     // ------------------------------------------------------------------ restore
-    // Navigate to the share URL and verify the factory restores via /initialize.
+    // Navigate to the share URL and verify the factory restores via the share-load
+    // endpoint GET /api/shared-factories/{key} (the /initialize game-data server path is gone;
+    // game data now loads from static bundles and the share config comes from this function).
     const restoreResponsePromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes('/initialize') &&
+        resp.url().includes('/shared-factories/') &&
         resp.url().includes(shareKey) &&
         resp.status() === 200,
       { timeout: 30_000 },
@@ -155,12 +158,12 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     // The share link uses the same host as the deployed SPA, so goto it directly.
     await page.goto(linkValue, { waitUntil: 'domcontentloaded' });
 
-    // The initialize call with the factory key must succeed.
+    // The share-load call with the factory key must succeed and return the config.
     const restoreResponse = await restoreResponsePromise;
     const restoreJson = await restoreResponse.json();
     expect(
       restoreJson?.data?.factory_config,
-      '/initialize?factoryKey=... must return a factory_config',
+      'GET /api/shared-factories/<key> must return a factory_config',
     ).toBeTruthy();
 
     // Open the drawer and confirm the product we saved is shown.
