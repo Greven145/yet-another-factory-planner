@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
-// Cross-viewport behavioural suite, run against the LIVE Aspire stack (real
-// /initialize + Cosmos + the in-browser GLPK solver). One run per project in
+// Cross-viewport behavioural suite, run against the LIVE Aspire stack (static
+// game-data bundles + Cosmos + the in-browser GLPK solver). One run per project in
 // playwright.responsive.config.ts; this single flow branches on whether the app
 // shows the mobile shell, which must mirror the app's gating in theme.ts
 // (MOBILE_MEDIA_QUERY).
@@ -26,9 +26,9 @@ function isPortrait(page: Page): boolean {
   return !!vp && vp.height > vp.width;
 }
 
-// The loading overlay shows "Loading game data..." until the real /initialize
-// resolves; wait it out, then wait on a layout-specific ready marker. Both have
-// generous timeouts because this is the un-mocked API + solver.
+// The loading overlay shows "Loading game data..." until the static game-data
+// bundle resolves; wait it out, then wait on a layout-specific ready marker. Both
+// have generous timeouts because this is the un-mocked solver (+ live share API).
 async function waitForAppReady(page: Page) {
   await expect(page.getByText('Loading game data...')).toBeHidden({ timeout: 40_000 });
   if (isMobileShell(page)) {

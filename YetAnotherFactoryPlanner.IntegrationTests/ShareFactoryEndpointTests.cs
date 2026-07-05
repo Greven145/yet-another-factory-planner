@@ -8,7 +8,12 @@ namespace YetAnotherFactoryPlanner.IntegrationTests;
 ///   "Save &amp; Share" was creating a new CosmosDB entry on every click with no deduplication.
 ///   A second POST with an identical factory configuration should return the same key as
 ///   the first, not a brand-new one.
-///   Bug is fixed in api.web via content-hashed IDs (FindOrSaveAsync) — these tests now pass.
+///   Bug is fixed in the api.functions managed-functions API via content-hashed IDs
+///   (FactoryClient.FindOrSaveAsync) — these tests exercise it through the AppHost.
+///
+/// Routes are the SWA managed-functions shape: POST /api/share-factory (201 { data: { key } }) and
+/// GET /api/shared-factories/{key} (200 { data: { factory_config } } / 404). The AppHost's "api"
+/// resource is the Functions host, whose HTTP triggers sit under the default /api route prefix.
 /// </summary>
 [Collection(AppHostCollection.Name)]
 public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
@@ -21,7 +26,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 	/// <summary>
 	/// Bug 6 (fixed) — verifier.
 	/// Posting the same factory configuration twice must return the same share key.
-	/// api.web uses content-hashed IDs via FindOrSaveAsync so duplicates are deduplicated.
+	/// api.functions uses content-hashed IDs via FindOrSaveAsync so duplicates are deduplicated.
 	/// </summary>
 	[Fact]
 	public async Task PostShareFactory_SameConfigPostedTwice_ReturnsSameKey()
@@ -32,8 +37,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var requestBody = BuildMinimalFactoryRequest("Desc_IronIngot_C", amount: 30);
 
 		// Act
-		var firstResponse = await client.PostAsJsonAsync("/share-factory", requestBody, JsonOptions);
-		var secondResponse = await client.PostAsJsonAsync("/share-factory", requestBody, JsonOptions);
+		var firstResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
+		var secondResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
 
 		// Assert — both calls must succeed
 		Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
@@ -42,7 +47,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var firstKey = await ExtractKeyAsync(firstResponse);
 		var secondKey = await ExtractKeyAsync(secondResponse);
 
-		// FIXED: api.web returns the same content-hashed key for identical configurations.
+		// FIXED: api.functions returns the same content-hashed key for identical configurations.
 		// Previously returned two different GUIDs.
 		Assert.Equal(firstKey, secondKey);
 	}
@@ -64,8 +69,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 			recipePartsCost: 2, powerConsumption: 2);
 
 		// Act
-		var defaultResponse = await client.PostAsJsonAsync("/share-factory", defaultMultipliers, JsonOptions);
-		var scaledResponse = await client.PostAsJsonAsync("/share-factory", scaledMultipliers, JsonOptions);
+		var defaultResponse = await client.PostAsJsonAsync("/api/share-factory", defaultMultipliers, JsonOptions);
+		var scaledResponse = await client.PostAsJsonAsync("/api/share-factory", scaledMultipliers, JsonOptions);
 
 		// Assert
 		Assert.Equal(HttpStatusCode.Created, defaultResponse.StatusCode);
@@ -90,16 +95,16 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 			recipePartsCost: 0.5m, powerConsumption: 2);
 
 		// Act — save, then fetch back
-		var postResponse = await client.PostAsJsonAsync("/share-factory", requestBody, JsonOptions);
+		var postResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
 		Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 		var key = await ExtractKeyAsync(postResponse);
 
-		var getResponse = await client.GetAsync($"/get-factory?factoryKey={key}&gameVersion=1.2");
+		var getResponse = await client.GetAsync($"/api/shared-factories/{key}");
 		Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
 
 		// Assert — the multipliers persisted exactly as sent
 		var json = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
-		var gameModeOptions = json.GetProperty("factory").GetProperty("gameModeOptions");
+		var gameModeOptions = json.GetProperty("data").GetProperty("factory_config").GetProperty("gameModeOptions");
 		Assert.Equal(0.5m, gameModeOptions.GetProperty("recipePartsCost").GetDecimal());
 		Assert.Equal(2m, gameModeOptions.GetProperty("powerConsumption").GetDecimal());
 	}
@@ -117,7 +122,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var requestBody = BuildMinimalFactoryRequest("Desc_IronPlate_C", amount: 15);
 
 		// Act
-		var response = await client.PostAsJsonAsync("/share-factory", requestBody, JsonOptions);
+		var response = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
 
 		// Assert
 		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -125,6 +130,26 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var key = await ExtractKeyAsync(response);
 		Assert.NotNull(key);
 		Assert.Equal(16, key.Length);
+	}
+
+	/// <summary>
+	/// A well-formed key that was never saved must resolve to 404 Not Found (not 400/500). Preserves
+	/// the coverage from the retired InitializeEndpointTests against the new share-load route.
+	/// </summary>
+	[Fact]
+	public async Task GetSharedFactory_NonExistentKey_ReturnsNotFound()
+	{
+		// Arrange
+		using var client = fixture.App.CreateHttpClient("api");
+
+		// 16 lowercase hex chars — valid content-hash format, but this key was never created.
+		const string nonExistentKey = "aaaaaaaaaaaaaaaa";
+
+		// Act
+		var response = await client.GetAsync($"/api/shared-factories/{nonExistentKey}");
+
+		// Assert
+		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 	}
 
 	// ---------------------------------------------------------------------------
