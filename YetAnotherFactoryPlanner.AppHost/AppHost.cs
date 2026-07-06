@@ -30,7 +30,7 @@ cosmosDb.ConfigureInfrastructure(infra =>
 });
 #pragma warning restore ASPIRECOSMOSDB001
 
-// Azure Functions (.NET 9 isolated) API. Replaces the ACA-hosted api.web: in production this is
+// Azure Functions (.NET 8 isolated) API. Replaces the ACA-hosted api.web: in production this is
 // deployed as Azure Static Web Apps managed functions (served same-origin at /api/*), which removes
 // the scale-from-zero cold start on the share path. Locally, Aspire's Functions integration runs it
 // via the Azure Functions Core Tools and injects the Cosmos connection string (ConnectionStrings__cosmosdb)

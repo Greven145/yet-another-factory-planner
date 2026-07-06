@@ -62,28 +62,17 @@ This starts the Cosmos DB emulator, the ASP.NET Core Web API (port 8000), and th
 
 This repo is wired for a split production deployment:
 
-- Frontend: Azure Static Web Apps (managed outside Aspire deployment)
-- Backend API: Azure Container Apps (deployed via Aspire)
-- Data: Azure Cosmos DB (provisioned via Aspire)
+- Frontend: Azure Static Web Apps (built in CI, deployed via the SWA GitHub Action)
+- Backend API: Azure Static Web Apps managed functions (.NET 8 isolated, `api.functions`), served same-origin at `/api/*`
+- Data: Azure Cosmos DB (provisioned by `azd provision` from `infra/`)
 
-### Deploy backend with Aspire (Azure Container Apps)
-
-From repository root:
-
-```bash
-aspire deploy
-```
-
-The CLI can be interactive. For non-interactive CI/CD, set:
-
-- `Azure__SubscriptionId`
-- `Azure__Location`
-- `Azure__ResourceGroup`
+The client and the managed functions are built in CI and deployed together by the SWA GitHub
+Action (`api_location`). There is no `aspire deploy` / Container Apps step — the AppHost is
+local-dev-only.
 
 Notes:
 
 - The AppHost includes the Vite client only in `Development` and `Testing` environments for local workflows.
-- Production deploys from this AppHost target the API/Cosmos backend stack; keep Static Web Apps as the public frontend.
 
 ### CI/CD & deploy gating
 

@@ -2,18 +2,18 @@
 
 ## What this is
 
-A [Satisfactory](https://www.satisfactorygame.com/) factory production-chain planner. The React SPA does **all** solving in-browser via a GLPK.js linear-programming solver; the .NET API is intentionally thin — it serves embedded game data and persists shared factories to Cosmos DB. Every factory is encoded into a shareable URL.
+A [Satisfactory](https://www.satisfactorygame.com/) factory production-chain planner. The React SPA does **all** solving in-browser via a GLPK.js linear-programming solver; the .NET API is intentionally thin — it only persists and serves shared factories in Cosmos DB. Game data ships as static JSON bundled with the client. Every factory is encoded into a shareable URL.
 
 ## Architecture
 
 - The whole app is orchestrated for local dev by .NET Aspire in `YetAnotherFactoryPlanner.AppHost`.
 - The front end is in `client/`
-- The web service is in `api.web`
+- The API is Azure Static Web Apps managed functions (.NET 8 isolated) in `api.functions/`, with the portable share-factory logic in `api.Core/`; served same-origin at `/api/*`
 - A complimentary CLI tool that parses the Satisfactory game data file in `ParseDocs/`
 
 ### Game data flow
 
-Satisfactory `Docs.json` → `ParseDocs` → `.resx` in `api.web/Resources/` → served by `/initialize` (selected by `gameVersion`, e.g. `1.1`/`1.2`, see `api.web/Models/GameData.cs`) → consumed by the client's `gameData` context.
+Game data ships as **static JSON bundled with the client** (no API call). `ParseDocs` converts Satisfactory's `Docs.json` into per-entity JSON (`buildings`/`recipes`/`resources`/`items`/`handGatheredItems`) under `client/src/data/<version>/` (e.g. `1.1`/`1.2`); the client's `gameData` context loads it via `loadGameData(version)` — a version-keyed dynamic `import()` that code-splits one hashed chunk per game version.
 
 ## Commands
 
@@ -27,7 +27,7 @@ The Vite client is excluded from the deploy process as Aspire doesn't have a nat
 
 ## Notes
 
-- C#: nullable enabled, implicit usings, .NET 10.
+- C#: nullable enabled, implicit usings. AppHost + tests target .NET 10; the SWA managed functions (`api.functions`/`api.Core`) target **.NET 8** (`dotnet-isolated:8.0` — SWA rejects .NET 9 managed-functions deploys).
 - Cosmos: local dev uses the Aspire-managed Linux emulator (preview)
 - The Aspire MCP server is configured — use it (list resources / console logs / structured logs / traces) to inspect and debug the running app instead of guessing. See `ASPIRE_MCP_GUIDE.md`.
 
