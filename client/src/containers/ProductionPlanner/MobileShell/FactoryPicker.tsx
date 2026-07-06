@@ -9,12 +9,12 @@
 // sit in the footer; Share targets the active factory, as on desktop.
 import React, { useMemo, useState } from 'react';
 import styled from 'styled-components';
-import { Menu, ActionIcon, Button, Group, Text, TextInput, Tooltip, Popover } from '@mantine/core';
-import { Search, Plus, Share2, Check, MoreVertical, Edit2, Copy, Trash2, RotateCcw } from 'react-feather';
+import { Menu, ActionIcon, Button, Group, Text, TextInput } from '@mantine/core';
+import { Search, Plus, Check, MoreVertical, Edit2, Copy, Trash2, RotateCcw } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import { useLibraryContext } from '../../../contexts/library';
 import { labelOf, relativeTime } from '../../../utilities/factory-label';
-import { canShareFactory } from '../../../utilities/shared-factory/codec';
+import ShareButton from '../ShareButton';
 import { RenameDialog, DeleteDialog } from '../PlannerOptions/factory-dialogs';
 
 type Props = { onClose: () => void };
@@ -25,7 +25,6 @@ const FactoryPicker = ({ onClose }: Props) => {
   const [query, setQuery] = useState('');
   const [renameId, setRenameId] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const byId = (id: string | null) => (id ? lib.factories.find((f) => f.id === id) : undefined);
 
@@ -35,10 +34,6 @@ const FactoryPicker = ({ onClose }: Props) => {
   );
 
   const pick = (id: string) => { lib.select(id); onClose(); };
-
-  // Guard the Share button rather than firing a POST that 400s with no feedback.
-  const canShare = canShareFactory(ctx.state);
-  const onShare = () => { ctx.generateShareLink(); setCopied(true); setTimeout(() => setCopied(false), 2500); };
 
   return (
     <>
@@ -94,19 +89,7 @@ const FactoryPicker = ({ onClose }: Props) => {
         <Button variant="default" leftSection={<Plus size={16} />} onClick={() => lib.create()} styles={{ root: { color: 'var(--mantine-color-text)' } }}>
           New factory
         </Button>
-        <Tooltip label="Add a product to share this factory" withArrow disabled={canShare}>
-          {/* The span keeps the Tooltip alive while the Button is disabled (a disabled
-              control emits no pointer events). The Popover targets the Button so its
-              aria-haspopup/expanded land on an element that supports them. */}
-          <span style={{ marginLeft: 'auto' }}>
-            <Popover opened={copied && canShare} position="top-end" withArrow>
-              <Popover.Target>
-                <Button color="positive.8" leftSection={<Share2 size={16} />} loading={ctx.shareLink.loading} disabled={!canShare} onClick={onShare}>Share</Button>
-              </Popover.Target>
-              <Popover.Dropdown><Text size="sm">{ctx.shareLink.link ? 'Link copied!' : 'Generating…'}</Text></Popover.Dropdown>
-            </Popover>
-          </span>
-        </Tooltip>
+        <ShareButton position="top-end" wrapperStyle={{ marginLeft: 'auto' }} />
       </Group>
 
       <RenameDialog opened={!!renameId} initial={byId(renameId)?.nickname ?? ''} onClose={() => setRenameId(null)} onSubmit={(v) => renameId && lib.rename(renameId, v)} />

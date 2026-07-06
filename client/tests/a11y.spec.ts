@@ -115,7 +115,14 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     expect(results.violations).toEqual([]);
   });
 
-  test('Share-link "copied" popover has no WCAG A/AA violations', async ({ page }) => {
+  test('Share-link "copied" popover has no WCAG A/AA violations', async ({ page, context, browserName }) => {
+    // The popover now confirms "Link copied!" only once the clipboard write actually
+    // resolves (#182). Grant clipboard-write so Chromium's write succeeds here (its
+    // permission model gates it; Firefox/WebKit resolve without an explicit grant).
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-write']);
+    }
+
     // Stub the share endpoint so the popover opens without a live backend.
     await page.route(/\/share-factory$/, async (route) => {
       await route.fulfill({

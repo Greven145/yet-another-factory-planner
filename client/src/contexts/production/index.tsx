@@ -11,7 +11,7 @@ import { useSolverRun } from './useSolverRun';
 import { useLibraryContext } from '../library';
 
 
-export type ShareLinkProps = { link: string, copyToClipboard: boolean, loading: boolean };
+export type ShareLinkProps = { loading: boolean };
 
 // TYPE
 export type ProductionContextType = {
@@ -21,7 +21,7 @@ export type ProductionContextType = {
   calculating: boolean,
   solverResults: SolverResults | null,
   calculate: () => void,
-  generateShareLink: () => void,
+  generateShareLink: () => Promise<string>,
   shareLink: ShareLinkProps,
 };
 
@@ -61,22 +61,24 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
   // and the calculating flag) lives in useSolverRun. The provider only decides WHEN to solve.
   const { solverResults, calculating, calculate: handleCalculateFactory } = useSolverRun(state, gameData);
 
-  const handleGenerateShareLink = () => {
-    postSharedFactory.request({ factoryConfig: state, gameVersion });
+  // Await the POST and resolve to the full share link so the caller can copy it inside
+  // the originating click gesture (see #182). Rejects if the server never returned a
+  // key, letting the Share UI drop to its manual-copy fallback.
+  const handleGenerateShareLink = async (): Promise<string> => {
+    const result = await postSharedFactory.request({ factoryConfig: state, gameVersion });
+    const key = result?.key;
+    if (!key) {
+      throw new Error('Failed to generate a share link');
+    }
+    return `${window.location.protocol}//${window.location.host}${window.location.pathname}?${SHARE_QUERY_PARAM}=${key}`;
   };
 
-  const shareLink: ShareLinkProps = useMemo(() => {
-    let link = '';
-    const key = postSharedFactory.data?.key;
-    if (key) {
-      link = `${window.location.protocol}//${window.location.host}${window.location.pathname}?${SHARE_QUERY_PARAM}=${key}`;
-    }
-    return {
-      link,
-      copyToClipboard: !!postSharedFactory.data?.key,
-      loading: postSharedFactory.loading,
-    }
-  }, [postSharedFactory.data?.key, postSharedFactory.loading]);
+  // The share link itself is returned by handleGenerateShareLink (awaited inside the
+  // Share click), so the context only needs to expose the in-flight state for the
+  // button's spinner — it no longer rebuilds the URL here.
+  const shareLink: ShareLinkProps = useMemo(() => ({
+    loading: postSharedFactory.loading,
+  }), [postSharedFactory.loading]);
 
   // Load the active factory's content into the reducer. Shared/legacy take priority
   // (URL imports), then a stored library config, else a fresh/empty factory.
