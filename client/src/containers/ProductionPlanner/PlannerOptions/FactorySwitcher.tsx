@@ -4,12 +4,12 @@
 // control, presented as a header band with a divider above the view tabs. Switching
 // = the tabs; per-factory actions sit in a "⋯" menu + Share beside.
 import React, { useState } from 'react';
-import { Tabs, Group, Menu, Text, ActionIcon, Tooltip, Button, Popover } from '@mantine/core';
-import { Plus, Share2, MoreHorizontal, Edit2, Copy, Trash2, RotateCcw } from 'react-feather';
+import { Tabs, Group, Menu, ActionIcon, Tooltip } from '@mantine/core';
+import { Plus, MoreHorizontal, Edit2, Copy, Trash2, RotateCcw } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import { useLibraryContext } from '../../../contexts/library';
 import { labelOf, relativeTime } from '../../../utilities/factory-label';
-import { canShareFactory } from '../../../utilities/shared-factory/codec';
+import ShareButton from '../ShareButton';
 import { RenameDialog, DeleteDialog } from './factory-dialogs';
 
 // `inline` (default) is the desktop header band: tabs and actions share one nowrap
@@ -23,7 +23,6 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
   const lib = useLibraryContext();
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   const activeFactory = lib.activeFactory;
   if (!activeFactory) return null;
@@ -34,10 +33,6 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
   // active label from the reducer state instead lags a render behind the switch and
   // flashes the previous factory's name.
   const activeLabel = labelOf(activeFactory, ctx.gameData);
-
-  // Guard the Share button rather than firing a POST that 400s with no feedback.
-  const canShare = canShareFactory(ctx.state);
-  const onShare = () => { ctx.generateShareLink(); setCopied(true); setTimeout(() => setCopied(false), 2500); };
 
   const stacked = layout === 'stacked';
 
@@ -104,20 +99,7 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
       </Menu>
 
       {/* Share */}
-      <Tooltip label="Add a product to share this factory" withArrow disabled={canShare}>
-        {/* The span keeps the Tooltip working while the Button is disabled (a
-            disabled control emits no pointer events). The Popover targets the Button
-            itself — not the span — so its aria-haspopup/aria-expanded land on an
-            element that supports them (WCAG aria-allowed-attr). */}
-        <span>
-          <Popover opened={copied && canShare} position="bottom-end" withArrow>
-            <Popover.Target>
-              <Button color="positive.8" leftSection={<Share2 size={16} />} loading={ctx.shareLink.loading} disabled={!canShare} onClick={onShare}>Share</Button>
-            </Popover.Target>
-            <Popover.Dropdown><Text size="sm">{ctx.shareLink.link ? 'Link copied!' : 'Generating…'}</Text></Popover.Dropdown>
-          </Popover>
-        </span>
-      </Tooltip>
+      <ShareButton position="bottom-end" />
     </>
   );
 

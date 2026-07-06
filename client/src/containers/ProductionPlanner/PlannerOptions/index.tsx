@@ -1,30 +1,19 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { Container, Tabs } from '@mantine/core';
 import { TrendingUp, Shuffle, Box, Tool } from 'react-feather';
-import { useProductionContext } from '../../../contexts/production';
 import ProductionTab from './ProductionTab';
 import InputsTab from './InputsTab';
 import RecipesTab from './RecipesTab';
 import BuildingsTab from './BuildingsTab';
-import { usePrevious } from '../../../hooks/usePrevious';
 // The old Calculate/Auto-calc/Save&Share/Reset header is gone: WelcomeCard hosts the
 // relocated greeting and the factory switcher lives in the main body (FactorySwitcher).
 import WelcomeCard from './WelcomeCard';
 
 const PlannerOptions = () => {
-  const ctx = useProductionContext();
   // Drop the container chrome around the tab sections so the section cards sit flush
   // on the drawer surface, aligned with the Welcome card above.
   const flush = true;
-
-  // Copy the share link to the clipboard when one is generated.
-  const prevShareLink = usePrevious(ctx.shareLink.link);
-  useEffect(() => {
-    if (ctx.shareLink.copyToClipboard && ctx.shareLink.link && ctx.shareLink.link !== prevShareLink) {
-      navigator.clipboard.writeText(ctx.shareLink.link);
-    }
-  }, [ctx.shareLink, prevShareLink]);
 
   return (
     <>

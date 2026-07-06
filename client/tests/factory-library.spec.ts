@@ -202,7 +202,14 @@ test.describe('Multi-factory library', () => {
     await expect(page.locator(FACTORY_TAB).filter({ hasText: 'Iron Plate' })).toHaveCount(1);
   });
 
-  test('Share is gated until a product exists, then posts and confirms', async ({ page }) => {
+  test('Share is gated until a product exists, then posts and confirms', async ({ page, context, browserName }) => {
+    // The confirmation popover now waits for the clipboard write to resolve (#182), so
+    // grant clipboard-write for Chromium (whose permission model gates it) to exercise
+    // the success path; Firefox/WebKit resolve the write without an explicit grant.
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-write']);
+    }
+
     // Stub the share endpoint so no real backend is needed.
     await page.route(/\/share-factory$/, async (route) => {
       await route.fulfill({
