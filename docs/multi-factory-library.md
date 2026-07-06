@@ -88,8 +88,8 @@ the first library factory so current users don't lose in-progress work.
 ## Implementation notes (no decision required)
 
 - Switching to a factory on a different `gameVersion` reuses the existing
-  `/initialize?gameVersion=` reload path (same mechanism as loading a shared factory or
-  changing the version selector).
+  game-data reload path (`loadGameData(version)` — the static-bundle load, same
+  mechanism as loading a shared factory or changing the version selector).
 - `localStorage` quota: hundreds of factories fit comfortably; on `QuotaExceededError`,
   surface a toast ("storage full — delete some factories or export the library").
 
