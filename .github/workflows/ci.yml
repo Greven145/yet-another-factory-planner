@@ -197,9 +197,10 @@ jobs:
           npm ci --prefix client
           npm run build --prefix client
 
-      # Functions: pre-publish the .NET 9 isolated worker so the SWA action deploys the built output
-      # (skip_api_build) rather than asking Oryx to build a .NET 9 isolated project it can't reliably
-      # build. staticwebapp.config.json pins platform.apiRuntime to dotnet-isolated:9.0.
+      # Functions: pre-publish the .NET 8 isolated worker so the SWA action deploys the built output
+      # (skip_api_build) rather than asking Oryx to build it. staticwebapp.config.json pins
+      # platform.apiRuntime to dotnet-isolated:8.0 — dotnet-isolated:9.0 fails to deploy as a SWA
+      # managed function ("Failed to deploy the Azure Functions"; verified via a minimal repro).
       - name: Publish managed functions
         run: dotnet publish api.functions/api.functions.csproj --configuration Release --output ./api-publish
 

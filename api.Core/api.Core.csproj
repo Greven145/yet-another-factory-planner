@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net9.0 so SWA managed functions (dotnet-isolated:9.0) and api.functions can share this. -->
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- net8.0: SWA managed functions reject dotnet-isolated:9.0 at deploy time ("Failed to
+         deploy the Azure Functions"); dotnet-isolated:8.0 deploys. Shared by api.functions. -->
+    <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>api</RootNamespace>

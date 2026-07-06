@@ -1,6 +1,6 @@
 {
   "platform": {
-    "apiRuntime": "dotnet-isolated:9.0"
+    "apiRuntime": "dotnet-isolated:8.0"
   },
   "globalHeaders": {
     "Content-Security-Policy": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",

@@ -1,8 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- net9.0 isolated worker: SWA managed functions cap is dotnet-isolated:9.0. -->
-    <TargetFramework>net9.0</TargetFramework>
+    <!-- net8.0 isolated worker. dotnet-isolated:9.0 is listed in the SWA apiRuntime table but
+         fails to deploy as a managed function ("Failed to deploy the Azure Functions", verified
+         via a minimal repro); dotnet-isolated:8.0 deploys cleanly. -->
+    <TargetFramework>net8.0</TargetFramework>
     <AzureFunctionsVersion>v4</AzureFunctionsVersion>
     <OutputType>Exe</OutputType>
     <Nullable>enable</Nullable>
