@@ -20,13 +20,13 @@ public sealed class ProductionTabPlaywrightTests(AppHostFixture appHost, Browser
 
 	private Uri _clientBaseUri = null!;
 
-	public async Task InitializeAsync()
+	public async ValueTask InitializeAsync()
 	{
 		await appHost.WaitForClientAsync();
 		_clientBaseUri = appHost.GetClientBaseUri();
 	}
 
-	public Task DisposeAsync() => Task.CompletedTask;
+	public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
 	/// <summary>
 	/// Bug 8 — reproducer.

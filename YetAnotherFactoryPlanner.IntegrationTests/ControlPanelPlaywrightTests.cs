@@ -26,13 +26,13 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 
 	private Uri _clientBaseUri = null!;
 
-	public async Task InitializeAsync()
+	public async ValueTask InitializeAsync()
 	{
 		await appHost.WaitForClientAsync();
 		_clientBaseUri = appHost.GetClientBaseUri();
 	}
 
-	public Task DisposeAsync() => Task.CompletedTask;
+	public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
 	/// <summary>
 	/// Clicking "Share" shows a "Link copied!" popover that auto-dismisses after ~2.5 s.
@@ -40,8 +40,14 @@ public sealed class ControlPanelPlaywrightTests(AppHostFixture appHost, BrowserF
 	[Fact]
 	public async Task Share_LinkCopiedTooltipDismissesAutomatically()
 	{
-		// Arrange
-		await using var context = await browser.Browser.NewContextAsync();
+		// Arrange — headless Chromium rejects navigator.clipboard.write unless the context
+		// is granted clipboard permission. Without it the Share flow's write throws and the
+		// app drops to its manual-copy fallback (status 'failed'), so "Link copied!" never
+		// renders. Granting the permission exercises the real success path.
+		await using var context = await browser.Browser.NewContextAsync(new BrowserNewContextOptions
+		{
+			Permissions = ["clipboard-read", "clipboard-write"],
+		});
 		var page = await context.NewPageAsync();
 
 		await page.GotoAsync(_clientBaseUri.ToString());

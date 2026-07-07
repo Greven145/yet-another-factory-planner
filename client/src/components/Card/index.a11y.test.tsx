@@ -2,7 +2,7 @@ import React from 'react';
 import { render } from '@testing-library/react';
 import { axe } from 'jest-axe';
 import { MantineProvider } from '@mantine/core';
-import { ThemeProvider } from 'styled-components';
+import { ThemeProvider, DefaultTheme } from 'styled-components';
 import Card from './index';
 import { theme } from '../../theme';
 
@@ -13,7 +13,7 @@ const scTheme = {
     background: ['#26282b', '#373b40', '#3f434a', '#50565e', '#6c7582'],
     primary: ['#fcebde', '#f9d8be', '#f7c59f', '#f4b17f', '#f19e60', '#ef8b40', '#ec7821'],
   },
-};
+} as unknown as DefaultTheme;
 
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (

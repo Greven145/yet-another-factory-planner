@@ -67,7 +67,9 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
             per factory (keepMounted, so inactive tabs resolve too) to keep those
             references valid (WCAG aria-valid-attr-value). */}
         {lib.factories.map((f) => (
-          <Tabs.Panel key={f.id} value={f.id} keepMounted style={{ display: 'none' }} />
+          <Tabs.Panel key={f.id} value={f.id} keepMounted style={{ display: 'none' }}>
+            <></>
+          </Tabs.Panel>
         ))}
       </Tabs>
     </div>

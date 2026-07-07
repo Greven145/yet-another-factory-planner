@@ -37,8 +37,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var requestBody = BuildMinimalFactoryRequest("Desc_IronIngot_C", amount: 30);
 
 		// Act
-		var firstResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
-		var secondResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
+		var firstResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions, TestContext.Current.CancellationToken);
+		var secondResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions, TestContext.Current.CancellationToken);
 
 		// Assert — both calls must succeed
 		Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
@@ -69,8 +69,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 			recipePartsCost: 2, powerConsumption: 2);
 
 		// Act
-		var defaultResponse = await client.PostAsJsonAsync("/api/share-factory", defaultMultipliers, JsonOptions);
-		var scaledResponse = await client.PostAsJsonAsync("/api/share-factory", scaledMultipliers, JsonOptions);
+		var defaultResponse = await client.PostAsJsonAsync("/api/share-factory", defaultMultipliers, JsonOptions, TestContext.Current.CancellationToken);
+		var scaledResponse = await client.PostAsJsonAsync("/api/share-factory", scaledMultipliers, JsonOptions, TestContext.Current.CancellationToken);
 
 		// Assert
 		Assert.Equal(HttpStatusCode.Created, defaultResponse.StatusCode);
@@ -95,15 +95,15 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 			recipePartsCost: 0.5m, powerConsumption: 2);
 
 		// Act — save, then fetch back
-		var postResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
+		var postResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions, TestContext.Current.CancellationToken);
 		Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 		var key = await ExtractKeyAsync(postResponse);
 
-		var getResponse = await client.GetAsync($"/api/shared-factories/{key}");
+		var getResponse = await client.GetAsync($"/api/shared-factories/{key}", TestContext.Current.CancellationToken);
 		Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
 
 		// Assert — the multipliers persisted exactly as sent
-		var json = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions);
+		var json = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
 		var gameModeOptions = json.GetProperty("data").GetProperty("factory_config").GetProperty("gameModeOptions");
 		Assert.Equal(0.5m, gameModeOptions.GetProperty("recipePartsCost").GetDecimal());
 		Assert.Equal(2m, gameModeOptions.GetProperty("powerConsumption").GetDecimal());
@@ -122,7 +122,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		var requestBody = BuildMinimalFactoryRequest("Desc_IronPlate_C", amount: 15);
 
 		// Act
-		var response = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions);
+		var response = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions, TestContext.Current.CancellationToken);
 
 		// Assert
 		Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -146,7 +146,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		const string nonExistentKey = "aaaaaaaaaaaaaaaa";
 
 		// Act
-		var response = await client.GetAsync($"/api/shared-factories/{nonExistentKey}");
+		var response = await client.GetAsync($"/api/shared-factories/{nonExistentKey}", TestContext.Current.CancellationToken);
 
 		// Assert
 		Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
