@@ -123,7 +123,10 @@ test.describe('Smoke: create → share → restore (live API)', () => {
     // Intercept the /share-factory request so we can assert the response key.
     const shareResponsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/share-factory') && resp.status() === 201,
-      { timeout: 30_000 },
+      // 60s (not 30s): a freshly-deployed SWA managed-function can cold-start on
+      // the first share POST, which was overrunning the old 30s cap and gating
+      // the promote-to-production step.
+      { timeout: 60_000 },
     );
 
     await shareBtn.click();
@@ -152,7 +155,9 @@ test.describe('Smoke: create → share → restore (live API)', () => {
         resp.url().includes('/shared-factories/') &&
         resp.url().includes(shareKey) &&
         resp.status() === 200,
-      { timeout: 30_000 },
+      // 60s to match the share POST above — the restore GET normally hits an
+      // already-warm function, but keep the same cold-start headroom.
+      { timeout: 60_000 },
     );
 
     // The share link uses the same host as the deployed SPA, so goto it directly.
