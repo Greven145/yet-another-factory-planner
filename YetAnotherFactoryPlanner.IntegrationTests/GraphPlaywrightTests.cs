@@ -28,13 +28,13 @@ public sealed class GraphPlaywrightTests(AppHostFixture appHost, BrowserFixture 
 
 	private Uri _clientBaseUri = null!;
 
-	public async Task InitializeAsync()
+	public async ValueTask InitializeAsync()
 	{
 		await appHost.WaitForClientAsync();
 		_clientBaseUri = appHost.GetClientBaseUri();
 	}
 
-	public Task DisposeAsync() => Task.CompletedTask;
+	public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
 	/// <summary>
 	/// Bug 7 — reproducer.

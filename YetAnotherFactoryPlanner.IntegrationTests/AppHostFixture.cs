@@ -15,7 +15,7 @@ public sealed class AppHostFixture : IAsyncLifetime
 
 	public DistributedApplication App => _app ?? throw new InvalidOperationException("App has not been initialised — ensure InitializeAsync completed successfully.");
 
-	public async Task InitializeAsync()
+	public async ValueTask InitializeAsync()
 	{
 		var appHost = await DistributedApplicationTestingBuilder
 			.CreateAsync<Projects.YetAnotherFactoryPlanner_AppHost>(["--environment=Testing"]);
@@ -30,7 +30,7 @@ public sealed class AppHostFixture : IAsyncLifetime
 			.WaitForResourceAsync("api", KnownResourceStates.Running, cts.Token);
 	}
 
-	public async Task DisposeAsync()
+	public async ValueTask DisposeAsync()
 	{
 		if (_app is not null)
 			await _app.DisposeAsync();
