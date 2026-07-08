@@ -5,12 +5,13 @@
 // = the tabs; per-factory actions sit in a "⋯" menu + Share beside.
 import React, { useState } from 'react';
 import { Tabs, Group, Menu, ActionIcon, Tooltip } from '@mantine/core';
-import { Plus, MoreHorizontal, Edit2, Copy, Trash2, RotateCcw } from 'react-feather';
+import { Plus, MoreHorizontal, Edit2, Copy, Trash2, RotateCcw, Folder } from 'react-feather';
 import { useProductionContext } from '../../../contexts/production';
 import { useLibraryContext } from '../../../contexts/library';
 import { labelOf, relativeTime } from '../../../utilities/factory-label';
 import ShareButton from '../ShareButton';
 import { RenameDialog, DeleteDialog } from './factory-dialogs';
+import { LibraryManagerModal } from './LibraryManagerModal';
 
 // `inline` (default) is the desktop header band: tabs and actions share one nowrap
 // row. `stacked` is for the narrow mobile factory sheet, where that single row makes
@@ -23,6 +24,7 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
   const lib = useLibraryContext();
   const [renameOpen, setRenameOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const activeFactory = lib.activeFactory;
   if (!activeFactory) return null;
@@ -97,6 +99,8 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
           <Menu.Item leftSection={<Trash2 size={14} />} color="red" onClick={() => setDeleteOpen(true)}>Delete</Menu.Item>
           <Menu.Divider />
           <Menu.Item leftSection={<RotateCcw size={14} />} onClick={() => ctx.dispatch({ type: 'RESET_FACTORY', gameData: ctx.gameData })}>Reset to empty</Menu.Item>
+          <Menu.Divider />
+          <Menu.Item leftSection={<Folder size={14} />} onClick={() => setManageOpen(true)}>Manage library…</Menu.Item>
         </Menu.Dropdown>
       </Menu>
 
@@ -135,6 +139,7 @@ const FactorySwitcher = ({ layout = 'inline' }: { layout?: FactorySwitcherLayout
 
       <RenameDialog opened={renameOpen} initial={activeFactory.nickname ?? ''} onClose={() => setRenameOpen(false)} onSubmit={(v) => lib.rename(lib.activeId, v)} />
       <DeleteDialog opened={deleteOpen} label={activeLabel} onClose={() => setDeleteOpen(false)} onConfirm={() => lib.remove(lib.activeId)} />
+      <LibraryManagerModal opened={manageOpen} onClose={() => setManageOpen(false)} gameData={ctx.gameData} />
     </div>
   );
 };

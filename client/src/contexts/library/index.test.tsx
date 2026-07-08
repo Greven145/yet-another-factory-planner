@@ -192,3 +192,35 @@ describe('importFactory', () => {
     expect(loadLibrary()[imported.id].sourceKey).toBe('shareKey1');
   });
 });
+
+describe('importFactories', () => {
+  it('adds every factory in one commit (a multi-factory import is not clobbered)', () => {
+    const { result } = setup();
+    const a = { key: 'a' } as unknown as FactoryOptions;
+    const b = { key: 'b' } as unknown as FactoryOptions;
+
+    tick();
+    act(() => {
+      result.current.importFactories([
+        { config: a, gameVersion: '1.2', nickname: 'Alpha' },
+        { config: b, gameVersion: '1.1', nickname: 'Beta' },
+      ]);
+    });
+
+    // 1 auto-created + 2 imported — the earlier per-factory loop dropped all but the last.
+    expect(result.current.factories).toHaveLength(3);
+    const nicks = result.current.factories.map((f) => f.nickname);
+    expect(nicks).toContain('Alpha');
+    expect(nicks).toContain('Beta');
+    // Persisted, and the last import is active.
+    expect(Object.keys(loadLibrary())).toHaveLength(3);
+    expect(result.current.activeFactory!.nickname).toBe('Beta');
+  });
+
+  it('is a no-op for an empty list', () => {
+    const { result } = setup();
+    tick();
+    act(() => { result.current.importFactories([]); });
+    expect(result.current.factories).toHaveLength(1);
+  });
+});
