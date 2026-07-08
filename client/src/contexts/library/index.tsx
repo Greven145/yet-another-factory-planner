@@ -13,6 +13,15 @@ import {
 } from './storage';
 
 
+// One factory to import: a config + version, optionally a nickname and the share
+// key it came from. Id and timestamps are minted fresh on import (import = copy).
+export type FactoryImportInput = {
+  config?: FactoryOptions;
+  gameVersion: string;
+  nickname?: string;
+  sourceKey?: string;
+};
+
 // TYPE
 export type LibraryContextType = {
   factories: LibraryFactory[]; // stable display order (createdAt asc)
@@ -26,6 +35,7 @@ export type LibraryContextType = {
   saveActiveConfig: (config: FactoryOptions) => void;
   setActiveVersion: (gameVersion: string) => void;
   importFactory: (input: { config?: FactoryOptions; gameVersion: string; sourceKey?: string }) => LibraryFactory;
+  importFactories: (inputs: FactoryImportInput[]) => LibraryFactory[];
 };
 
 
@@ -117,6 +127,24 @@ export const LibraryProvider = ({ children }: PropTypes) => {
     [addFactory],
   );
 
+  // Batch-import factories in ONE commit. addFactory/importFactory each close over
+  // the render's `library`, so calling them in a loop makes every call overwrite the
+  // previous (last-write-wins). This adds them all via a single functional update, so
+  // a multi-factory file lands intact. Nicknames from the file are preserved; ids are
+  // re-minted (import = copy). The last imported factory becomes active.
+  const importFactories = useCallback((inputs: FactoryImportInput[]): LibraryFactory[] => {
+    if (inputs.length === 0) return [];
+    const created = inputs.map((i) => makeFactory(i.gameVersion, { config: i.config, nickname: i.nickname, sourceKey: i.sourceKey }));
+    setLibrary((prev) => {
+      const next = { ...prev };
+      for (const f of created) next[f.id] = f;
+      writeLibrary(next);
+      return next;
+    });
+    selectId(created[created.length - 1].id);
+    return created;
+  }, [selectId]);
+
   const duplicate = useCallback((id: string) => {
     const src = library[id];
     if (!src) return;
@@ -186,7 +214,8 @@ export const LibraryProvider = ({ children }: PropTypes) => {
     saveActiveConfig,
     setActiveVersion,
     importFactory,
-  }), [factories, activeId, activeFactory, select, create, duplicate, rename, remove, saveActiveConfig, setActiveVersion, importFactory]);
+    importFactories,
+  }), [factories, activeId, activeFactory, select, create, duplicate, rename, remove, saveActiveConfig, setActiveVersion, importFactory, importFactories]);
 
   return (
     <LibraryContext.Provider value={ctxValue}>
