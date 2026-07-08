@@ -24,6 +24,8 @@ const gameDataValue = {
   initializer: null,
   loading: false,
   loadingError: false,
+  shareError: false,
+  clearShareError: () => {},
   completedThisFrame: false,
   reinitToken: 0,
   gameVersion: DEFAULT_GAME_VERSION,

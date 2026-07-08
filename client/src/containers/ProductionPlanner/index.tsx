@@ -16,6 +16,7 @@ import MobileShell from './MobileShell';
 import FactorySwitcher from './PlannerOptions/FactorySwitcher';
 import Portal from '../../components/Portal';
 import { useSessionStorage } from '../../hooks/useSessionStorage';
+import ShareErrorModal from './ShareErrorModal';
 
 // Staged reassurance while the Azure Container App cold-starts. Each entry fires
 // once the loader has been up for `after` seconds; the last one just sticks.
@@ -103,6 +104,9 @@ const ProductionPlanner = () => {
   return (
     <>
       {renderLoading()}
+      {/* Surfaces an invalid/expired share link over the loaded planner, instead
+          of the full-screen dead-end that a failed share fetch used to cause. */}
+      {gdCtx.gameData && <ShareErrorModal />}
       {gdCtx.gameData && (
         <ProductionProvider
           gameData={gdCtx.gameData}

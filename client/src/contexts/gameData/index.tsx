@@ -25,6 +25,11 @@ export type GameDataContextType = {
   initializer: FactoryInitializer | null,
   loading: boolean,
   loadingError: boolean,
+  // A ?factory= share link that couldn't be resolved (invalid or past its 7-day
+  // TTL). Non-fatal: the app still loads a normal factory; the UI surfaces this
+  // so the user knows why their link didn't open. Cleared on the next load.
+  shareError: boolean,
+  clearShareError: () => void,
   completedThisFrame: boolean,
   // Bumped to reload the active factory into the reducer WITHOUT refetching game
   // data (a same-version factory switch). Different-version switches refetch instead.
@@ -58,6 +63,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   const [initializer, setInitializer] = useState<FactoryInitializer | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingError, setLoadingError] = useState(false);
+  const [shareError, setShareError] = useState(false);
   const [reinitToken, setReinitToken] = useState(0);
   const prevLoading = usePrevious(loading);
   const [needToFetchGameData, setNeedToFetchGameData] = useState(true);
@@ -134,6 +140,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       setNeedToFetchGameData(false);
       setGameData(null);
       setInitializer(null);
+      setShareError(false);
 
       const params = new URLSearchParams(window.location.search);
       const shareKey = params.get(SHARE_QUERY_PARAM);
@@ -158,8 +165,18 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   useEffect(() => {
     if (sharedFactory.completedThisFrame) {
       if (sharedFactory.error) {
-        setLoadingError(true);
-        setLoading(false);
+        // Invalid or expired ?factory= link (share links live 7 days — the
+        // factories container's Cosmos TTL). Don't dead-end: drop the dead key
+        // from the URL so finalizeLoad takes the normal library path (not an
+        // import of a non-existent share) and a refresh won't retry, flag the
+        // failure for the UI, then load a normal factory.
+        const params = new URLSearchParams(window.location.search);
+        params.delete(SHARE_QUERY_PARAM);
+        const rest = params.toString();
+        window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
+        setShareError(true);
+        const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
+        void finalizeLoad({ version, factoryConfig: null });
         return;
       }
       const factoryConfig = sharedFactory.data?.factory_config || null;
@@ -194,18 +211,22 @@ export const GameDataProvider = ({ children }: PropTypes) => {
     }
   }, [gameVersion, lib]);
 
+  const clearShareError = useCallback(() => setShareError(false), []);
+
   const ctxValue = useMemo(() => {
     return {
       gameData,
       initializer,
       loading,
       loadingError,
+      shareError,
+      clearShareError,
       completedThisFrame,
       reinitToken,
       gameVersion,
       setGameVersion: handleSetGameVersion,
     }
-  }, [completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading, loadingError, reinitToken]);
+  }, [clearShareError, completedThisFrame, gameData, gameVersion, handleSetGameVersion, initializer, loading, loadingError, shareError, reinitToken]);
 
   return (
     <GameDataContext.Provider value={ctxValue}>
