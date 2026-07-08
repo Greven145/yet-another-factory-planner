@@ -11,6 +11,7 @@ import TrashButton from '../../../../components/TrashButton';
 import LabelWithTooltip from '../../../../components/LabelWithTooltip';
 import { MOBILE_MEDIA } from '../../../../theme';
 import { ProductionItemOptions, TransportOptions } from '../../../../contexts/production/types';
+import { GameData } from '../../../../contexts/gameData/types';
 
 
 const baseModeOptions = [
@@ -74,6 +75,27 @@ interface ItemRowProps {
   itemOptions: { value: string; label: string }[];
   gameData: any;
   dispatch: (action: any) => void;
+}
+
+// The selectable Production Goals. Any item a recipe can produce is a valid goal — including base
+// resources that have a producing recipe (e.g. Crude Oil via Unpackage Oil, Water/Nitrogen via
+// their unpackage recipes, ores via converter recipes). The producedFromRecipes check alone keeps
+// out un-producible resources like SAM; we intentionally do NOT exclude resources outright.
+export function buildProductionGoalOptions(gameData: GameData): { value: string; label: string }[] {
+  const opts = Object.keys(gameData.items)
+    .filter((key) => gameData.items[key].producedFromRecipes.length !== 0)
+    .map((key) => ({
+      value: key,
+      label: gameData.items[key].name,
+    }))
+    .sort((a, b) => (a.label > b.label ? 1 : -1));
+
+  opts.unshift({
+    value: POINTS_ITEM_KEY,
+    label: 'AWESOME Sink Points (x1000)',
+  });
+
+  return opts;
 }
 
 const ProductionItemRow = ({ data, itemOptions, gameData, dispatch }: ItemRowProps) => {
@@ -182,24 +204,7 @@ const ProductionTab = () => {
   const ctx = useProductionContext();
   const { gameVersion } = useGameDataContext();
 
-  const itemOptions = useMemo(() => {
-    const opts = Object.keys(ctx.gameData.items)
-      .filter((key) => ctx.gameData.items[key].producedFromRecipes.length !== 0 && !ctx.gameData.resources[key])
-      .map((key) => ({
-        value: key,
-        label: ctx.gameData.items[key].name,
-      }))
-      .sort((a, b) => {
-        return a.label > b.label ? 1 : -1;
-      });
-
-    opts.unshift({
-      value: POINTS_ITEM_KEY,
-      label: 'AWESOME Sink Points (x1000)'
-    });
-
-    return opts;
-  }, [ctx.gameData]);
+  const itemOptions = useMemo(() => buildProductionGoalOptions(ctx.gameData), [ctx.gameData]);
 
   const maximizeCount = ctx.state.productionItems.filter((i) => i.mode === 'maximize').length;
 
