@@ -13,9 +13,11 @@ import { useRowSelection } from './PlannerOptions/useRowSelection';
 
 // Resolved rows carry the fully-hydrated config so the gameData layer hydrates each
 // incoming factory exactly once (at resolve time) and the import is a plain map.
+// Unresolvable rows carry the reason they can't be imported (expired/invalid vs. past
+// the cap) so the picker shows the accurate message.
 export type IncomingFactory =
   | { key: string; ok: true; config: FactoryOptions; version: string; label: string }
-  | { key: string; ok: false }; // 404 / expired / over-cap
+  | { key: string; ok: false; reason: string };
 
 export function ImportPickerModal({
   opened,
@@ -41,7 +43,7 @@ export function ImportPickerModal({
 
   const rows: SelectRow[] = incoming.map((i) => {
     if (!i.ok) {
-      return { id: i.key, label: i.key, meta: '', disabled: true, disabledReason: 'Expired or invalid' };
+      return { id: i.key, label: i.key, meta: '', disabled: true, disabledReason: i.reason };
     }
     const overCap = atCap && !selected.has(i.key);
     return {

@@ -6,7 +6,7 @@ import { GameData } from './types';
 import { loadGameData } from './loadGameData';
 import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
 import { toDisplay } from '../../utilities/shared-factory/codec';
-import { parseShareKeys, MAX_SHARE_FACTORIES } from '../../utilities/shared-factory/share-url';
+import { parseShareKeys, MAX_SHARE_FACTORIES, OVER_CAP_REASON } from '../../utilities/shared-factory/share-url';
 import { hydrateSharedFactory } from '../../utilities/shared-factory/hydrate';
 import { usePrevious } from '../../hooks/usePrevious';
 import { FactoryOptions } from '../production/types';
@@ -59,6 +59,10 @@ export function useGameDataContext() {
   return ctx;
 }
 
+
+// Reason shown for a multi-share key that couldn't be resolved (404 / past its 7-day
+// TTL / malformed). Distinct from the over-the-cap reason (OVER_CAP_REASON).
+const EXPIRED_REASON = 'Expired or invalid';
 
 // Remove the given query params from the URL in place (history.replaceState), keeping
 // any other params so a refresh neither re-imports a consumed share nor drops unrelated
@@ -160,7 +164,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
     const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
     void finalizeLoad({ version, factoryConfig: null });
 
-    // Cap how many keys we resolve; extras past the cap surface as unresolvable rows.
+    // Cap how many keys we resolve; extras past the cap surface as over-limit rows.
     const capped = keys.slice(0, MAX_SHARE_FACTORIES);
     const overflow = keys.slice(MAX_SHARE_FACTORIES);
 
@@ -170,9 +174,9 @@ export const GameDataProvider = ({ children }: PropTypes) => {
     const incoming: IncomingFactory[] = await Promise.all(
       settled.map(async (res, idx): Promise<IncomingFactory> => {
         const key = capped[idx];
-        if (res.status !== 'fulfilled') return { key, ok: false };
+        if (res.status !== 'fulfilled') return { key, ok: false, reason: EXPIRED_REASON };
         const wire = unwrapSharedFactoryConfig(res.value);
-        if (!wire) return { key, ok: false };
+        if (!wire) return { key, ok: false, reason: EXPIRED_REASON };
         try {
           const v = wire.gameVersion ? toDisplay(wire.gameVersion) : DEFAULT_GAME_VERSION;
           const gd = await loadGameData(v);
@@ -181,11 +185,12 @@ export const GameDataProvider = ({ children }: PropTypes) => {
           const config = hydrateSharedFactory(wire, gd);
           return { key, ok: true, config, version: v, label: deriveAutoLabel(config, gd) };
         } catch {
-          return { key, ok: false };
+          return { key, ok: false, reason: EXPIRED_REASON };
         }
       }),
     );
-    overflow.forEach((key) => incoming.push({ key, ok: false }));
+    // Keys past the cap were never fetched: they're over the limit, not expired.
+    overflow.forEach((key) => incoming.push({ key, ok: false, reason: OVER_CAP_REASON }));
 
     // All keys dead (invalid/expired/over-cap): surface cohesively like a bad single
     // link instead of opening an empty picker.

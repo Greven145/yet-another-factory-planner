@@ -494,6 +494,10 @@ test.describe('Share multiple — receive', () => {
     await expect(dialog.getByRole('checkbox', { checked: true })).toHaveCount(50);
     await expect(dialog.getByRole('button', { name: 'Import 50 selected' })).toBeVisible();
     await expect(dialog.getByRole('checkbox', { disabled: true })).toHaveCount(1);
+    // The overflow row reads as over-the-limit, NOT "Expired or invalid": these keys
+    // were never fetched, they're simply past the 50-per-link cap.
+    await expect(dialog.getByText('Over the 50-factory limit')).toBeVisible();
+    await expect(dialog.getByText('Expired or invalid')).toHaveCount(0);
   });
 });
 
