@@ -2,12 +2,14 @@
 // import factories from a file (drag-drop or browse). Opened from the FactorySwitcher
 // "⋯" menu. Import adds factories as new copies (fresh ids) via lib.importFactory.
 import React, { useEffect, useRef, useState } from 'react';
-import { Modal, Stack, Group, Button, Checkbox, Text, Badge, Alert } from '@mantine/core';
+import { Modal, Stack, Button, Text, Alert } from '@mantine/core';
 import { Download, Upload } from 'react-feather';
 import { useLibraryContext } from '../../../contexts/library';
 import { GameData } from '../../../contexts/gameData/types';
 import { labelOf, relativeTime } from '../../../utilities/factory-label';
 import { downloadFactories, parseBundle, ImportableFactory } from '../../../utilities/factory-io';
+import { FactorySelectList, SelectRow } from './FactorySelectList';
+import { useRowSelection } from './useRowSelection';
 
 type ImportResult = { added: number; warnings: string[]; errors: string[] };
 
@@ -24,18 +26,23 @@ export const LibraryManagerModal = ({
 }) => {
   const lib = useLibraryContext();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const { selected, setSelected, toggle } = useRowSelection();
   const [dragging, setDragging] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
   // Reset transient state each time the modal opens.
   useEffect(() => {
     if (opened) { setSelected(new Set()); setResult(null); }
-  }, [opened]);
+  }, [opened, setSelected]);
 
   const chosen = lib.factories.filter((f) => selected.has(f.id));
-  const toggle = (id: string) =>
-    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const rows: SelectRow[] = lib.factories.map((f) => ({
+    id: f.id,
+    label: labelOf(f, gameData),
+    meta: `v${f.gameVersion} · ${relativeTime(f.updatedAt)}`,
+    isActive: f.id === lib.activeId,
+  }));
 
   const importFiles = async (files: FileList | File[] | null | undefined) => {
     if (!files || Array.from(files).length === 0) return;
@@ -68,35 +75,14 @@ export const LibraryManagerModal = ({
   return (
     <Modal opened={opened} onClose={onClose} title="Factory library" size="lg" centered>
       <Stack gap="sm">
-        <Group justify="space-between">
-          <Text size="sm" c="dimmed">{lib.factories.length} {lib.factories.length === 1 ? 'factory' : 'factories'}</Text>
-          <Button
-            size="xs"
-            variant="default"
-            styles={{ root: { color: 'var(--mantine-color-text)' } }}
-            onClick={() => setSelected(new Set(lib.factories.map((f) => f.id)))}
-          >
-            Select all
-          </Button>
-        </Group>
+        <Text size="sm" c="dimmed">{lib.factories.length} {lib.factories.length === 1 ? 'factory' : 'factories'}</Text>
 
-        <Stack gap={4} style={{ maxHeight: 260, overflow: 'auto' }}>
-          {lib.factories.map((f) => (
-            <Group
-              key={f.id}
-              justify="space-between"
-              wrap="nowrap"
-              style={{ padding: '4px 6px', borderRadius: 4, background: f.id === lib.activeId ? 'var(--mantine-color-default-hover)' : undefined }}
-            >
-              <Checkbox
-                checked={selected.has(f.id)}
-                onChange={() => toggle(f.id)}
-                label={<span>{labelOf(f, gameData)} {f.id === lib.activeId && <Badge size="xs" variant="light">active</Badge>}</span>}
-              />
-              <Text size="xs" c="dimmed" style={{ whiteSpace: 'nowrap' }}>v{f.gameVersion} · {relativeTime(f.updatedAt)}</Text>
-            </Group>
-          ))}
-        </Stack>
+        <FactorySelectList
+          rows={rows}
+          selected={selected}
+          onToggle={toggle}
+          onSelectAll={() => setSelected(new Set(lib.factories.map((f) => f.id)))}
+        />
 
         <Button
           leftSection={<Download size={16} />}

@@ -9,7 +9,7 @@ import type { ShareStatus } from './useShareFactory';
 // A read-only, auto-selected field holding the link, shown when the clipboard write
 // couldn't complete (rejected, or an insecure/unsupported context). It guarantees the
 // link is always reachable — one Ctrl/Cmd-C away — even when the server was cold.
-const ManualCopyField = ({ link }: { link: string }) => {
+export const ManualCopyField = ({ link }: { link: string }) => {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
