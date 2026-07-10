@@ -1,13 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useGetSharedFactory } from '../../api/modules/shared-factories/useGetSharedFactory';
+import { unwrapSharedFactoryConfig } from '../../api/modules/shared-factories/unwrapSharedFactory';
+import { get } from '../../api';
 import { GameData } from './types';
 import { loadGameData } from './loadGameData';
 import { DEFAULT_GAME_VERSION, SHARE_QUERY_PARAM } from './consts';
 import { toDisplay } from '../../utilities/shared-factory/codec';
+import { parseShareKeys, MAX_SHARE_FACTORIES } from '../../utilities/shared-factory/share-url';
+import { hydrateSharedFactory } from '../../utilities/shared-factory/hydrate';
 import { usePrevious } from '../../hooks/usePrevious';
 import { FactoryOptions } from '../production/types';
 import { usePageTitle } from '../../hooks/usePageTitle';
-import { useLibraryContext } from '../library';
+import { deriveAutoLabel } from '../../utilities/factory-label';
+import { useLibraryContext, FactoryImportInput } from '../library';
+import { ImportPickerModal, IncomingFactory } from '../../containers/ProductionPlanner/ImportPickerModal';
 
 
 // TYPE
@@ -54,6 +60,17 @@ export function useGameDataContext() {
 }
 
 
+// Remove the given query params from the URL in place (history.replaceState), keeping
+// any other params so a refresh neither re-imports a consumed share nor drops unrelated
+// state (e.g. the prototype's ?variant=).
+function stripUrlParams(names: string[]) {
+  const params = new URLSearchParams(window.location.search);
+  names.forEach((n) => params.delete(n));
+  const rest = params.toString();
+  window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
+}
+
+
 // PROVIDER
 type PropTypes = { children: React.ReactNode };
 export const GameDataProvider = ({ children }: PropTypes) => {
@@ -65,6 +82,9 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   const [loadingError, setLoadingError] = useState(false);
   const [shareError, setShareError] = useState(false);
   const [reinitToken, setReinitToken] = useState(0);
+  // The multi-share receive picker: resolved incoming factories + open state.
+  const [importIncoming, setImportIncoming] = useState<IncomingFactory[]>([]);
+  const [importOpen, setImportOpen] = useState(false);
   const prevLoading = usePrevious(loading);
   const [needToFetchGameData, setNeedToFetchGameData] = useState(true);
   const completedThisFrame = useMemo(() => !loading && loading !== prevLoading, [loading, prevLoading]);
@@ -101,13 +121,8 @@ export const GameDataProvider = ({ children }: PropTypes) => {
     const params = new URLSearchParams(window.location.search);
     const shareKey = params.get(SHARE_QUERY_PARAM);
     const legacyEncoding = params.get('f');
-    // Clear only the share keys we just imported — leave any other query params
-    // (e.g. the prototype's ?variant=) intact so a refresh doesn't re-import the
-    // shared factory while still preserving the rest of the URL.
-    params.delete(SHARE_QUERY_PARAM);
-    params.delete('f');
-    const rest = params.toString();
-    window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
+    // Clear only the share keys we just imported (see stripUrlParams).
+    stripUrlParams([SHARE_QUERY_PARAM, 'f']);
 
     let libraryConfig: FactoryOptions | null = null;
     if (shareKey || legacyEncoding) {
@@ -134,6 +149,65 @@ export const GameDataProvider = ({ children }: PropTypes) => {
     setLoading(false);
   };
 
+  // Multi-share receive (`?factory=k1,k2,…`, >1 key). Unlike the single path this
+  // never hydrates the active factory: it boots the planner normally, resolves each
+  // key in parallel, and opens a picker so the recipient chooses what to import. The
+  // share param is stripped up front so a refresh can't re-import.
+  const resolveMultiShare = async (keys: string[]) => {
+    stripUrlParams([SHARE_QUERY_PARAM]);
+
+    // Boot the planner normally so it's usable while (and after) the picker is open.
+    const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
+    void finalizeLoad({ version, factoryConfig: null });
+
+    // Cap how many keys we resolve; extras past the cap surface as unresolvable rows.
+    const capped = keys.slice(0, MAX_SHARE_FACTORIES);
+    const overflow = keys.slice(MAX_SHARE_FACTORIES);
+
+    const settled = await Promise.allSettled(
+      capped.map((key) => get('/shared-factories/:factoryKey', { factoryKey: key })),
+    );
+    const incoming: IncomingFactory[] = await Promise.all(
+      settled.map(async (res, idx): Promise<IncomingFactory> => {
+        const key = capped[idx];
+        if (res.status !== 'fulfilled') return { key, ok: false };
+        const wire = unwrapSharedFactoryConfig(res.value);
+        if (!wire) return { key, ok: false };
+        try {
+          const v = wire.gameVersion ? toDisplay(wire.gameVersion) : DEFAULT_GAME_VERSION;
+          const gd = await loadGameData(v);
+          // Hydrate once, here: the picker's label and the eventual import both reuse
+          // this config, so handleImportShared never re-hydrates.
+          const config = hydrateSharedFactory(wire, gd);
+          return { key, ok: true, config, version: v, label: deriveAutoLabel(config, gd) };
+        } catch {
+          return { key, ok: false };
+        }
+      }),
+    );
+    overflow.forEach((key) => incoming.push({ key, ok: false }));
+
+    // All keys dead (invalid/expired/over-cap): surface cohesively like a bad single
+    // link instead of opening an empty picker.
+    if (incoming.every((i) => !i.ok)) {
+      setShareError(true);
+      return;
+    }
+    setImportIncoming(incoming);
+    setImportOpen(true);
+  };
+
+  // Import the picked resolved factories in ONE library commit (importFactories
+  // selects the last + persists). Each config was already hydrated at resolve time,
+  // so this is a plain map — no re-fetch, no re-hydrate.
+  const handleImportShared = (chosen: IncomingFactory[]) => {
+    setImportOpen(false);
+    const inputs: FactoryImportInput[] = chosen
+      .filter((i): i is Extract<IncomingFactory, { ok: true }> => i.ok)
+      .map((i) => ({ config: i.config, gameVersion: i.version, sourceKey: i.key }));
+    if (inputs.length) lib.importFactories(inputs);
+  };
+
   useEffect(() => {
     if (needToFetchGameData) {
       setLoading(true);
@@ -143,13 +217,16 @@ export const GameDataProvider = ({ children }: PropTypes) => {
       setShareError(false);
 
       const params = new URLSearchParams(window.location.search);
-      const shareKey = params.get(SHARE_QUERY_PARAM);
+      const shareKeys = parseShareKeys(params.get(SHARE_QUERY_PARAM));
       const legacyEncoding = params.get('f');
 
-      if (shareKey) {
-        // Resolve the saved config first; finalizeLoad runs once it arrives so we
-        // can load the bundle for the share's own game version (below).
-        sharedFactory.request({ factoryKey: shareKey });
+      if (shareKeys.length > 1) {
+        // Multi-share link: boot normally + resolve the set for the import picker.
+        void resolveMultiShare(shareKeys);
+      } else if (shareKeys.length === 1) {
+        // Single share — unchanged: resolve the saved config first; finalizeLoad runs
+        // once it arrives so we can load the bundle for the share's own game version.
+        sharedFactory.request({ factoryKey: shareKeys[0] });
       } else if (legacyEncoding) {
         // Legacy ?f= links never carried a server config; default the version.
         void finalizeLoad({ version: DEFAULT_GAME_VERSION, factoryConfig: null });
@@ -170,10 +247,7 @@ export const GameDataProvider = ({ children }: PropTypes) => {
         // from the URL so finalizeLoad takes the normal library path (not an
         // import of a non-existent share) and a refresh won't retry, flag the
         // failure for the UI, then load a normal factory.
-        const params = new URLSearchParams(window.location.search);
-        params.delete(SHARE_QUERY_PARAM);
-        const rest = params.toString();
-        window.history.replaceState(null, '', rest ? `${window.location.pathname}?${rest}` : window.location.pathname);
+        stripUrlParams([SHARE_QUERY_PARAM]);
         setShareError(true);
         const version = lib.activeFactory?.gameVersion || gameVersion || DEFAULT_GAME_VERSION;
         void finalizeLoad({ version, factoryConfig: null });
@@ -231,6 +305,12 @@ export const GameDataProvider = ({ children }: PropTypes) => {
   return (
     <GameDataContext.Provider value={ctxValue}>
       {children}
+      <ImportPickerModal
+        opened={importOpen}
+        incoming={importIncoming}
+        onCancel={() => setImportOpen(false)}
+        onImport={handleImportShared}
+      />
     </GameDataContext.Provider>
   );
 }

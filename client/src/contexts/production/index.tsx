@@ -5,7 +5,7 @@ import { reducer, FactoryAction, getInitialState } from './reducer';
 import { FactoryOptions } from './types';
 import { FactoryInitializer } from '../gameData';
 import { GameData } from '../gameData/types';
-import { SHARE_QUERY_PARAM } from '../gameData/consts';
+import { buildShareUrl } from '../../utilities/shared-factory/share-url';
 import { SolverResults } from '../../utilities/production-solver/models';
 import { useSolverRun } from './useSolverRun';
 import { useLibraryContext } from '../library';
@@ -70,7 +70,7 @@ export const ProductionProvider = ({ gameData, gameVersion, initializer, trigger
     if (!key) {
       throw new Error('Failed to generate a share link');
     }
-    return `${window.location.protocol}//${window.location.host}${window.location.pathname}?${SHARE_QUERY_PARAM}=${key}`;
+    return buildShareUrl([key]);
   };
 
   // The share link itself is returned by handleGenerateShareLink (awaited inside the
