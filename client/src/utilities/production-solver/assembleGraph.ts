@@ -7,6 +7,7 @@ import {
   ProductionSolution,
   getItemPoints,
 } from './internals';
+import { buildVariant, parseVariantKey, sloopSlotsFor } from './amplification';
 
 // Pure assembly of a production graph from a solver solution. Builds recipe nodes,
 // item nodes (final products, side products, inputs, resources), and the edges that
@@ -24,10 +25,15 @@ export function assembleGraph(
   };
 
   for (const [recipeKey, multiplier] of Object.entries(productionSolution)) {
-    const recipeInfo = gameData.recipes[recipeKey];
+    // recipeKey may be a boost-variant key (e.g. "Recipe_X_C::AMP"); resolve to the base
+    // recipe and the variant multipliers. producedBy/usedBy are keyed by the variant key so
+    // each variant is its own graph node, while node.key stays the base recipe for lookups.
+    const { baseRecipeKey, suffix } = parseVariantKey(recipeKey);
+    const recipeInfo = gameData.recipes[baseRecipeKey];
+    const variant = buildVariant(suffix, sloopSlotsFor(recipeInfo.producedIn));
 
     for (const product of recipeInfo.products) {
-      const amount = multiplier * product.perMinute;
+      const amount = multiplier * product.perMinute * variant.outputMult;
       if (!itemProductionTotals[product.itemClass]) {
         itemProductionTotals[product.itemClass] = {
           producedBy: [],
@@ -38,7 +44,7 @@ export function assembleGraph(
     }
 
     for (const ingredient of recipeInfo.ingredients) {
-      const amount = multiplier * ingredient.perMinute;
+      const amount = multiplier * ingredient.perMinute * variant.inputMult;
       if (!itemProductionTotals[ingredient.itemClass]) {
         itemProductionTotals[ingredient.itemClass] = {
           producedBy: [],
@@ -50,9 +56,11 @@ export function assembleGraph(
 
     graph.nodes[recipeKey] = {
       id: recipeKey,
-      key: recipeKey,
+      key: baseRecipeKey,
       type: NODE_TYPE.RECIPE,
       multiplier,
+      // Only boosted nodes carry a suffix; base nodes stay identical to the un-boosted shape.
+      ...(suffix ? { suffix } : {}),
     };
   }
 

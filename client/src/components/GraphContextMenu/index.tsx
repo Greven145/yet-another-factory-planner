@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { useMantineTheme } from '@mantine/core';
 import { truncateFloat } from '../../utilities/number';
 import { NODE_TYPE } from '../../utilities/production-solver/models';
+import { buildVariant, sloopSlotsFor, OC_THROUGHPUT_MULT } from '../../utilities/production-solver/amplification';
 import { NodeData } from '../../containers/ProductionPlanner/PlannerResults/ProductionGraphTab';
 import Portal from '../Portal';
 import { useProductionContext } from '../../contexts/production';
@@ -28,9 +29,12 @@ function buildMenuItems(node: NodeData, gameData: GameData): MenuItem[] {
   if (node.type === NODE_TYPE.RECIPE) {
     const recipeInfo = gameData.recipes[node.key];
     const primaryProduct = recipeInfo.products[0];
+    const variant = buildVariant(node.suffix ?? '', sloopSlotsFor(recipeInfo.producedIn));
+    const isOverclocked = node.suffix === 'OC' || node.suffix === 'AMPOC';
+    const maxClock = isOverclocked ? 100 * OC_THROUGHPUT_MULT : 100;
     const totalBuildings = Math.ceil(node.multiplier);
-    const clockPercentage = node.multiplier / totalBuildings * 100;
-    const itemsPerMinPerBuilding = primaryProduct.perMinute * node.multiplier / totalBuildings;
+    const clockPercentage = node.multiplier / totalBuildings * maxClock;
+    const itemsPerMinPerBuilding = primaryProduct.perMinute * variant.outputMult * node.multiplier / totalBuildings;
     return [
       { label: `Copy clock speed (${truncateFloat(clockPercentage)}%)`, value: truncateFloat(clockPercentage) },
       { label: `Copy items/min per machine (${truncateFloat(itemsPerMinPerBuilding)})`, value: truncateFloat(itemsPerMinPerBuilding) },

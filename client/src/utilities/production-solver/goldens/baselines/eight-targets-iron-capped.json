@@ -935,6 +935,12 @@
       }
     },
     "report": {
+      "amplification": {
+        "shardsAvailable": 0,
+        "shardsUsed": 0,
+        "sloopsAvailable": 0,
+        "sloopsUsed": 0
+      },
       "buildingsUsed": {
         "Desc_AssemblerMk1_C": {
           "count": 15,

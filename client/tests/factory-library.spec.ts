@@ -222,7 +222,7 @@ test.describe('Multi-factory library', () => {
     await gotoApp(page);
 
     // Empty factory → Share disabled (firing it would 400).
-    const shareBtn = page.getByRole('button', { name: 'Share' });
+    const shareBtn = page.getByRole('button', { name: 'Share', exact: true });
     await expect(shareBtn).toBeDisabled();
 
     // Add a product → Share becomes enabled.

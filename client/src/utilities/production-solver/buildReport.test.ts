@@ -55,7 +55,7 @@ const inputs: Inputs = {
   'Desc_OreIron_C': { amount: Infinity, weight: 0.5, type: NODE_TYPE.RESOURCE },
 };
 
-const context: ReportContext = { gameData, inputs };
+const context: ReportContext = { gameData, inputs, availableSloops: 0, availableShards: 0 };
 
 // A complete iron-ore -> ingot -> plate chain produced graph.
 //  - Smelter recipe at multiplier 1 (30 ore -> 30 ingot)
@@ -97,7 +97,7 @@ describe('buildReport', () => {
       ...gameData,
       buildings: { ...gameData.buildings, 'Build_SmelterMk1_C': { ...gameData.buildings['Build_SmelterMk1_C'], power: -50 } },
     };
-    const report = buildReport(g, { gameData: gd, inputs });
+    const report = buildReport(g, { gameData: gd, inputs, availableSloops: 0, availableShards: 0 });
     expect(report.powerUsageEstimate.generators).toBeCloseTo(50);
     // production now only the constructor: 1.5 * 4 = 6
     expect(report.powerUsageEstimate.production).toBeCloseTo(6);
@@ -141,7 +141,7 @@ describe('buildReport', () => {
       ...gameData,
       items: { ...gameData.items, 'Desc_IronPlate_C': { ...gameData.items['Desc_IronPlate_C'], isFicsmas: true } },
     };
-    const report = buildReport(makeGraph(), { gameData: gd, inputs });
+    const report = buildReport(makeGraph(), { gameData: gd, inputs, availableSloops: 0, availableShards: 0 });
     expect(report.pointsProduced).toBe(0);
   });
 
@@ -158,7 +158,7 @@ describe('buildReport', () => {
       resources: { ...gameData.resources, 'Desc_Water_C': { itemClass: 'Desc_Water_C', maxExtraction: null, relativeValue: 1 } },
     };
     const waterInputs: Inputs = { 'Desc_Water_C': { amount: Infinity, weight: 1, type: NODE_TYPE.RESOURCE } };
-    const report = buildReport(graph, { gameData: gd, inputs: waterInputs });
+    const report = buildReport(graph, { gameData: gd, inputs: waterInputs, availableSloops: 0, availableShards: 0 });
     // numExtractors = ceil(300/120) = 3; rods = 3 * 10 = 30
     expect(report.buildingsUsed['Desc_WaterPump_C'].count).toBe(3);
     expect(report.buildingsUsed['Desc_WaterPump_C'].materialCost['Desc_IronRod_C']).toBe(30);
@@ -204,7 +204,7 @@ describe('buildReport', () => {
         'B': { slug: 'b', name: 'B', isAlternate: false, ingredients: [], products: [], producedIn: 'Build_SmelterMk1_C', isFicsmas: false },
       },
     };
-    const report = buildReport(graph, { gameData: gd, inputs });
+    const report = buildReport(graph, { gameData: gd, inputs, availableSloops: 0, availableShards: 0 });
     expect(report.loopWarning).toBe(true);
   });
 });

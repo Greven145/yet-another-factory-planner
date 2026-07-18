@@ -218,6 +218,21 @@ const stylesheet: Cytoscape.StylesheetStyle[] = [
     style: { 'background-color': graphColors.nuclear.selected },
   },
 
+  // Boost-indicator borders (placed after the selection rules so the ring stays visible
+  // even when a boosted node is selected). Combined amp+OC gets the blended colour.
+  {
+    selector: 'node.amplified',
+    style: { 'border-width': 5, 'border-color': graphColors.amplification.amplified },
+  },
+  {
+    selector: 'node.overclocked',
+    style: { 'border-width': 5, 'border-color': graphColors.amplification.overclocked },
+  },
+  {
+    selector: 'node.amplified.overclocked',
+    style: { 'border-width': 5, 'border-color': graphColors.amplification.both },
+  },
+
 
   // ====== EDGES ====== //
   {
@@ -316,6 +331,9 @@ function getNodeClasses(node: GraphNode, gameData: GameData) {
     } else {
       classes.push(NODE_COLOR_CLASS[node.type]);
     }
+    // Boost indicators: a somersloop (amplified) and/or power-shard (overclocked) border.
+    if (node.suffix === 'AMP' || node.suffix === 'AMPOC') classes.push('amplified');
+    if (node.suffix === 'OC' || node.suffix === 'AMPOC') classes.push('overclocked');
   } else {
     classes.push('item-shape');
     classes.push(NODE_COLOR_CLASS[node.type]);

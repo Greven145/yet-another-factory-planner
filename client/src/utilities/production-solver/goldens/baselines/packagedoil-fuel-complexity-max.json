@@ -531,6 +531,12 @@
       }
     },
     "report": {
+      "amplification": {
+        "shardsAvailable": 0,
+        "shardsUsed": 0,
+        "sloopsAvailable": 0,
+        "sloopsUsed": 0
+      },
       "buildingsUsed": {
         "Desc_ConstructorMk1_C": {
           "count": 2,

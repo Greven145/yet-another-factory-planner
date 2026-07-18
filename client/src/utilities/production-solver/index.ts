@@ -21,6 +21,14 @@ import {
 } from './internals';
 import { assembleGraph } from './assembleGraph';
 import { buildReport } from './buildReport';
+import {
+  RecipeVariant,
+  getRecipeVariants,
+  buildVariant,
+  sloopSlotsFor,
+  variantKey,
+  parseVariantKey,
+} from './amplification';
 
 export {
   NODE_TYPE,
@@ -98,6 +106,12 @@ export class ProductionSolver {
   private maximizeBalanceMode: MaximizeBalanceMode;
   private beltCapacity: number | null;
   private pipeCapacity: number | null;
+  // Somersloop / power-shard budgets, and the boost variants each allowed recipe may run.
+  // With both budgets 0 every recipe maps to a single base variant, so the LP is identical
+  // to the un-boosted model.
+  private availableSloops: number;
+  private availableShards: number;
+  private variantsByRecipe: Map<string, RecipeVariant[]>;
 
   public constructor(options: FactoryOptions, gameData: GameData) {
     // Apply 1.2 Game Mode cost multipliers (default 1 = no scaling, e.g. for 1.1 or default mode).
@@ -115,6 +129,11 @@ export class ProductionSolver {
     const rawPipe = options.transportOptions?.pipeCapacity;
     const parsedPipe = rawPipe != null ? Number(rawPipe) : NaN;
     this.pipeCapacity = !Number.isNaN(parsedPipe) && parsedPipe > 0 ? parsedPipe : null;
+
+    this.availableSloops = options.amplificationOptions ? Number(options.amplificationOptions.availableSloops) : 0;
+    this.availableShards = options.amplificationOptions ? Number(options.amplificationOptions.availableShards) : 0;
+    this.validateNumber(this.availableSloops);
+    this.validateNumber(this.availableShards);
 
     const allowedRecipes = options.allowedRecipes;
     // allowedBuildings may be absent on state restored from very old session storage;
@@ -305,6 +324,26 @@ export class ProductionSolver {
     if (Object.keys(this.rateTargets).length === 0 && this.maximizeTargets.length === 0) {
       throw new GraphError('NO OUTPUTS SET', 'Open the control panel to get started.');
     }
+
+    // Precompute the boost variants offered per allowed recipe. Recipes pinned as a
+    // recipe-mode production target keep a fixed building count, so they stay base-only —
+    // boosting them would contradict the user's explicit "run N of this recipe" intent and
+    // muddy the recipe-target graph edge that routes their output.
+    const recipeTargetKeys = new Set(Object.keys(recipeTargets));
+    this.variantsByRecipe = new Map();
+    for (const [recipeKey, allowed] of Object.entries(this.effectiveAllowedRecipes)) {
+      if (!allowed) continue;
+      const recipeInfo = this.gameData.recipes[recipeKey];
+      const buildingInfo = this.gameData.buildings[recipeInfo.producedIn];
+      const variants = recipeTargetKeys.has(recipeKey)
+        ? [buildVariant('', 0)]
+        : getRecipeVariants(recipeInfo.producedIn, buildingInfo.power, this.availableSloops, this.availableShards);
+      this.variantsByRecipe.set(recipeKey, variants);
+    }
+  }
+
+  private variantsFor(recipeKey: string): RecipeVariant[] {
+    return this.variantsByRecipe.get(recipeKey) ?? [buildVariant('', 0)];
   }
 
   private validateNumber(num: number) {
@@ -431,7 +470,12 @@ export class ProductionSolver {
       if (Object.keys(productionGraph.nodes).length === 0) {
         throw new GraphError('SOLUTION IS EMPTY', 'For some reason the solution for your parameters is an empty factory. Double check that your factory settings make sense.');
       }
-      const report = buildReport(productionGraph, { gameData: this.gameData, inputs: this.inputs });
+      const report = buildReport(productionGraph, {
+        gameData: this.gameData,
+        inputs: this.inputs,
+        availableSloops: this.availableSloops,
+        availableShards: this.availableShards,
+      });
 
       return {
         productionGraph,
@@ -457,14 +501,16 @@ export class ProductionSolver {
   // feed a final product back into the factory to be re-consumed.
   private surplusByproducts(solution: ProductionSolution): Inputs {
     const net: { [key: string]: number } = {};
-    for (const [recipeKey, multiplier] of Object.entries(solution)) {
-      const recipeInfo = this.gameData.recipes[recipeKey];
+    for (const [key, multiplier] of Object.entries(solution)) {
+      const { baseRecipeKey, suffix } = parseVariantKey(key);
+      const recipeInfo = this.gameData.recipes[baseRecipeKey];
       if (!recipeInfo) continue;
+      const variant = buildVariant(suffix, sloopSlotsFor(recipeInfo.producedIn));
       for (const product of recipeInfo.products) {
-        net[product.itemClass] = (net[product.itemClass] ?? 0) + multiplier * product.perMinute;
+        net[product.itemClass] = (net[product.itemClass] ?? 0) + multiplier * product.perMinute * variant.outputMult;
       }
       for (const ingredient of recipeInfo.ingredients) {
-        net[ingredient.itemClass] = (net[ingredient.itemClass] ?? 0) - multiplier * ingredient.perMinute;
+        net[ingredient.itemClass] = (net[ingredient.itemClass] ?? 0) - multiplier * ingredient.perMinute * variant.inputMult;
       }
     }
     const surplus: Inputs = {};
@@ -510,67 +556,78 @@ export class ProductionSolver {
     for (const [recipeKey, recipeInfo] of Object.entries(this.gameData.recipes)) {
       if (!this.effectiveAllowedRecipes[recipeKey]) continue;
       const buildingInfo = this.gameData.buildings[recipeInfo.producedIn];
-      const powerScore = buildingInfo.power > 0 ? buildingInfo.power * this.globalWeights.power : 0;
-      const buildingsScore = this.globalWeights.buildings;
-      let resourceScore = 0;
 
-      for (const ingredient of recipeInfo.ingredients) {
-        const inputInfo = this.inputs[ingredient.itemClass];
-        if (inputInfo) {
-          resourceScore += inputInfo.weight * ingredient.perMinute * this.globalWeights.resources;
-        }
-      }
+      // Each recipe expands into one LP variable per boost variant (base + amplified /
+      // overclocked / both). A variant's value is measured in physical buildings of that
+      // variant; the variant multipliers scale throughput and power accordingly.
+      for (const variant of this.variantsFor(recipeKey)) {
+        const vKey = variantKey(recipeKey, variant.suffix);
 
+        // Overclocking (variant.powerMult) raises consumer power super-linearly; amplification
+        // (also folded into powerMult) squares it. Generators (power < 0) never get boost variants.
+        const powerScore = buildingInfo.power > 0 ? buildingInfo.power * variant.powerMult * this.globalWeights.power : 0;
+        const buildingsScore = this.globalWeights.buildings;
+        let resourceScore = 0;
 
-      const recipeObjVar: Var = {
-        name: recipeKey,
-        coef: powerScore + resourceScore + buildingsScore,
-      };
-      model.objective.vars.push(recipeObjVar);
-      objectiveVarMap.set(recipeKey, recipeObjVar);
-
-      if (this.beltCapacity !== null || this.pipeCapacity !== null) {
-        for (const product of recipeInfo.products) {
-          if (!this.allowedItems[product.itemClass] || product.perMinute <= 0) continue;
-          const isFluid = this.gameData.items[product.itemClass]?.isFluid ?? false;
-          const capacity = isFluid ? this.pipeCapacity : this.beltCapacity;
-          if (capacity !== null) {
-            // Tighten the cap by output already allocated to this recipe in prior passes, so the
-            // cumulative total across all summed passes stays within a single belt/pipe (issue #130).
-            const priorMultiplier = priorSolution?.[recipeKey] ?? 0;
-            const ub = Math.max(0, capacity - priorMultiplier * product.perMinute);
-            model.subjectTo.push({
-              name: `${recipeKey}_${product.itemClass}_capacity`,
-              vars: [{ name: recipeKey, coef: product.perMinute }],
-              bnds: { type: glpk.GLP_UP, ub, lb: NaN },
-            });
-          }
-        }
-      }
-
-      if (isRateTargetPass) {
-        if (this.rateTargets[recipeKey]) {
-          model.subjectTo.push({
-            name: `${recipeKey} recipe constraint`,
-            vars: [{ name: recipeKey, coef: 1 }],
-            bnds: { type: glpk.GLP_LO, ub: 0, lb: this.rateTargets[recipeKey].value },
-          });
-        }
-      }
-
-      if (doPoints) {
-        let pointCoef = 0;
-        for (const product of recipeInfo.products) {
-          if (!this.inputs[product.itemClass] || this.inputs[product.itemClass].type === NODE_TYPE.INPUT_ITEM) {
-            pointCoef -= product.perMinute * getItemPoints(this.gameData, product.itemClass) / 1000;
-          }
-        }
         for (const ingredient of recipeInfo.ingredients) {
-          if (!this.inputs[ingredient.itemClass] || this.inputs[ingredient.itemClass].type === NODE_TYPE.INPUT_ITEM) {
-            pointCoef += ingredient.perMinute * getItemPoints(this.gameData, ingredient.itemClass) / 1000;
+          const inputInfo = this.inputs[ingredient.itemClass];
+          if (inputInfo) {
+            // Amplification leaves inputs unchanged (inputMult 1); overclocking scales them.
+            resourceScore += inputInfo.weight * ingredient.perMinute * variant.inputMult * this.globalWeights.resources;
           }
         }
-        pointsVars.push({ name: recipeKey, coef: pointCoef });
+
+        const recipeObjVar: Var = {
+          name: vKey,
+          coef: powerScore + resourceScore + buildingsScore,
+        };
+        model.objective.vars.push(recipeObjVar);
+        objectiveVarMap.set(vKey, recipeObjVar);
+
+        if (this.beltCapacity !== null || this.pipeCapacity !== null) {
+          for (const product of recipeInfo.products) {
+            if (!this.allowedItems[product.itemClass] || product.perMinute <= 0) continue;
+            const isFluid = this.gameData.items[product.itemClass]?.isFluid ?? false;
+            const capacity = isFluid ? this.pipeCapacity : this.beltCapacity;
+            if (capacity !== null) {
+              const perMin = product.perMinute * variant.outputMult;
+              // Tighten the cap by output already allocated to this variant in prior passes, so the
+              // cumulative total across all summed passes stays within a single belt/pipe (issue #130).
+              const priorMultiplier = priorSolution?.[vKey] ?? 0;
+              const ub = Math.max(0, capacity - priorMultiplier * perMin);
+              model.subjectTo.push({
+                name: `${vKey}_${product.itemClass}_capacity`,
+                vars: [{ name: vKey, coef: perMin }],
+                bnds: { type: glpk.GLP_UP, ub, lb: NaN },
+              });
+            }
+          }
+        }
+
+        if (doPoints) {
+          let pointCoef = 0;
+          for (const product of recipeInfo.products) {
+            if (!this.inputs[product.itemClass] || this.inputs[product.itemClass].type === NODE_TYPE.INPUT_ITEM) {
+              pointCoef -= product.perMinute * variant.outputMult * getItemPoints(this.gameData, product.itemClass) / 1000;
+            }
+          }
+          for (const ingredient of recipeInfo.ingredients) {
+            if (!this.inputs[ingredient.itemClass] || this.inputs[ingredient.itemClass].type === NODE_TYPE.INPUT_ITEM) {
+              pointCoef += ingredient.perMinute * variant.inputMult * getItemPoints(this.gameData, ingredient.itemClass) / 1000;
+            }
+          }
+          pointsVars.push({ name: vKey, coef: pointCoef });
+        }
+      }
+
+      // Recipe-mode targets pin a building count. These recipes are base-only (see
+      // variantsByRecipe), so the sum below is a single variable in practice.
+      if (isRateTargetPass && this.rateTargets[recipeKey]) {
+        model.subjectTo.push({
+          name: `${recipeKey} recipe constraint`,
+          vars: this.variantsFor(recipeKey).map((variant) => ({ name: variantKey(recipeKey, variant.suffix), coef: 1 })),
+          bnds: { type: glpk.GLP_LO, ub: 0, lb: this.rateTargets[recipeKey].value },
+        });
       }
     }
 
@@ -616,31 +673,41 @@ export class ProductionSolver {
       const binKey = `${itemKey}_BIN`;
       const binVars: Var[] = [];
 
+      // Consumption: each variant consumes inputs scaled by inputMult (amplification = 1,
+      // overclock = 2.5). One LP variable per variant, keyed by its suffixed name.
       for (const recipeKey of itemInfo.usedInRecipes) {
         if (!this.effectiveAllowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.ingredients.find((i) => i.itemClass === itemKey)!;
-        const v: Var = { name: recipeKey, coef: target.perMinute };
-        vars.push(v);
-        varsMap.set(recipeKey, v);
+        for (const variant of this.variantsFor(recipeKey)) {
+          const vKey = variantKey(recipeKey, variant.suffix);
+          const v: Var = { name: vKey, coef: target.perMinute * variant.inputMult };
+          vars.push(v);
+          varsMap.set(vKey, v);
 
-        if (!this.gameData.handGatheredItems[itemKey]) {
-          binVars.push({ name: recipeKey, coef: -1 });
+          if (!this.gameData.handGatheredItems[itemKey]) {
+            binVars.push({ name: vKey, coef: -1 });
+          }
         }
       }
 
+      // Production: each variant produces outputs scaled by outputMult (amplification = 2,
+      // overclock = 2.5, both = 5).
       for (const recipeKey of itemInfo.producedFromRecipes) {
         if (!this.effectiveAllowedRecipes[recipeKey]) continue;
         const recipeInfo = this.gameData.recipes[recipeKey];
         const target = recipeInfo.products.find((p) => p.itemClass === itemKey)!;
-
-        const existingVar = varsMap.get(recipeKey);
-        if (existingVar) {
-          existingVar.coef -= target.perMinute;
-        } else {
-          const v: Var = { name: recipeKey, coef: -target.perMinute };
-          vars.push(v);
-          varsMap.set(recipeKey, v);
+        for (const variant of this.variantsFor(recipeKey)) {
+          const vKey = variantKey(recipeKey, variant.suffix);
+          const produced = target.perMinute * variant.outputMult;
+          const existingVar = varsMap.get(vKey);
+          if (existingVar) {
+            existingVar.coef -= produced;
+          } else {
+            const v: Var = { name: vKey, coef: -produced };
+            vars.push(v);
+            varsMap.set(vKey, v);
+          }
         }
       }
 
@@ -706,6 +773,42 @@ export class ProductionSolver {
           name: `${itemKey} intermediates constraint`,
           vars,
           bnds: { type: glpk.GLP_UP, ub: 0, lb: NaN },
+        });
+      }
+    }
+
+    // Global somersloop / power-shard budgets: the total slots consumed across every boost
+    // variant may not exceed what the user has available. This is a continuous relaxation —
+    // fractional buildings consume fractional slots — so the reported usage should be rounded
+    // up when built in-game. Only added when the corresponding budget is set (and thus boost
+    // variants exist), so the un-boosted model gains no constraints.
+    if (this.availableSloops > 0) {
+      const sloopVars: Var[] = [];
+      for (const [recipeKey, variants] of this.variantsByRecipe) {
+        for (const variant of variants) {
+          if (variant.sloops > 0) sloopVars.push({ name: variantKey(recipeKey, variant.suffix), coef: variant.sloops });
+        }
+      }
+      if (sloopVars.length > 0) {
+        model.subjectTo.push({
+          name: 'somersloop budget',
+          vars: sloopVars,
+          bnds: { type: glpk.GLP_UP, ub: this.availableSloops, lb: NaN },
+        });
+      }
+    }
+    if (this.availableShards > 0) {
+      const shardVars: Var[] = [];
+      for (const [recipeKey, variants] of this.variantsByRecipe) {
+        for (const variant of variants) {
+          if (variant.shards > 0) shardVars.push({ name: variantKey(recipeKey, variant.suffix), coef: variant.shards });
+        }
+      }
+      if (shardVars.length > 0) {
+        model.subjectTo.push({
+          name: 'power shard budget',
+          vars: shardVars,
+          bnds: { type: glpk.GLP_UP, ub: this.availableShards, lb: NaN },
         });
       }
     }
@@ -780,7 +883,9 @@ export class ProductionSolver {
     const result: ProductionSolution = {};
     Object.entries(solution.result.vars).forEach(([key, val]) => {
       if (val > cullThreshold) {
-        if (this.gameData.recipes[key]) {
+        // Keep the variant key intact (assembleGraph/buildReport re-derive the boost from it),
+        // but validate against the underlying base recipe so binary/budget vars are dropped.
+        if (this.gameData.recipes[parseVariantKey(key).baseRecipeKey]) {
           result[key] = val;
         }
       }
