@@ -134,6 +134,10 @@ function createValidOptions(overrides?: Partial<FactoryOptions>): FactoryOptions
       recipePartsCost: '1',
       powerConsumption: '1',
     },
+    amplificationOptions: {
+      availableSloops: '0',
+      availableShards: '0',
+    },
     allowedRecipes: {
       'Recipe_IronIngot_C': true,
       'Recipe_IronPlate_C': true,
@@ -431,6 +435,7 @@ function byproductOptions(): FactoryOptions {
     allowHandGatheredItems: false,
     weightingOptions: { resources: '1', power: '1', complexity: '0', buildings: '0' },
     gameModeOptions: { recipePartsCost: '1', powerConsumption: '1' },
+    amplificationOptions: { availableSloops: '0', availableShards: '0' },
     allowedRecipes: { 'Recipe_Package_C': true, 'Recipe_Fuel_C': true },
     allowedBuildings: { 'Build_Refinery_C': true },
     nodesPositions: [],
@@ -624,5 +629,95 @@ describe('ProductionSolver belt/pipe capacity (issue #130)', () => {
     expect(error).not.toBeNull();
     expect(error!.message).toBe('BELT/PIPE CAPACITY TOO LOW');
     expect(error!.helpText).toMatch(/belt 60\/min/);
+  });
+});
+
+describe('ProductionSolver amplification (somersloops / power shards)', () => {
+  // A single amplifiable recipe (Constructor has 1 somersloop slot). Iron ingot is a bounded
+  // raw input so the resource weight rewards amplification (2x output for the same input).
+  const ampGameData: GameData = {
+    buildings: {
+      'Desc_ConstructorMk1_C': { slug: 'constructor', name: 'Constructor', power: 4, area: 100, buildCost: [], isFicsmas: false },
+      // Iron ingot is modeled as a raw resource here; buildReport attributes its extraction to a miner.
+      'Desc_MinerMk3_C': { slug: 'miner_mk3', name: 'Miner Mk.3', power: 110, area: 100, buildCost: [], isFicsmas: false },
+    },
+    recipes: {
+      'Recipe_IronPlate_C': {
+        slug: 'iron_plate',
+        name: 'Iron Plate',
+        isAlternate: false,
+        ingredients: [{ itemClass: 'Desc_IronIngot_C', perMinute: 30 }],
+        products: [{ itemClass: 'Desc_IronPlate_C', perMinute: 20 }],
+        producedIn: 'Desc_ConstructorMk1_C',
+        isFicsmas: false,
+      },
+    },
+    resources: {
+      'Desc_IronIngot_C': { itemClass: 'Desc_IronIngot_C', maxExtraction: 100000, relativeValue: 1 },
+    },
+    items: {
+      'Desc_IronIngot_C': { slug: 'iron_ingot', name: 'Iron Ingot', sinkPoints: 2, isFluid: false, usedInRecipes: ['Recipe_IronPlate_C'], producedFromRecipes: [], isFicsmas: false },
+      'Desc_IronPlate_C': { slug: 'iron_plate', name: 'Iron Plate', sinkPoints: 6, isFluid: false, usedInRecipes: [], producedFromRecipes: ['Recipe_IronPlate_C'], isFicsmas: false },
+    },
+    handGatheredItems: {},
+  };
+
+  function ampOptions(overrides?: Partial<FactoryOptions>): FactoryOptions {
+    return {
+      key: 'amp',
+      productionItems: [{ key: 'p1', itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: '20' }],
+      inputItems: [],
+      inputResources: [{ key: 'Desc_IronIngot_C', itemKey: 'Desc_IronIngot_C', value: '1000', weight: '1', unlimited: false }],
+      allowHandGatheredItems: false,
+      weightingOptions: { resources: '1000', power: '1', complexity: '0', buildings: '0' },
+      gameModeOptions: { recipePartsCost: '1', powerConsumption: '1' },
+      amplificationOptions: { availableSloops: '0', availableShards: '0' },
+      allowedRecipes: { 'Recipe_IronPlate_C': true },
+      allowedBuildings: { 'Desc_ConstructorMk1_C': true },
+      nodesPositions: [],
+      maximizeBalanceMode: 'proportional',
+      transportOptions: { beltCapacity: null, pipeCapacity: null },
+      ...overrides,
+    };
+  }
+
+  it('runs the base recipe and reports no boost usage when no sloops are available', async () => {
+    const { productionGraph, report, error } = await new ProductionSolver(ampOptions(), ampGameData).exec();
+    expect(error).toBeNull();
+    // Base variant only: the bare recipe key exists, no ::AMP node.
+    expect(productionGraph!.nodes['Recipe_IronPlate_C']).toBeDefined();
+    expect(productionGraph!.nodes['Recipe_IronPlate_C::AMP']).toBeUndefined();
+    // 20 plates/min needs 1 base constructor consuming 30 ingots/min.
+    expect(report!.amplification.sloopsUsed).toBe(0);
+    expect(productionGraph!.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(30, 4);
+  });
+
+  it('amplifies to halve input use when sloops are available', async () => {
+    const options = ampOptions({ amplificationOptions: { availableSloops: '106', availableShards: '0' } });
+    const { productionGraph, report, error } = await new ProductionSolver(options, ampGameData).exec();
+    expect(error).toBeNull();
+    // Solver switches to the amplified variant: 0.5 amplified constructors make 20 plates
+    // from just 15 ingots (2x output, same input), using 0.5 somersloops.
+    const ampNode = productionGraph!.nodes['Recipe_IronPlate_C::AMP'];
+    expect(ampNode).toBeDefined();
+    expect(ampNode.suffix).toBe('AMP');
+    expect(ampNode.multiplier).toBeCloseTo(0.5, 4);
+    expect(productionGraph!.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(15, 4);
+    // Somersloops go into whole machines: 0.5 amplified constructors round up to 1 physical
+    // machine, whose single slot needs 1 whole somersloop (not the fractional 0.5).
+    expect(report!.amplification.sloopsUsed).toBe(1);
+    expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
+    expect(report!.amplification.sloopsAvailable).toBe(106);
+  });
+
+  it('reports somersloop usage as whole machines, rounding each machine up', async () => {
+    // The LP allocates fractional amplified machines, but a real build needs whole machines
+    // with every slot filled — so usage is always an integer (regression for issue: report
+    // showed 4.833 sloops when the real requirement was 6).
+    const options = ampOptions({ amplificationOptions: { availableSloops: '106', availableShards: '0' } });
+    const { report, error } = await new ProductionSolver(options, ampGameData).exec();
+    expect(error).toBeNull();
+    expect(report!.amplification.sloopsUsed).toBeGreaterThan(0);
+    expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
   });
 });

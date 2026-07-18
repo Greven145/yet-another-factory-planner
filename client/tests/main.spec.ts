@@ -282,7 +282,7 @@ test.describe('Factory Planner Application', () => {
     // The Share control now lives in the body FactorySwitcher; close the drawer so
     // it isn't overlapped. With a product selected it must be enabled.
     await page.getByRole('button', { name: 'Close Control Panel' }).click();
-    const shareBtn = page.getByRole('button', { name: 'Share' });
+    const shareBtn = page.getByRole('button', { name: 'Share', exact: true });
     await expect(shareBtn).toBeVisible();
     await expect(shareBtn).toBeEnabled();
   });
@@ -315,7 +315,7 @@ test.describe('Factory Planner Application', () => {
 
     // Share moved to the body FactorySwitcher; close the drawer so it isn't overlapped.
     await page.getByRole('button', { name: 'Close Control Panel' }).click();
-    await page.getByRole('button', { name: 'Share' }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
 
     await expect.poll(() => sharedBody).not.toBeNull();
     expect(sharedBody.factoryConfig.gameModeOptions).toEqual({
@@ -358,5 +358,33 @@ test.describe('Factory Planner Application', () => {
     // The dropdowns should reflect the saved multipliers, not the defaults.
     await expect(page.getByRole('combobox', { name: 'Recipe Cost Multiplier' })).toHaveValue('0.5x');
     await expect(page.getByRole('combobox', { name: 'Power Multiplier' })).toHaveValue('2x');
+  });
+
+  test('applies a somersloop budget and reports the boost usage', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+
+    // A production goal is required for the solver to run.
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    await page.getByPlaceholder('Select an item').click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+
+    // Give the solver a somersloop budget (section gated to 1.2, the default version).
+    // With the default resource-dominant weighting, amplifying halves the ore a step
+    // consumes, so the solver should spend sloops.
+    const sloopsInput = page.getByRole('spinbutton', { name: 'Somersloops' });
+    await sloopsInput.fill('20');
+    await page.waitForTimeout(700); // let the debounced auto-solve run
+
+    // Read the plan on the Report tab.
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
+    await page.getByRole('tab', { name: 'Report' }).click();
+
+    // The Amplification section and its cards appear only when a budget is set.
+    await expect(page.getByRole('heading', { name: 'Amplification' })).toBeVisible();
+    const sloopCard = page.getByText('Somersloops Used', { exact: true }).locator('..');
+    await expect(sloopCard).toContainText('/ 20');
+    // Usage must be > 0 — the solver actually amplified (not just rendered the card).
+    await expect(sloopCard).not.toContainText('0 / 20');
   });
 });

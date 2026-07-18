@@ -20,6 +20,7 @@ function sampleConfig(): FactoryOptions {
     allowHandGatheredItems: true,
     weightingOptions: { resources: '1000', power: '1', complexity: '0', buildings: '0' },
     gameModeOptions: { recipePartsCost: '1', powerConsumption: '1' },
+    amplificationOptions: { availableSloops: '10', availableShards: '15' },
     allowedRecipes: {
       Recipe_IronIngot_C: true,
       Recipe_IronPlate_C: true,
@@ -65,6 +66,7 @@ describe('encode', () => {
     expect(wire.productionItems[0]).toEqual({ itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: 20 });
     expect(typeof wire.weightingOptions.resources).toBe('number');
     expect(wire.gameModeOptions).toEqual({ recipePartsCost: 1, powerConsumption: 1 });
+    expect(wire.amplificationOptions).toEqual({ availableSloops: 10, availableShards: 15 });
     // only enabled recipes survive the flatten
     expect(wire.allowedRecipes).toEqual(['Recipe_IronIngot_C', 'Recipe_IronPlate_C']);
     // allowedBuildings flattens the same way: only the enabled set is stored
@@ -85,6 +87,25 @@ describe('decode', () => {
     delete wire.gameModeOptions;
     const decoded = decode(wire as WireFactory);
     expect(decoded.gameModeOptions).toBeNull();
+  });
+
+  it('encodes a config missing amplificationOptions as no-boost (old library factories)', () => {
+    const config = sampleConfig();
+    delete (config as Partial<FactoryOptions>).amplificationOptions;
+    const wire = encode(config, '1.2');
+    expect(wire.amplificationOptions).toEqual({ availableSloops: 0, availableShards: 0 });
+  });
+
+  it('coerces amplificationOptions numbers back to strings', () => {
+    const decoded = decode(encode(sampleConfig(), '1.2'));
+    expect(decoded.amplificationOptions).toEqual({ availableSloops: '10', availableShards: '15' });
+  });
+
+  it('yields null amplificationOptions when the wire payload omits them (older/server-stripped share)', () => {
+    const wire = encode(sampleConfig(), '1.2') as Partial<WireFactory>;
+    delete wire.amplificationOptions;
+    const decoded = decode(wire as WireFactory);
+    expect(decoded.amplificationOptions).toBeNull();
   });
 
   it('yields null allowedBuildings when the wire payload omits them (pre-feature share)', () => {
@@ -115,6 +136,7 @@ describe('round-trip decode(encode(x))', () => {
     expect(decoded.allowHandGatheredItems).toBe(true);
     expect(decoded.weightingOptions).toEqual(config.weightingOptions);
     expect(decoded.gameModeOptions).toEqual(config.gameModeOptions);
+    expect(decoded.amplificationOptions).toEqual(config.amplificationOptions);
     // allowedRecipes is map -> filtered list on encode; decode yields the enabled keys
     expect(decoded.allowedRecipes).toEqual(['Recipe_IronIngot_C', 'Recipe_IronPlate_C']);
     expect(decoded.allowedBuildings).toEqual(['Build_SmelterMk1_C', 'Build_ConstructorMk1_C']);

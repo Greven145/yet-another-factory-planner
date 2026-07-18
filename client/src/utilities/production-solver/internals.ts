@@ -58,4 +58,7 @@ export type GraphContext = {
 export type ReportContext = {
   gameData: GameData,
   inputs: Inputs,
+  // Somersloop / power-shard budgets the user made available (0 when unused).
+  availableSloops: number,
+  availableShards: number,
 };

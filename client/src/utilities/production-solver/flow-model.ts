@@ -1,5 +1,6 @@
 import { GameData } from '../../contexts/gameData/types';
 import { GraphNode, NODE_TYPE, ProductionGraph } from './models';
+import { variantLabel } from './amplification';
 import { describeTransport, formatTransport, TransportCapacities } from './transport';
 
 // An accessible, DOM-friendly view-model of the production graph (issue #92, ADR 0002).
@@ -98,7 +99,7 @@ export function buildFlowModel(
       rows.set(node.id, {
         id: node.id,
         recipeKey: node.key,
-        recipeName: recipe?.name ?? node.key,
+        recipeName: (recipe?.name ?? node.key) + variantLabel(node.suffix),
         buildingKey,
         buildingName: gameData.buildings[buildingKey]?.name ?? buildingKey,
         buildingCount: node.multiplier,

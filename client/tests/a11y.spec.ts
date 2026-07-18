@@ -142,7 +142,8 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
     await page.getByRole('button', { name: 'Close Control Panel' }).click();
 
     // Clicking Share posts the factory and opens the "Link copied!" popover.
-    await page.getByRole('button', { name: 'Share' }).click();
+    // (exact: the multi-share split control also renders a "More share options" button.)
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
     await expect(page.getByText('Link copied!')).toBeVisible();
 
     const results = await buildScan(page).analyze();
@@ -201,6 +202,31 @@ test.describe('Accessibility (WCAG 2.0 A/AA) scans', () => {
 
     // Switch to the Report tab
     await page.getByRole('tab', { name: 'Report' }).click();
+
+    const results = await buildScan(page).analyze();
+
+    expect(results.violations).toEqual([]);
+  });
+
+  test('Report tab with an amplification budget has no WCAG A/AA violations', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('button', { name: 'Open Control Panel' }).click();
+    await page.getByRole('button', { name: '+ Add Product' }).click();
+    await page.getByPlaceholder('Select an item').click();
+    await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+
+    // Set budgets so the Report tab renders the Amplification stat cards (only shown
+    // when a somersloop/power-shard budget is available).
+    await page.getByRole('spinbutton', { name: 'Somersloops' }).fill('20');
+    await page.getByRole('spinbutton', { name: 'Power Shards' }).fill('30');
+    await page.waitForTimeout(1000);
+
+    await page.getByRole('button', { name: 'Close Control Panel' }).click();
+    await page.getByRole('tab', { name: 'Report' }).click();
+
+    // Confirm the new cards actually rendered before scanning them.
+    await expect(page.getByRole('heading', { name: 'Amplification' })).toBeVisible();
 
     const results = await buildScan(page).analyze();
 

@@ -1,4 +1,5 @@
 import { GraphError } from '../error/GraphError';
+import { VariantSuffix } from './amplification';
 
 export const NODE_TYPE = {
   FINAL_PRODUCT: 'FINAL_PRODUCT',
@@ -45,6 +46,14 @@ export type Report = {
   },
   totalItemsRecap: ProducedItemInformation[],
   loopWarning: boolean,
+  // Somersloop / power-shard consumption and budgets. usage is a continuous relaxation
+  // (fractional buildings use fractional slots) so round up when building in-game.
+  amplification: {
+    sloopsUsed: number,
+    sloopsAvailable: number,
+    shardsUsed: number,
+    shardsAvailable: number,
+  },
 }
 
 export type GraphNode = {
@@ -52,6 +61,8 @@ export type GraphNode = {
   key: string,
   type: string,
   multiplier: number,
+  // Boost variant for RECIPE nodes: '' base, 'AMP' amplified, 'OC' overclocked, 'AMPOC' both.
+  suffix?: VariantSuffix,
 };
 
 export type GraphEdge = {

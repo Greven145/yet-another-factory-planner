@@ -116,6 +116,10 @@
       "recipePartsCost": "1",
       "powerConsumption": "1"
     },
+    "amplificationOptions": {
+      "availableSloops": "0",
+      "availableShards": "0"
+    },
     "allowedRecipes": {
       "Recipe_AILimiter_C": true,
       "Recipe_AlienDNACapsule_C": true,
@@ -1443,6 +1447,12 @@
       }
     },
     "report": {
+      "amplification": {
+        "shardsAvailable": 0,
+        "shardsUsed": 0,
+        "sloopsAvailable": 0,
+        "sloopsUsed": 0
+      },
       "buildingsUsed": {
         "Desc_AssemblerMk1_C": {
           "count": 16,

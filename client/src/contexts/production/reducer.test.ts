@@ -401,6 +401,17 @@ describe('reducer', () => {
     });
   });
 
+  describe('UPDATE_AMPLIFICATION_OPTIONS', () => {
+    it('updates the somersloop/power-shard budgets', () => {
+      const state = createInitialState();
+      const result = reducer(state, {
+        type: 'UPDATE_AMPLIFICATION_OPTIONS',
+        data: { availableSloops: '106', availableShards: '250' },
+      });
+      expect(result.amplificationOptions).toEqual({ availableSloops: '106', availableShards: '250' });
+    });
+  });
+
   describe('SET_ALL_WEIGHTS_DEFAULT', () => {
     it('resets weighting options to defaults', () => {
       const state = createInitialState();

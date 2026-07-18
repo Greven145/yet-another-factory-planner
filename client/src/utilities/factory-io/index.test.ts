@@ -12,6 +12,7 @@ function sampleConfig(itemKey = 'Desc_IronPlate_C'): FactoryOptions {
     allowHandGatheredItems: false,
     weightingOptions: { resources: '1', power: '1', complexity: '1', buildings: '1' },
     gameModeOptions: { recipePartsCost: '0', powerConsumption: '0' },
+    amplificationOptions: { availableSloops: '0', availableShards: '0' },
     allowedRecipes: { Recipe_IronPlate_C: true },
     allowedBuildings: {},
     nodesPositions: [],

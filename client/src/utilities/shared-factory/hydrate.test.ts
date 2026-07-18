@@ -47,6 +47,7 @@ function sampleConfig(): FactoryOptions {
     allowHandGatheredItems: true,
     weightingOptions: { resources: '500', power: '10', complexity: '5', buildings: '3' },
     gameModeOptions: { recipePartsCost: '1', powerConsumption: '1' },
+    amplificationOptions: { availableSloops: '2', availableShards: '4' },
     allowedRecipes: {
       Recipe_IronIngot_C: true,
       Recipe_IronPlate_C: true,
@@ -82,6 +83,7 @@ describe('hydrateSharedFactory', () => {
     expect(result.allowHandGatheredItems).toBe(true);
     expect(result.weightingOptions).toEqual(config.weightingOptions);
     expect(result.gameModeOptions).toEqual(config.gameModeOptions);
+    expect(result.amplificationOptions).toEqual(config.amplificationOptions);
 
     expect(result.allowedRecipes.Recipe_IronIngot_C).toBe(true);
     expect(result.allowedRecipes.Recipe_IronPlate_C).toBe(true);

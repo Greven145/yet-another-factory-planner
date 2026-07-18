@@ -30,7 +30,7 @@ async function addProductAndReachShare(page: Page) {
   await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
   // Share lives in the body FactorySwitcher — close the drawer so it isn't overlapped.
   await page.getByRole('button', { name: 'Close Control Panel' }).click();
-  await expect(page.getByRole('button', { name: 'Share' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Share', exact: true })).toBeEnabled();
 }
 
 test.describe('Share on a cold-started server (#182)', () => {
@@ -62,7 +62,7 @@ test.describe('Share on a cold-started server (#182)', () => {
     await routeColdStartShare(page, 3000);
     await addProductAndReachShare(page);
 
-    await page.getByRole('button', { name: 'Share' }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
 
     // While the cold POST is in flight the popover must read "Generating…", never "copied".
     await expect(page.getByText('Generating…')).toBeVisible();
@@ -93,7 +93,7 @@ test.describe('Share on a cold-started server (#182)', () => {
     await routeColdStartShare(page, 1500);
     await addProductAndReachShare(page);
 
-    await page.getByRole('button', { name: 'Share' }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
 
     // The failure copy appears and the link is offered in a read-only field, never a
     // false "Link copied!".

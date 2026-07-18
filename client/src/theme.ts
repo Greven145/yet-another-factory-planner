@@ -41,6 +41,16 @@ export const graphColors = {
   recipe: { base: `hsl(197, ${baseSat}, ${baseLight})`, selected: `hsl(197, ${selectSat}, ${selectLight})` },
   nuclear: { base: `hsl(50, ${baseSat}, ${baseLight})`, selected: `hsl(50, ${selectSat}, ${selectLight})` },
 
+  // Boost-indicator borders on recipe nodes, echoing the in-game glow: somersloop
+  // amplification is purple, power-shard overclocking is a deep electric blue, both is
+  // a blend. The recipe node fill is a light sky-blue (hsl 197, 63% light), so the
+  // overclock border is pushed toward true blue and darkened to stay legible on it.
+  amplification: {
+    amplified: 'hsl(285, 95%, 60%)',
+    overclocked: 'hsl(224, 100%, 42%)',
+    both: 'hsl(255, 95%, 58%)',
+  },
+
   // edges
   edge: { line: '#999999', label: '#eeeeee' },
   incoming: { line: `hsl(31, ${baseSat}, ${baseLight})`, label: `hsl(31, ${baseSat}, ${baseLight})` },

@@ -4,6 +4,7 @@ import {
   InputItemOptions,
   WeightingOptions,
   GameModeOptions,
+  AmplificationOptions,
   NodeInfo,
 } from '../../contexts/production/types';
 
@@ -84,6 +85,11 @@ export type WireGameModeOptions = {
   powerConsumption: number,
 };
 
+export type WireAmplificationOptions = {
+  availableSloops: number,
+  availableShards: number,
+};
+
 export type WireFactory = {
   gameVersion: string,
   productionItems: WireProductionItem[],
@@ -92,6 +98,10 @@ export type WireFactory = {
   allowHandGatheredItems: boolean,
   weightingOptions: WireWeightingOptions,
   gameModeOptions: WireGameModeOptions,
+  /** Somersloop/power-shard budgets. Added after 1.2; absent on older shares (= 0/0).
+   *  NOTE: not yet declared on the server FactoryConfigSchema, so it is dropped on
+   *  persisted `?factory=` shares; it round-trips only for client-side configs. */
+  amplificationOptions?: WireAmplificationOptions,
   allowedRecipes: string[],
   /** Enabled building keys. Added after 1.2; absent on older shares (= all enabled). */
   allowedBuildings?: string[],
@@ -107,6 +117,8 @@ export type DecodedFactory = {
   weightingOptions: WeightingOptions,
   /** Present only when the wire payload included game-mode options (added in 1.2). */
   gameModeOptions: GameModeOptions | null,
+  /** Present only when the wire payload included amplification options; null on older shares (= 0/0). */
+  amplificationOptions: AmplificationOptions | null,
   /** Recipe keys that should be marked allowed. */
   allowedRecipes: string[],
   /** Enabled building keys, or null when the share predates building selection (= all enabled). */
@@ -160,6 +172,12 @@ export function encode(config: FactoryOptions, gameVersion: string): WireFactory
       recipePartsCost: Number(config.gameModeOptions.recipePartsCost),
       powerConsumption: Number(config.gameModeOptions.powerConsumption),
     },
+    // Optional-chained: library factories saved before this field existed (and older
+    // persisted configs) lack amplificationOptions; encode them as no-boost rather than throw.
+    amplificationOptions: {
+      availableSloops: Number(config.amplificationOptions?.availableSloops ?? 0),
+      availableShards: Number(config.amplificationOptions?.availableShards ?? 0),
+    },
     allowedRecipes: Object.keys(config.allowedRecipes).filter((key) => config.allowedRecipes[key]),
     allowedBuildings: Object.keys(config.allowedBuildings).filter((key) => config.allowedBuildings[key]),
     nodesPositions: config.nodesPositions,
@@ -199,6 +217,14 @@ export function decode(wire: WireFactory): DecodedFactory {
       ? {
           recipePartsCost: String(wire.gameModeOptions.recipePartsCost),
           powerConsumption: String(wire.gameModeOptions.powerConsumption),
+        }
+      : null,
+    // amplificationOptions added after 1.2; older shares (and server-persisted shares
+    // that drop it) lack it => null = no boost budget.
+    amplificationOptions: wire.amplificationOptions
+      ? {
+          availableSloops: String(wire.amplificationOptions.availableSloops),
+          availableShards: String(wire.amplificationOptions.availableShards),
         }
       : null,
     allowedRecipes: wire.allowedRecipes,

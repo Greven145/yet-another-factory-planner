@@ -46,6 +46,10 @@ export function hydrateSharedFactory(wire: WireFactory, gameData: GameData): Fac
     if (decoded.gameModeOptions) {
       newState.gameModeOptions = decoded.gameModeOptions;
     }
+    // amplificationOptions added after 1.2; keep the 0/0 default when absent.
+    if (decoded.amplificationOptions) {
+      newState.amplificationOptions = decoded.amplificationOptions;
+    }
     decoded.allowedRecipes.forEach((key) => {
       if (newState.allowedRecipes[key] != null) {
         newState.allowedRecipes[key] = true;

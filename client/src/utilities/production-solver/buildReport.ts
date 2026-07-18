@@ -1,13 +1,14 @@
 import { ItemRate } from '../../contexts/gameData/types';
 import { NODE_TYPE, ProducedItemInformation, ProductionGraph, Report } from './models';
 import { ReportContext, getItemPoints } from './internals';
+import { buildVariant, sloopSlotsFor } from './amplification';
 
 // Pure computation of the production report (power breakdown, build area, foundations,
 // buildings used, material costs, raw resources, items-per-step recap, loop warning)
 // from an assembled production graph. Behavior is identical to the former
 // ProductionSolver.generateProductionReport method.
 export function buildReport(productionGraph: ProductionGraph, context: ReportContext): Report {
-  const { gameData, inputs } = context;
+  const { gameData, inputs, availableSloops, availableShards } = context;
   const report: Report = {
     pointsProduced: 0,
     powerUsageEstimate: {
@@ -23,7 +24,13 @@ export function buildReport(productionGraph: ProductionGraph, context: ReportCon
     totalMaterialCost: {},
     totalRawResources: {},
     totalItemsRecap: [],
-    loopWarning: false
+    loopWarning: false,
+    amplification: {
+      sloopsUsed: 0,
+      sloopsAvailable: availableSloops,
+      shardsUsed: 0,
+      shardsAvailable: availableShards,
+    },
   };
 
   report.totalItemsRecap = generateItemsPerStep(productionGraph, gameData);
@@ -34,10 +41,19 @@ export function buildReport(productionGraph: ProductionGraph, context: ReportCon
       report.totalRawResources[gameData.items[node.key].name] = node.multiplier;
     }
     if (node.type === NODE_TYPE.RECIPE) {
-      const recipeInfo = gameData.recipes[key];
+      // node.key is the base recipe (the map key may be a boost-variant key); the variant
+      // scales power and tallies the somersloops/power shards this node consumes.
+      const recipeInfo = gameData.recipes[node.key];
       const buildingKey = recipeInfo.producedIn;
       const buildingInfo = gameData.buildings[buildingKey];
-      const power = node.multiplier * buildingInfo.power;
+      const variant = buildVariant(node.suffix ?? '', sloopSlotsFor(buildingKey));
+      // Somersloops and power shards are placed in whole machines, so the real requirement
+      // is per-machine slots x the (rounded-up) machine count — never a fraction. This matches
+      // how buildingsUsed.count and material costs round up below.
+      const machineCount = Math.ceil(node.multiplier);
+      report.amplification.sloopsUsed += machineCount * variant.sloops;
+      report.amplification.shardsUsed += machineCount * variant.shards;
+      const power = node.multiplier * buildingInfo.power * variant.powerMult;
       if (power < 0) {
         report.powerUsageEstimate.generators += -power;
       } else {
@@ -147,7 +163,9 @@ function generateItemsPerStep(productionGraph: ProductionGraph, gameData: Report
 
   while (keys.length > 0){
     for (key of keys){
-      const recipe = gameData.recipes[key];
+      // `key` is the node map key, which may be a boost-variant key; the underlying recipe
+      // (same ingredients/products) is found via the node's base recipe key.
+      const recipe = gameData.recipes[nodes[key].key];
       const applicableIngredientsAmount = recipe.ingredients.filter(ingredientKeyFilter).length;
       if (applicableIngredientsAmount === recipe.ingredients.length){
         for (var product of recipe.products){

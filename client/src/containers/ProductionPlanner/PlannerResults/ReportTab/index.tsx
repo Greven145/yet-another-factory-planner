@@ -58,6 +58,24 @@ const ReportTab = () => {
           </StatCard>
         </StatGrid>
 
+        {(report!.amplification.sloopsAvailable > 0 || report!.amplification.shardsAvailable > 0) && (
+          <>
+            <SectionTitle order={2}>Amplification</SectionTitle>
+            <StatGrid>
+              <StatCard>
+                <StatLabel>Somersloops Used</StatLabel>
+                <StatValue>{formatFloat(report!.amplification.sloopsUsed)}<StatUnit> / {formatFloat(report!.amplification.sloopsAvailable)}</StatUnit></StatValue>
+                <StatSub>whole machines, all slots filled</StatSub>
+              </StatCard>
+              <StatCard>
+                <StatLabel>Power Shards Used</StatLabel>
+                <StatValue>{formatFloat(report!.amplification.shardsUsed)}<StatUnit> / {formatFloat(report!.amplification.shardsAvailable)}</StatUnit></StatValue>
+                <StatSub>3 per overclocked machine</StatSub>
+              </StatCard>
+            </StatGrid>
+          </>
+        )}
+
         <SectionTitle order={2}>Summary of Produced Items</SectionTitle>
         {renderLoopWarning()}
         {renderSteps()}

@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { Title, Text, Divider, List, useMantineTheme, Paper } from '@mantine/core';
 import { truncateFloat } from '../../utilities/number';
 import { NODE_TYPE } from '../../utilities/production-solver/models';
+import { buildVariant, sloopSlotsFor, variantLabel, OC_THROUGHPUT_MULT } from '../../utilities/production-solver/amplification';
 import { NodeData } from '../../containers/ProductionPlanner/PlannerResults/ProductionGraphTab';
 import Portal from '../Portal';
 import { useProductionContext } from '../../contexts/production';
@@ -38,13 +39,18 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
     const recipeInfo = ctx.gameData.recipes[data.key];
     const primaryProduct = recipeInfo.products[0];
 
+    // Boost variant (somersloops/power shards) scales throughput and, for overclocking, the clock.
+    const variant = buildVariant(data.suffix ?? '', sloopSlotsFor(recipeInfo.producedIn));
+    const isOverclocked = data.suffix === 'OC' || data.suffix === 'AMPOC';
+    const maxClock = isOverclocked ? 100 * OC_THROUGHPUT_MULT : 100;
+
     const totalBuildings = Math.ceil(data.multiplier);
-    const clockPercentage = data.multiplier / totalBuildings * 100;
-    const itemsPerMinPerBuilding = primaryProduct.perMinute * data.multiplier / totalBuildings;
+    const clockPercentage = data.multiplier / totalBuildings * maxClock;
+    const itemsPerMinPerBuilding = primaryProduct.perMinute * variant.outputMult * data.multiplier / totalBuildings;
 
     return (
       <Tooltip>
-        <TooltipTitle order={3}>Recipe: [{recipeInfo.name}]</TooltipTitle>
+        <TooltipTitle order={3}>Recipe: [{recipeInfo.name}{variantLabel(data.suffix)}]</TooltipTitle>
         <TooltipDivider />
         <TooltipText>
           <b>Buildings:</b> {totalBuildings}x {ctx.gameData.buildings[recipeInfo.producedIn].name}
@@ -52,6 +58,16 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
         <TooltipText>
           <b>Clock speed:</b> {truncateFloat(clockPercentage)}% each
         </TooltipText>
+        {variant.sloops > 0 && (
+          <TooltipText>
+            <b>Somersloops:</b> {variant.sloops} each ({variant.sloops * totalBuildings} total)
+          </TooltipText>
+        )}
+        {variant.shards > 0 && (
+          <TooltipText>
+            <b>Power shards:</b> {variant.shards} each ({variant.shards * totalBuildings} total)
+          </TooltipText>
+        )}
         <TooltipText>
           <b>Items per min:</b> {truncateFloat(itemsPerMinPerBuilding)} each
         </TooltipText>
@@ -61,7 +77,7 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
           {
             recipeInfo.ingredients.map((ingredient) => (
               <List.Item key={ingredient.itemClass}>
-                <TooltipText>{ctx.gameData.items[ingredient.itemClass].name}: {truncateFloat(ingredient.perMinute * data.multiplier)} / min</TooltipText>
+                <TooltipText>{ctx.gameData.items[ingredient.itemClass].name}: {truncateFloat(ingredient.perMinute * variant.inputMult * data.multiplier)} / min</TooltipText>
               </List.Item>
             ))
           }
@@ -71,7 +87,7 @@ const GraphTooltip = forwardRef<HTMLDivElement, Props>((props, ref) => {
           {
             recipeInfo.products.map((product) => (
               <List.Item key={product.itemClass}>
-                <TooltipText>{ctx.gameData.items[product.itemClass].name}: {truncateFloat(product.perMinute * data.multiplier)} / min</TooltipText>
+                <TooltipText>{ctx.gameData.items[product.itemClass].name}: {truncateFloat(product.perMinute * variant.outputMult * data.multiplier)} / min</TooltipText>
               </List.Item>
             ))
           }

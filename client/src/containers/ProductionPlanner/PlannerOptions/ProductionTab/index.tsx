@@ -307,6 +307,42 @@ const ProductionTab = () => {
     )
   }
 
+  function renderAmplificationInputs() {
+    const amplificationOptions = ctx.state.amplificationOptions;
+    return (
+      <Group grow>
+        <TextInput
+          label={<LabelWithTooltip label='Somersloops' tooltip='How many somersloops you have available. The solver spends them to amplify machines (up to 2x output for the same input, at 4x power). Usage may be fractional — round up when building in-game.' />}
+          className='no-spinner'
+          type='number'
+          min='0'
+          step='1'
+          value={amplificationOptions.availableSloops}
+          onChange={(e) => {
+            ctx.dispatch({
+              type: 'UPDATE_AMPLIFICATION_OPTIONS',
+              data: { ...amplificationOptions, availableSloops: e.currentTarget.value },
+            });
+          }}
+        />
+        <TextInput
+          label={<LabelWithTooltip label='Power Shards' tooltip='How many power shards you have available. The solver spends them to overclock machines to 250% (2.5x throughput at ~3.36x power), trading power for fewer buildings. 3 shards per overclocked building.' />}
+          className='no-spinner'
+          type='number'
+          min='0'
+          step='1'
+          value={amplificationOptions.availableShards}
+          onChange={(e) => {
+            ctx.dispatch({
+              type: 'UPDATE_AMPLIFICATION_OPTIONS',
+              data: { ...amplificationOptions, availableShards: e.currentTarget.value },
+            });
+          }}
+        />
+      </Group>
+    );
+  }
+
   function renderTransportOptions() {
     const opts: TransportOptions = ctx.state.transportOptions;
     const beltSelectValue = getSelectValue(opts.beltCapacity, BELT_PRESET_VALUES);
@@ -397,6 +433,14 @@ const ProductionTab = () => {
           {renderGameModeInputs()}
           <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'UPDATE_GAME_MODE_OPTIONS', data: { recipePartsCost: '1', powerConsumption: '1' } }) }} style={{ marginTop: '15px' }}>
             Reset Game Mode
+          </Button>
+        </CollapsibleSection>
+      )}
+      {gameVersion === GV_1_2 && (
+        <CollapsibleSection title='Amplification' tooltip='Give the solver a budget of somersloops and power shards to allocate. It amplifies (more output per input) and overclocks (fewer buildings) where that improves your weighting, up to the budget. Only full-boost machines are modeled.'>
+          {renderAmplificationInputs()}
+          <Button color='danger.8' onClick={() => { ctx.dispatch({ type: 'UPDATE_AMPLIFICATION_OPTIONS', data: { availableSloops: '0', availableShards: '0' } }) }} style={{ marginTop: '15px' }}>
+            Reset Amplification
           </Button>
         </CollapsibleSection>
       )}

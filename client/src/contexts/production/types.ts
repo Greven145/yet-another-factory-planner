@@ -19,6 +19,11 @@ export type GameModeOptions = {
   powerConsumption: string,
 };
 
+export type AmplificationOptions = {
+  availableSloops: string,
+  availableShards: string,
+};
+
 export type InputItemOptions = {
   key: string,
   itemKey: string,
@@ -54,6 +59,7 @@ export type FactoryOptions = {
   allowHandGatheredItems: boolean,
   weightingOptions: WeightingOptions,
   gameModeOptions: GameModeOptions,
+  amplificationOptions: AmplificationOptions,
   allowedRecipes: RecipeSelectionMap,
   allowedBuildings: BuildingSelectionMap,
   nodesPositions: NodeInfo[],

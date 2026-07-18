@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, RecipeSelectionMap, BuildingSelectionMap, FactoryOptions, TransportOptions } from './types';
+import { ProductionItemOptions, InputItemOptions, WeightingOptions, GameModeOptions, AmplificationOptions, RecipeSelectionMap, BuildingSelectionMap, FactoryOptions, TransportOptions } from './types';
 import { GameData, RecipeMap, ResourceMap } from '../gameData/types';
 import { DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 
@@ -84,6 +84,15 @@ export function getInitialGameModeOptions(): GameModeOptions {
   };
 }
 
+// Somersloop/power-shard budgets default to 0 -> the solver offers no boost variants
+// and behaves exactly as before until the user makes some available.
+export function getInitialAmplificationOptions(): AmplificationOptions {
+  return {
+    availableSloops: '0',
+    availableShards: '0',
+  };
+}
+
 export function getInitialTransportOptions(): TransportOptions {
   return {
     beltCapacity: null,
@@ -119,6 +128,7 @@ export function getInitialState(gameData: GameData): FactoryOptions {
     allowHandGatheredItems: false,
     weightingOptions: getInitialWeightingOptions(),
     gameModeOptions: getInitialGameModeOptions(),
+    amplificationOptions: getInitialAmplificationOptions(),
     allowedRecipes: getInitialAllowedRecipes(gameData.recipes),
     allowedBuildings: getInitialAllowedBuildings(gameData.recipes),
     nodesPositions: [],

@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { decodeState_v1_U5 } from './legacy-state-decoders/v1_U5';
 import { decodeState_v2_U5 } from './legacy-state-decoders/v2_U5';
 import { decodeState_v3_U5 } from './legacy-state-decoders/v3_U5';
-import { InputItemOptions, WeightingOptions, GameModeOptions, FactoryOptions, NodeInfo, TransportOptions } from './types';
+import { InputItemOptions, WeightingOptions, GameModeOptions, AmplificationOptions, FactoryOptions, NodeInfo, TransportOptions } from './types';
 import { GameData } from '../gameData/types';
 import { MAX_PRIORITY, MaximizeBalanceMode, DEFAULT_MAXIMIZE_BALANCE_MODE } from './consts';
 import { WireFactory } from '../../utilities/shared-factory/codec';
@@ -14,6 +14,7 @@ import {
   getInitialInputResources,
   getInitialWeightingOptions,
   getInitialGameModeOptions,
+  getInitialAmplificationOptions,
   getInitialTransportOptions,
   getInitialAllowedBuildings,
 } from './defaults';
@@ -41,6 +42,7 @@ export type FactoryAction =
   | { type: 'SET_ALLOW_HAND_GATHERED_ITEMS', active: boolean }
   | { type: 'UPDATE_WEIGHTING_OPTIONS', data: WeightingOptions }
   | { type: 'UPDATE_GAME_MODE_OPTIONS', data: GameModeOptions }
+  | { type: 'UPDATE_AMPLIFICATION_OPTIONS', data: AmplificationOptions }
   | { type: 'SET_ALL_WEIGHTS_DEFAULT', gameData: GameData }
   | { type: 'SET_RECIPE_ACTIVE', key: string, active: boolean }
   | { type: 'MASS_SET_RECIPES_ACTIVE', recipes: string[], active: boolean }
@@ -174,6 +176,10 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
       const newGameModeOptions = { ...action.data };
       return { ...state, gameModeOptions: newGameModeOptions };
     }
+    case 'UPDATE_AMPLIFICATION_OPTIONS': {
+      const newAmplificationOptions = { ...action.data };
+      return { ...state, amplificationOptions: newAmplificationOptions };
+    }
     case 'SET_ALL_WEIGHTS_DEFAULT': {
       const newWeightingOptions = getInitialWeightingOptions();
       const newInputResources = state.inputResources
@@ -226,6 +232,7 @@ export function reducer(state: FactoryOptions, action: FactoryAction): FactoryOp
           maximizeBalanceMode: action.config.maximizeBalanceMode ?? DEFAULT_MAXIMIZE_BALANCE_MODE,
           transportOptions: action.config.transportOptions ?? getInitialTransportOptions(),
           gameModeOptions: action.config.gameModeOptions ?? getInitialGameModeOptions(),
+          amplificationOptions: action.config.amplificationOptions ?? getInitialAmplificationOptions(),
           allowedBuildings: action.config.allowedBuildings ?? getInitialAllowedBuildings(action.gameData.recipes),
         };
       } catch (e) {
