@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using api.Models;
 
 namespace api.Services;
@@ -17,9 +18,25 @@ namespace api.Services;
 /// </summary>
 public static class ShareFactoryId
 {
+    // Amplification and building-selection are appended to the canonical ONLY when set (see below).
+    // WhenWritingNull then omits the default cases so that pre-feature configs serialize to the exact
+    // historical bytes and keep their original id — no existing share link or dedup entry is orphaned.
+    // No pre-existing canonical field is ever null, so this option is a no-op for them.
+    private static readonly JsonSerializerOptions CanonicalOptions =
+        new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+
     /// <summary>Produces the deterministic canonical JSON used as the hash input.</summary>
-    public static string Canonicalize(FactoryConfigSchema config) =>
-        JsonSerializer.Serialize(new
+    public static string Canonicalize(FactoryConfigSchema config)
+    {
+        // These fields were added after the original wire contract. They affect the factory's identity
+        // (a different boost budget or building restriction is a genuinely different factory), so they
+        // must be hashed — otherwise distinct factories would collide on the same id and be deduped.
+        // They are included only when non-default so the ids of every pre-feature config stay stable.
+        var amp = config.AmplificationOptions;
+        var hasAmp = amp is not null && (amp.AvailableSloops != 0 || amp.AvailableShards != 0);
+        var hasBuildings = config.AllowedBuildings.Count > 0;
+
+        return JsonSerializer.Serialize(new
         {
             gameVersion = config.GameVersion,
             productionItems = config.ProductionItems.OrderBy(x => x.ItemKey).ThenBy(x => x.Mode).ThenBy(x => x.Value),
@@ -29,7 +46,10 @@ public static class ShareFactoryId
             weightingOptions = config.WeightingOptions,
             gameModeOptions = config.GameModeOptions,
             allowHandGatheredItems = config.AllowHandGatheredItems,
-        });
+            amplificationOptions = hasAmp ? amp : null,
+            allowedBuildings = hasBuildings ? config.AllowedBuildings.OrderBy(x => x) : null,
+        }, CanonicalOptions);
+    }
 
     /// <summary>Computes the 16-hex-char share id for a config.</summary>
     public static string Compute(FactoryConfigSchema config)
