@@ -254,6 +254,86 @@ public class FactoryConfigSchemaValidatorTests
         result.ShouldHaveValidationErrorFor(x => x.WeightingOptions);
     }
 
+    // AmplificationOptions validation
+    [Fact]
+    public void ValidConfig_DefaultAmplification_ShouldPass()
+    {
+        var config = CreateValidConfig();
+        config.AmplificationOptions = new AmplificationOptions(0, 0);
+        var result = _validator.TestValidate(config);
+        result.ShouldNotHaveValidationErrorFor(x => x.AmplificationOptions);
+    }
+
+    [Fact]
+    public void ValidConfig_PositiveAmplification_ShouldPass()
+    {
+        var config = CreateValidConfig();
+        config.AmplificationOptions = new AmplificationOptions(10, 5);
+        var result = _validator.TestValidate(config);
+        result.ShouldNotHaveValidationErrorFor(x => x.AmplificationOptions);
+    }
+
+    [Fact]
+    public void ValidConfig_NullAmplification_ShouldFail()
+    {
+        var config = CreateValidConfig();
+        config.AmplificationOptions = null!;
+        var result = _validator.TestValidate(config);
+        result.ShouldHaveValidationErrorFor(x => x.AmplificationOptions);
+    }
+
+    [Theory]
+    [InlineData(-1, 0, "AmplificationOptions.AvailableSloops")]
+    [InlineData(0, -1, "AmplificationOptions.AvailableShards")]
+    [InlineData(100001, 0, "AmplificationOptions.AvailableSloops")]
+    [InlineData(0, 100001, "AmplificationOptions.AvailableShards")]
+    public void ValidConfig_OutOfRangeAmplification_ShouldFail(int sloops, int shards, string property)
+    {
+        var config = CreateValidConfig();
+        config.AmplificationOptions = new AmplificationOptions(sloops, shards);
+        var result = _validator.TestValidate(config);
+        result.ShouldHaveValidationErrorFor(property);
+    }
+
+    // AllowedBuildings validation
+    [Fact]
+    public void ValidConfig_EmptyAllowedBuildings_ShouldPass()
+    {
+        var config = CreateValidConfig();
+        config.AllowedBuildings = [];
+        var result = _validator.TestValidate(config);
+        result.ShouldNotHaveValidationErrorFor(x => x.AllowedBuildings);
+    }
+
+    [Fact]
+    public void ValidConfig_ValidAllowedBuildings_ShouldPass()
+    {
+        var config = CreateValidConfig();
+        config.AllowedBuildings = ["Build_SmelterMk1_C", "Build_ConstructorMk1_C"];
+        var result = _validator.TestValidate(config);
+        result.ShouldNotHaveValidationErrorFor(x => x.AllowedBuildings);
+    }
+
+    [Fact]
+    public void ValidConfig_AllowedBuildings_WithEmptyString_ShouldFail()
+    {
+        var config = CreateValidConfig();
+        config.AllowedBuildings = [""];
+        var result = _validator.TestValidate(config);
+        result.ShouldHaveValidationErrorFor("AllowedBuildings[0]");
+    }
+
+    [Fact]
+    public void ValidConfig_AllowedBuildingsExceedingLimit_ShouldFail()
+    {
+        var config = CreateValidConfig();
+        config.AllowedBuildings = Enumerable.Range(0, 501)
+            .Select(i => $"Build_{i}")
+            .ToList();
+        var result = _validator.TestValidate(config);
+        result.ShouldHaveValidationErrorFor(x => x.AllowedBuildings);
+    }
+
     // Multiple production items
     [Fact]
     public void ValidConfig_MultipleValidProductionItems_ShouldPass()

@@ -26,10 +26,15 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         RuleForEach(x => x.InputResources).SetValidator(new InputValidator());
         RuleFor(x => x.WeightingOptions).NotNull().SetValidator(new WeightingOptionsValidator());
         RuleFor(x => x.GameModeOptions).NotNull().SetValidator(new GameModeOptionsValidator());
+        RuleFor(x => x.AmplificationOptions).NotNull().SetValidator(new AmplificationOptionsValidator());
         // AllowedRecipes may be empty (means all recipes are allowed)
         RuleFor(x => x.AllowedRecipes)
             .Must(x => x.Count <= 500).WithMessage("AllowedRecipes must not exceed 500 items.");
         RuleForEach(x => x.AllowedRecipes).NotEmpty().MaximumLength(200);
+        // AllowedBuildings may be empty (means all buildings are allowed)
+        RuleFor(x => x.AllowedBuildings)
+            .Must(x => x.Count <= 500).WithMessage("AllowedBuildings must not exceed 500 items.");
+        RuleForEach(x => x.AllowedBuildings).NotEmpty().MaximumLength(200);
         RuleFor(x => x.NodesPositions)
             .Must(x => x.Count <= 1000).WithMessage("NodesPositions must not exceed 1000 items.");
         RuleForEach(x => x.NodesPositions).SetValidator(new NodePositionValidator());
@@ -76,6 +81,16 @@ public class FactoryConfigSchemaValidator : AbstractValidator<FactoryConfigSchem
         {
             RuleFor(x => x.RecipePartsCost).GreaterThan(0);
             RuleFor(x => x.PowerConsumption).GreaterThan(0);
+        }
+    }
+
+    private sealed class AmplificationOptionsValidator : AbstractValidator<AmplificationOptions>
+    {
+        public AmplificationOptionsValidator()
+        {
+            // Whole, non-negative counts; the upper bound is a sanity ceiling well above any real budget.
+            RuleFor(x => x.AvailableSloops).InclusiveBetween(0, 100000);
+            RuleFor(x => x.AvailableShards).InclusiveBetween(0, 100000);
         }
     }
 

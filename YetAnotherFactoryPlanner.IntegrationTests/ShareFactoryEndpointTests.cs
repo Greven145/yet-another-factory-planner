@@ -110,6 +110,65 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 	}
 
 	/// <summary>
+	/// Regression guard for the amplification-persistence fix — somersloop/power-shard budgets are part
+	/// of the factory's identity. Two configs identical except for <c>amplificationOptions</c> must hash
+	/// to DIFFERENT keys; otherwise FindOrSaveAsync dedupes the second save away and a shared 10-sloop
+	/// factory could resolve to an otherwise-identical 0-sloop link.
+	/// </summary>
+	[Fact]
+	public async Task PostShareFactory_ConfigsDifferingOnlyByAmplification_ReturnDifferentKeys()
+	{
+		// Arrange
+		using var client = fixture.App.CreateHttpClient("api");
+
+		var noBoost = BuildMinimalFactoryRequest("Desc_IronPlate_C", amount: 10, gameVersion: "1.2");
+		var boosted = BuildMinimalFactoryRequest("Desc_IronPlate_C", amount: 10, gameVersion: "1.2",
+			availableSloops: 10, availableShards: 5);
+
+		// Act
+		var noBoostResponse = await client.PostAsJsonAsync("/api/share-factory", noBoost, JsonOptions, TestContext.Current.CancellationToken);
+		var boostedResponse = await client.PostAsJsonAsync("/api/share-factory", boosted, JsonOptions, TestContext.Current.CancellationToken);
+
+		// Assert
+		Assert.Equal(HttpStatusCode.Created, noBoostResponse.StatusCode);
+		Assert.Equal(HttpStatusCode.Created, boostedResponse.StatusCode);
+
+		var noBoostKey = await ExtractKeyAsync(noBoostResponse);
+		var boostedKey = await ExtractKeyAsync(boostedResponse);
+
+		Assert.NotEqual(noBoostKey, boostedKey);
+	}
+
+	/// <summary>
+	/// End-to-end guard for the amplification-persistence fix — the saved <c>amplificationOptions</c>
+	/// must survive the Cosmos round-trip: after sharing a factory with non-zero sloops/shards, fetching
+	/// it back returns the same budgets (so the <c>?factory=</c> link restores as configured). This is
+	/// the automated form of the handoff's manual "open the shared link and confirm budgets restore".
+	/// </summary>
+	[Fact]
+	public async Task PostShareFactory_PersistsAmplificationOptions_RoundTrips()
+	{
+		// Arrange
+		using var client = fixture.App.CreateHttpClient("api");
+		var requestBody = BuildMinimalFactoryRequest("Desc_IronPlate_C", amount: 10, gameVersion: "1.2",
+			availableSloops: 12, availableShards: 7);
+
+		// Act — save, then fetch back
+		var postResponse = await client.PostAsJsonAsync("/api/share-factory", requestBody, JsonOptions, TestContext.Current.CancellationToken);
+		Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
+		var key = await ExtractKeyAsync(postResponse);
+
+		var getResponse = await client.GetAsync($"/api/shared-factories/{key}", TestContext.Current.CancellationToken);
+		Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+		// Assert — the budgets persisted exactly as sent
+		var json = await getResponse.Content.ReadFromJsonAsync<JsonElement>(JsonOptions, TestContext.Current.CancellationToken);
+		var amplificationOptions = json.GetProperty("data").GetProperty("factory_config").GetProperty("amplificationOptions");
+		Assert.Equal(12, amplificationOptions.GetProperty("availableSloops").GetInt32());
+		Assert.Equal(7, amplificationOptions.GetProperty("availableShards").GetInt32());
+	}
+
+	/// <summary>
 	/// Smoke test — a single POST with a valid factory config is saved and returns a key.
 	/// This verifies the happy path remains intact.
 	/// </summary>
@@ -161,6 +220,8 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 		decimal amount,
 		decimal recipePartsCost = 1,
 		decimal powerConsumption = 1,
+		int availableSloops = 0,
+		int availableShards = 0,
 		string gameVersion = "1.1") => new
 	{
 		factoryConfig = new
@@ -176,6 +237,7 @@ public sealed class ShareFactoryEndpointTests(AppHostFixture fixture)
 			},
 			weightingOptions = new { resources = 1000, power = 1, complexity = 0, buildings = 0 },
 			gameModeOptions = new { recipePartsCost, powerConsumption },
+			amplificationOptions = new { availableSloops, availableShards },
 			nodesPositions = Array.Empty<object>(),
 		},
 	};

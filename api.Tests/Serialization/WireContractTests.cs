@@ -26,6 +26,8 @@ public class WireContractTests
         NodesPositions = [new NodePosition("node-1", 10, 20)],
         WeightingOptions = new WeightingOptions(1000, 1, 0, 0),
         GameModeOptions = new GameModeOptions(1, 1),
+        AmplificationOptions = new AmplificationOptions(10, 5),
+        AllowedBuildings = ["Build_SmelterMk1_C", "Build_ConstructorMk1_C"],
         AllowHandGatheredItems = true,
     };
 
@@ -46,10 +48,45 @@ public class WireContractTests
                  {
                      "productionItems", "inputItems", "inputResources", "allowedRecipes",
                      "nodesPositions", "weightingOptions", "gameModeOptions", "allowHandGatheredItems",
+                     "amplificationOptions", "allowedBuildings",
                  })
         {
             Assert.True(root.TryGetProperty(field, out _), $"Missing camelCase field '{field}'.");
         }
+
+        // Nested amplification keys must be camelCase too — the client reads availableSloops/availableShards.
+        var amp = root.GetProperty("amplificationOptions");
+        Assert.Equal(10, amp.GetProperty("availableSloops").GetInt32());
+        Assert.Equal(5, amp.GetProperty("availableShards").GetInt32());
+    }
+
+    [Fact]
+    public void FactoryConfig_RoundTrips_AmplificationAndAllowedBuildings()
+    {
+        // Guards the camelCase mapping end-to-end: what the worker persists to Cosmos must deserialize
+        // back into the same C# members (a mapping regression here silently drops the fields on shares).
+        var json = JsonSerializer.Serialize(SampleConfig(), Web);
+        var restored = JsonSerializer.Deserialize<FactoryConfigSchema>(json, Web);
+
+        Assert.NotNull(restored);
+        Assert.Equal(10, restored!.AmplificationOptions.AvailableSloops);
+        Assert.Equal(5, restored.AmplificationOptions.AvailableShards);
+        Assert.Equal(["Build_SmelterMk1_C", "Build_ConstructorMk1_C"], restored.AllowedBuildings);
+    }
+
+    [Fact]
+    public void FactoryConfig_MissingAmplification_DeserializesToDefaultZero()
+    {
+        // Old Cosmos docs written before these fields existed must deserialize cleanly to 0/0 (and an
+        // empty building list), not null — the defaulted properties guarantee this back-compat.
+        const string legacy = """{"gameVersion":"V1_2","productionItems":[{"itemKey":"Desc_IronPlate_C","mode":"per-minute","value":20}]}""";
+
+        var restored = JsonSerializer.Deserialize<FactoryConfigSchema>(legacy, Web);
+
+        Assert.NotNull(restored);
+        Assert.Equal(0, restored!.AmplificationOptions.AvailableSloops);
+        Assert.Equal(0, restored.AmplificationOptions.AvailableShards);
+        Assert.Empty(restored.AllowedBuildings);
     }
 
     [Fact]
