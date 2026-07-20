@@ -34,6 +34,22 @@ describe('amplification against real 1.2 game data', () => {
     expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
   });
 
+  it('never exceeds a tight sloop/shard budget on a deep real chain', async () => {
+    // A many-recipe target with a tiny sloop budget and a generous shard budget: the old
+    // continuous relaxation smeared fractional boosts across ~24 recipes, each rounding up in
+    // the report to a whole machine (1 sloop -> 2 used, 100 shards -> 141 used). Whole-machine
+    // integer boosts must keep usage within budget.
+    const opts = baseOptions();
+    opts.productionItems = [{ key: 'p1', itemKey: 'Desc_Computer_C', mode: 'per-minute', value: '10' }];
+    opts.amplificationOptions = { availableSloops: '1', availableShards: '100' };
+    const { report, error } = await new ProductionSolver(opts, gd).exec();
+    expect(error).toBeNull();
+    expect(report!.amplification.sloopsUsed).toBeLessThanOrEqual(report!.amplification.sloopsAvailable);
+    expect(report!.amplification.shardsUsed).toBeLessThanOrEqual(report!.amplification.shardsAvailable);
+    expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
+    expect(Number.isInteger(report!.amplification.shardsUsed)).toBe(true);
+  });
+
   it('overclocks real recipes when only shards are available (buildings-weighted)', async () => {
     const opts = baseOptions();
     opts.weightingOptions = { resources: '10', power: '1', complexity: '0', buildings: '1000' };

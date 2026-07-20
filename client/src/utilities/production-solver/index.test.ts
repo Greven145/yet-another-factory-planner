@@ -693,31 +693,40 @@ describe('ProductionSolver amplification (somersloops / power shards)', () => {
   });
 
   it('amplifies to halve input use when sloops are available', async () => {
-    const options = ampOptions({ amplificationOptions: { availableSloops: '106', availableShards: '0' } });
+    // One whole amplified constructor makes 40 plates from 30 ingots (2x output, same input);
+    // matching that with base constructors would take two machines and 60 ingots. Boost variants
+    // are whole machines, so the win only exists when a full amplified machine is warranted.
+    const options = ampOptions({
+      productionItems: [{ key: 'p1', itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: '40' }],
+      amplificationOptions: { availableSloops: '106', availableShards: '0' },
+    });
     const { productionGraph, report, error } = await new ProductionSolver(options, ampGameData).exec();
     expect(error).toBeNull();
-    // Solver switches to the amplified variant: 0.5 amplified constructors make 20 plates
-    // from just 15 ingots (2x output, same input), using 0.5 somersloops.
     const ampNode = productionGraph!.nodes['Recipe_IronPlate_C::AMP'];
     expect(ampNode).toBeDefined();
     expect(ampNode.suffix).toBe('AMP');
-    expect(ampNode.multiplier).toBeCloseTo(0.5, 4);
-    expect(productionGraph!.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(15, 4);
-    // Somersloops go into whole machines: 0.5 amplified constructors round up to 1 physical
-    // machine, whose single slot needs 1 whole somersloop (not the fractional 0.5).
+    // A single, whole amplified machine — not a fraction.
+    expect(ampNode.multiplier).toBeCloseTo(1, 4);
+    expect(productionGraph!.nodes['Desc_IronIngot_C'].multiplier).toBeCloseTo(30, 4);
+    // Its one somersloop slot needs exactly one somersloop.
     expect(report!.amplification.sloopsUsed).toBe(1);
     expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
     expect(report!.amplification.sloopsAvailable).toBe(106);
   });
 
-  it('reports somersloop usage as whole machines, rounding each machine up', async () => {
-    // The LP allocates fractional amplified machines, but a real build needs whole machines
-    // with every slot filled — so usage is always an integer (regression for issue: report
-    // showed 4.833 sloops when the real requirement was 6).
-    const options = ampOptions({ amplificationOptions: { availableSloops: '106', availableShards: '0' } });
-    const { report, error } = await new ProductionSolver(options, ampGameData).exec();
+  it('reports whole-machine somersloop usage that never exceeds the budget', async () => {
+    // Five whole amplified constructors make 200 plates from 150 ingots (vs 300 for ten base
+    // machines), consuming exactly five somersloops — integer usage, within budget. Previously
+    // the LP smeared fractional amplified machines and the report rounded each up past the budget.
+    const options = ampOptions({
+      productionItems: [{ key: 'p1', itemKey: 'Desc_IronPlate_C', mode: 'per-minute', value: '200' }],
+      amplificationOptions: { availableSloops: '106', availableShards: '0' },
+    });
+    const { productionGraph, report, error } = await new ProductionSolver(options, ampGameData).exec();
     expect(error).toBeNull();
-    expect(report!.amplification.sloopsUsed).toBeGreaterThan(0);
+    expect(productionGraph!.nodes['Recipe_IronPlate_C::AMP'].multiplier).toBeCloseTo(5, 4);
+    expect(report!.amplification.sloopsUsed).toBe(5);
     expect(Number.isInteger(report!.amplification.sloopsUsed)).toBe(true);
+    expect(report!.amplification.sloopsUsed).toBeLessThanOrEqual(report!.amplification.sloopsAvailable);
   });
 });
