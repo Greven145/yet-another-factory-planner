@@ -46,8 +46,8 @@ export type Report = {
   },
   totalItemsRecap: ProducedItemInformation[],
   loopWarning: boolean,
-  // Somersloop / power-shard consumption and budgets. usage is a continuous relaxation
-  // (fractional buildings use fractional slots) so round up when building in-game.
+  // Somersloop / power-shard consumption and budgets. Boost variants are solved as whole
+  // machines (integer building counts), so usage is exact and never exceeds the budget.
   amplification: {
     sloopsUsed: number,
     sloopsAvailable: number,

@@ -525,6 +525,22 @@ export class ProductionSolver {
     return surplus;
   }
 
+  // Somersloops / power shards consumed by a (cumulative) solution's boost-variant nodes.
+  // Used to subtract prior passes' usage from the budget available to the next pass, since the
+  // slot budget is a physical pool shared across all summed passes. Base variants consume none.
+  private boostUsage(solution: ProductionSolution, kind: 'sloops' | 'shards'): number {
+    let total = 0;
+    for (const [key, multiplier] of Object.entries(solution)) {
+      const { baseRecipeKey, suffix } = parseVariantKey(key);
+      if (!suffix) continue;
+      const recipeInfo = this.gameData.recipes[baseRecipeKey];
+      if (!recipeInfo) continue;
+      const variant = buildVariant(suffix, sloopSlotsFor(recipeInfo.producedIn));
+      total += multiplier * variant[kind];
+    }
+    return total;
+  }
+
   private graphContext() {
     return {
       gameData: this.gameData,
@@ -547,6 +563,7 @@ export class ProductionSolver {
       },
       subjectTo: [],
       binaries: [],
+      generals: [],
     };
 
     const doPoints = (isRateTargetPass && this.rateTargets[POINTS_ITEM_KEY]) || targetKeys.includes(POINTS_ITEM_KEY);
@@ -777,40 +794,52 @@ export class ProductionSolver {
       }
     }
 
-    // Global somersloop / power-shard budgets: the total slots consumed across every boost
-    // variant may not exceed what the user has available. This is a continuous relaxation —
-    // fractional buildings consume fractional slots — so the reported usage should be rounded
-    // up when built in-game. Only added when the corresponding budget is set (and thus boost
-    // variants exist), so the un-boosted model gains no constraints.
-    if (this.availableSloops > 0) {
-      const sloopVars: Var[] = [];
-      for (const [recipeKey, variants] of this.variantsByRecipe) {
-        for (const variant of variants) {
-          if (variant.sloops > 0) sloopVars.push({ name: variantKey(recipeKey, variant.suffix), coef: variant.sloops });
-        }
-      }
-      if (sloopVars.length > 0) {
-        model.subjectTo.push({
-          name: 'somersloop budget',
-          vars: sloopVars,
-          bnds: { type: glpk.GLP_UP, ub: this.availableSloops, lb: NaN },
-        });
+    // Global somersloop / power-shard budgets. Somersloops and power shards are placed in
+    // WHOLE machines, so a boost variant's building count is an integer decision variable
+    // (GLPK generals) — not a continuous relaxation. Without this the LP smears the budget as
+    // fractional sub-machine overclocks across many recipes, each of which the report then
+    // rounds up to a whole machine, busting the budget (e.g. 1 sloop -> 2 used, 100 shards ->
+    // 141 used). Integer building counts make each boost land in a specific, buildable machine
+    // and keep total slot usage <= the budget exactly.
+    //
+    // The budget is a physical pool shared across every solver pass, so the amount already
+    // consumed by prior (summed) passes is subtracted before bounding this pass. Only added
+    // when a budget is set (and thus boost variants exist), so the un-boosted model gains no
+    // integer variables or constraints.
+    const priorSloopsUsed = priorSolution ? this.boostUsage(priorSolution, 'sloops') : 0;
+    const priorShardsUsed = priorSolution ? this.boostUsage(priorSolution, 'shards') : 0;
+    const remainingSloops = Math.max(0, this.availableSloops - priorSloopsUsed);
+    const remainingShards = Math.max(0, this.availableShards - priorShardsUsed);
+    const sloopVars: Var[] = [];
+    const shardVars: Var[] = [];
+    for (const [recipeKey, variants] of this.variantsByRecipe) {
+      for (const variant of variants) {
+        if (variant.sloops === 0 && variant.shards === 0) continue;
+        const vKey = variantKey(recipeKey, variant.suffix);
+        // Whole-machine boost: integer building count, capped by what each budget alone allows.
+        let ub = Infinity;
+        if (variant.sloops > 0) ub = Math.min(ub, Math.floor(remainingSloops / variant.sloops));
+        if (variant.shards > 0) ub = Math.min(ub, Math.floor(remainingShards / variant.shards));
+        model.generals!.push(vKey);
+        model.bounds = model.bounds ?? [];
+        model.bounds.push({ name: vKey, type: glpk.GLP_DB, lb: 0, ub: Math.max(0, ub) });
+        if (variant.sloops > 0) sloopVars.push({ name: vKey, coef: variant.sloops });
+        if (variant.shards > 0) shardVars.push({ name: vKey, coef: variant.shards });
       }
     }
-    if (this.availableShards > 0) {
-      const shardVars: Var[] = [];
-      for (const [recipeKey, variants] of this.variantsByRecipe) {
-        for (const variant of variants) {
-          if (variant.shards > 0) shardVars.push({ name: variantKey(recipeKey, variant.suffix), coef: variant.shards });
-        }
-      }
-      if (shardVars.length > 0) {
-        model.subjectTo.push({
-          name: 'power shard budget',
-          vars: shardVars,
-          bnds: { type: glpk.GLP_UP, ub: this.availableShards, lb: NaN },
-        });
-      }
+    if (this.availableSloops > 0 && sloopVars.length > 0) {
+      model.subjectTo.push({
+        name: 'somersloop budget',
+        vars: sloopVars,
+        bnds: { type: glpk.GLP_UP, ub: remainingSloops, lb: NaN },
+      });
+    }
+    if (this.availableShards > 0 && shardVars.length > 0) {
+      model.subjectTo.push({
+        name: 'power shard budget',
+        vars: shardVars,
+        bnds: { type: glpk.GLP_UP, ub: remainingShards, lb: NaN },
+      });
     }
 
     if (maxima && targetKeys.length > 1) {
@@ -882,12 +911,17 @@ export class ProductionSolver {
     const cullThreshold = Math.max(MIN_RECIPE_MULTIPLIER, this.scale * RECIPE_NOISE_SCALE_FACTOR);
     const result: ProductionSolution = {};
     Object.entries(solution.result.vars).forEach(([key, val]) => {
-      if (val > cullThreshold) {
-        // Keep the variant key intact (assembleGraph/buildReport re-derive the boost from it),
-        // but validate against the underlying base recipe so binary/budget vars are dropped.
-        if (this.gameData.recipes[parseVariantKey(key).baseRecipeKey]) {
-          result[key] = val;
-        }
+      // Validate against the underlying base recipe so binary/budget vars are dropped; keep the
+      // variant key intact (assembleGraph/buildReport re-derive the boost from it).
+      const { baseRecipeKey, suffix } = parseVariantKey(key);
+      if (!this.gameData.recipes[baseRecipeKey]) return;
+      if (suffix) {
+        // Boost variants are integer (whole machines); snap off MIP floating-point noise so the
+        // report's whole-machine slot tally is exact and can't drift over budget.
+        const rounded = Math.round(val);
+        if (rounded >= 1) result[key] = rounded;
+      } else if (val > cullThreshold) {
+        result[key] = val;
       }
     });
     return result;
