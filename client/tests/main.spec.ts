@@ -368,6 +368,10 @@ test.describe('Factory Planner Application', () => {
     await page.getByRole('button', { name: '+ Add Product' }).click();
     await page.getByPlaceholder('Select an item').click();
     await page.getByRole('option', { name: 'Iron Plate', exact: true }).click();
+    // Somersloops amplify WHOLE machines, so a target must be large enough that a fully
+    // amplified machine reduces resource use — the default 10/min is under a single machine
+    // and correctly warrants no sloops. 100/min spans several machines worth of production.
+    await page.getByPlaceholder('Amount').fill('100');
 
     // Give the solver a somersloop budget (section gated to 1.2, the default version).
     // With the default resource-dominant weighting, amplifying halves the ore a step
