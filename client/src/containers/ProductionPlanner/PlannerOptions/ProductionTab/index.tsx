@@ -23,13 +23,13 @@ const BELT_TIER_OPTIONS = [
   { value: 'disabled', label: 'Disabled' },
   { value: '60', label: 'Mk. 1 (60/min)' },
   { value: '120', label: 'Mk. 2 (120/min)' },
-  { value: '240', label: 'Mk. 3 (240/min)' },
+  { value: '270', label: 'Mk. 3 (270/min)' },
   { value: '480', label: 'Mk. 4 (480/min)' },
   { value: '780', label: 'Mk. 5 (780/min)' },
   { value: '1200', label: 'Mk. 6 (1200/min)' },
 ];
 
-const BELT_PRESET_VALUES = new Set(['60', '120', '240', '480', '780', '1200']);
+const BELT_PRESET_VALUES = new Set(['60', '120', '270', '480', '780', '1200']);
 
 const PIPE_TIER_OPTIONS = [
   { value: 'disabled', label: 'Disabled' },
