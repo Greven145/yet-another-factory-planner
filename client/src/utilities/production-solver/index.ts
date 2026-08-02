@@ -71,6 +71,10 @@ const MAXIMIZE_WEIGHT = 1e5;
 const ENFORCE_BIN_WEIGHT = 1000;
 const TIME_LIMIT = 3.0;
 
+// Recipes produced here only change an item's packaged/unpackaged form; the 1.2 Game Mode
+// recipe-cost multiplier does not apply to them (see applyGameModeMultipliers).
+const PACKAGER_BUILDING_KEY = 'Desc_Packager_C';
+
 type GlobalWeights = {
   resources: number,
   power: number,
@@ -362,6 +366,10 @@ export class ProductionSolver {
   // perMinute rates directly. The cycle time is derived from the GCD of all perMinute values in the
   // recipe (ingredients + products): craftTime = 60 / GCD, perCycleQty = perMinute / GCD.
   // Scaled quantities are rounded to the nearest whole number (minimum 1 per the game's floor).
+  // Fluid ingredients are exempt from this rounding (the game keeps fluids fractional) and are
+  // scaled directly. Packager recipes are exempt from the multiplier entirely: they only convert
+  // an item's packaged/unpackaged form, so scaling just one side of a package/unpackage pair would
+  // let a packaging loop manufacture resources for free.
   private static applyGameModeMultipliers(gameData: GameData, recipeCostMultiplier: number, powerMultiplier: number): GameData {
     if (recipeCostMultiplier === 1 && powerMultiplier === 1) {
       return gameData;
@@ -369,7 +377,7 @@ export class ProductionSolver {
 
     const recipes: GameData['recipes'] = {};
     for (const [key, recipe] of Object.entries(gameData.recipes)) {
-      if (recipeCostMultiplier === 1) {
+      if (recipeCostMultiplier === 1 || recipe.producedIn === PACKAGER_BUILDING_KEY) {
         recipes[key] = recipe;
       } else {
         const allRates = [
@@ -380,6 +388,9 @@ export class ProductionSolver {
         recipes[key] = {
           ...recipe,
           ingredients: recipe.ingredients.map((i) => {
+            if (gameData.items[i.itemClass]?.isFluid) {
+              return { ...i, perMinute: i.perMinute * recipeCostMultiplier };
+            }
             const perCycle = Math.round(i.perMinute / gcd);
             const scaledPerCycle = Math.max(1, Math.round(perCycle * recipeCostMultiplier));
             return { ...i, perMinute: scaledPerCycle * gcd };

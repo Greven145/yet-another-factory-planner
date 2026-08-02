@@ -495,21 +495,21 @@
       },
       "buildingsUsed": {
         "Desc_ConstructorMk1_C": {
-          "count": 3,
+          "count": 4,
           "materialCost": {
-            "Desc_Cable_C": 24,
-            "Desc_IronPlateReinforced_C": 6
+            "Desc_Cable_C": 32,
+            "Desc_IronPlateReinforced_C": 8
           }
         },
         "Desc_SmelterMk1_C": {
-          "count": 6,
+          "count": 7,
           "materialCost": {
-            "Desc_IronRod_C": 30,
-            "Desc_Wire_C": 48
+            "Desc_IronRod_C": 35,
+            "Desc_Wire_C": 56
           }
         }
       },
-      "estimatedFoundations": 18,
+      "estimatedFoundations": 22,
       "loopWarning": false,
       "pointsProduced": 360,
       "powerUsageEstimate": {
@@ -519,7 +519,7 @@
         "total": 103.5
       },
       "resourceEfficiencyScore": 10.7430618,
-      "totalBuildArea": 564,
+      "totalBuildArea": 698,
       "totalItemsRecap": [
         {
           "amount": 180,
@@ -541,10 +541,10 @@
         }
       ],
       "totalMaterialCost": {
-        "Desc_Cable_C": 24,
-        "Desc_IronPlateReinforced_C": 6,
-        "Desc_IronRod_C": 30,
-        "Desc_Wire_C": 48
+        "Desc_Cable_C": 32,
+        "Desc_IronPlateReinforced_C": 8,
+        "Desc_IronRod_C": 35,
+        "Desc_Wire_C": 56
       },
       "totalRawResources": {
         "Iron Ore": 360

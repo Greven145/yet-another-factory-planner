@@ -578,6 +578,131 @@ describe('ProductionSolver game mode multipliers (recipe cost)', () => {
   });
 });
 
+// issue #195: the cost multiplier must not round fluid ingredients to per-cycle integers
+// (the game keeps fluids fractional), and must not touch Packager recipes at all (scaling
+// only the ingredient side of a package/unpackage pair would let a packaging loop
+// manufacture resources for free).
+const fluidCostGameData: GameData = {
+  buildings: {
+    'Build_Refinery_C': { slug: 'refinery', name: 'Refinery', power: 30, area: 50, buildCost: [], isFicsmas: false },
+    // Referenced by buildReport's resource-extraction power estimate for non-water/oil resources.
+    'Desc_MinerMk3_C': { slug: 'miner_mk3', name: 'Miner Mk.3', power: 110, area: 100, buildCost: [], isFicsmas: false },
+  },
+  recipes: {
+    // 30 raw fluid/min -> 30 processed/min; at 0.25x the fluid ingredient should scale
+    // directly to 7.5/min rather than being rounded to a per-cycle integer.
+    'Recipe_FluidIntake_C': {
+      slug: 'fluid_intake', name: 'Fluid Intake', isAlternate: false,
+      ingredients: [{ itemClass: 'Desc_RawFluid_C', perMinute: 30 }],
+      products: [{ itemClass: 'Desc_ProcessedFluid_C', perMinute: 30 }],
+      producedIn: 'Build_Refinery_C', isFicsmas: false,
+    },
+  },
+  resources: {
+    'Desc_RawFluid_C': { itemClass: 'Desc_RawFluid_C', maxExtraction: 100000, relativeValue: 1 },
+  },
+  items: {
+    'Desc_RawFluid_C': { slug: 'raw_fluid', name: 'Raw Fluid', sinkPoints: 0, isFluid: true, usedInRecipes: ['Recipe_FluidIntake_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_ProcessedFluid_C': { slug: 'processed_fluid', name: 'Processed Fluid', sinkPoints: 0, isFluid: true, usedInRecipes: [], producedFromRecipes: ['Recipe_FluidIntake_C'], isFicsmas: false },
+  },
+  handGatheredItems: {},
+};
+
+function fluidCostOptions(recipePartsCost: string): FactoryOptions {
+  return {
+    key: 'fluid-cost',
+    productionItems: [{ key: 'p1', itemKey: 'Desc_ProcessedFluid_C', mode: 'per-minute', value: '30' }],
+    inputItems: [],
+    inputResources: [{ key: 'r1', itemKey: 'Desc_RawFluid_C', value: '100000', weight: '1', unlimited: false }],
+    allowHandGatheredItems: false,
+    weightingOptions: { resources: '1', power: '1', complexity: '0', buildings: '0' },
+    gameModeOptions: { recipePartsCost, powerConsumption: '1' },
+    amplificationOptions: { availableSloops: '0', availableShards: '0' },
+    allowedRecipes: { 'Recipe_FluidIntake_C': true },
+    allowedBuildings: { 'Build_Refinery_C': true },
+    nodesPositions: [],
+    maximizeBalanceMode: 'proportional',
+    transportOptions: { beltCapacity: null, pipeCapacity: null },
+  };
+}
+
+describe('ProductionSolver game mode multiplier: fluid ingredients (issue #195)', () => {
+  it('0.25x: scales a fluid ingredient directly instead of rounding it to a per-cycle integer', async () => {
+    // Naive per-cycle rounding: GCD(30, 30) = 30 -> 1 unit/cycle -> round(1 * 0.25) clamped to
+    // a minimum of 1 -> 30/min unchanged (no discount at all). Correct: 30 * 0.25 = 7.5/min.
+    const { productionGraph, error } = await new ProductionSolver(fluidCostOptions('0.25'), fluidCostGameData).exec();
+
+    expect(error).toBeNull();
+    const rawFluidNode = productionGraph!.nodes['Desc_RawFluid_C'];
+    expect(rawFluidNode.multiplier).toBeCloseTo(7.5, 4);
+  });
+
+  it('1x: multiplier of 1 leaves fluid ingredients unchanged', async () => {
+    const { productionGraph, error } = await new ProductionSolver(fluidCostOptions('1'), fluidCostGameData).exec();
+
+    expect(error).toBeNull();
+    const rawFluidNode = productionGraph!.nodes['Desc_RawFluid_C'];
+    expect(rawFluidNode.multiplier).toBeCloseTo(30, 4);
+  });
+});
+
+const packagerCostGameData: GameData = {
+  buildings: {
+    'Desc_Packager_C': { slug: 'packager', name: 'Packager', power: 10, area: 50, buildCost: [], isFicsmas: false },
+    // Referenced by buildReport's resource-extraction power estimate for non-water/oil resources.
+    'Desc_MinerMk3_C': { slug: 'miner_mk3', name: 'Miner Mk.3', power: 110, area: 100, buildCost: [], isFicsmas: false },
+  },
+  recipes: {
+    // 40 raw fluid + 40 canisters/min -> 40 packaged/min. The cost multiplier must not touch
+    // this recipe at all, since it only converts an item's packaged form.
+    'Recipe_PackageFluid_C': {
+      slug: 'package_fluid', name: 'Package Fluid', isAlternate: false,
+      ingredients: [{ itemClass: 'Desc_RawFluid_C', perMinute: 40 }, { itemClass: 'Desc_Canister_C', perMinute: 40 }],
+      products: [{ itemClass: 'Desc_PackagedFluid_C', perMinute: 40 }],
+      producedIn: 'Desc_Packager_C', isFicsmas: false,
+    },
+  },
+  resources: {
+    'Desc_RawFluid_C': { itemClass: 'Desc_RawFluid_C', maxExtraction: 100000, relativeValue: 1 },
+    'Desc_Canister_C': { itemClass: 'Desc_Canister_C', maxExtraction: 100000, relativeValue: 1 },
+  },
+  items: {
+    'Desc_RawFluid_C': { slug: 'raw_fluid', name: 'Raw Fluid', sinkPoints: 0, isFluid: true, usedInRecipes: ['Recipe_PackageFluid_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_Canister_C': { slug: 'canister', name: 'Canister', sinkPoints: 0, isFluid: false, usedInRecipes: ['Recipe_PackageFluid_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_PackagedFluid_C': { slug: 'packaged_fluid', name: 'Packaged Fluid', sinkPoints: 0, isFluid: false, usedInRecipes: [], producedFromRecipes: ['Recipe_PackageFluid_C'], isFicsmas: false },
+  },
+  handGatheredItems: {},
+};
+
+describe('ProductionSolver game mode multiplier: Packager exemption (issue #195)', () => {
+  it('0.25x: leaves Packager recipe ingredients unscaled', async () => {
+    const options: FactoryOptions = {
+      key: 'packager-cost',
+      productionItems: [{ key: 'p1', itemKey: 'Desc_PackagedFluid_C', mode: 'per-minute', value: '40' }],
+      inputItems: [],
+      inputResources: [
+        { key: 'r1', itemKey: 'Desc_RawFluid_C', value: '100000', weight: '1', unlimited: false },
+        { key: 'r2', itemKey: 'Desc_Canister_C', value: '100000', weight: '1', unlimited: false },
+      ],
+      allowHandGatheredItems: false,
+      weightingOptions: { resources: '1', power: '1', complexity: '0', buildings: '0' },
+      gameModeOptions: { recipePartsCost: '0.25', powerConsumption: '1' },
+      amplificationOptions: { availableSloops: '0', availableShards: '0' },
+      allowedRecipes: { 'Recipe_PackageFluid_C': true },
+      allowedBuildings: { 'Desc_Packager_C': true },
+      nodesPositions: [],
+      maximizeBalanceMode: 'proportional',
+      transportOptions: { beltCapacity: null, pipeCapacity: null },
+    };
+    const { productionGraph, error } = await new ProductionSolver(options, packagerCostGameData).exec();
+
+    expect(error).toBeNull();
+    // Unscaled: still needs the full 40/min of raw fluid and canisters, not a 0.25x-discounted amount.
+    expect(productionGraph!.nodes['Desc_RawFluid_C'].multiplier).toBeCloseTo(40, 4);
+    expect(productionGraph!.nodes['Desc_Canister_C'].multiplier).toBeCloseTo(40, 4);
+  });
+});
+
 describe('ProductionSolver belt/pipe capacity (issue #130)', () => {
   // Iron Ingot recipe produces 30 ingots/min per building, so the recipe node's total
   // output for iron ingot is `multiplier * 30`. A rate target (rate pass) plus a maximize
