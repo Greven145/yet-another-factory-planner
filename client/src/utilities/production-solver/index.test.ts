@@ -703,6 +703,80 @@ describe('ProductionSolver game mode multiplier: Packager exemption (issue #195)
   });
 });
 
+// issue #198: when a recipe's true per-cycle amounts share a common factor beyond what the
+// GCD-of-perMinute-rates heuristic captures, that heuristic silently derives the wrong cycle.
+// Modeled on the reported case (Sulfuric Acid: 5 sulfur + 5 water -> 5 acid per 6s, all 50/min,
+// GCD(50, 50, 50) = 50 -> falsely implies a 1-per-1.2s cycle). Supplying the recipe's real
+// craftTime lets applyGameModeMultipliers derive the correct per-cycle quantity directly instead.
+const realCraftTimeGameData: GameData = {
+  buildings: {
+    'Build_Refinery_C': { slug: 'refinery', name: 'Refinery', power: 30, area: 50, buildCost: [], isFicsmas: false },
+    'Desc_MinerMk3_C': { slug: 'miner_mk3', name: 'Miner Mk.3', power: 110, area: 100, buildCost: [], isFicsmas: false },
+    'Desc_WaterPump_C': { slug: 'water_extractor', name: 'Water Extractor', power: 20, area: 100, buildCost: [], isFicsmas: false },
+  },
+  recipes: {
+    'Recipe_Acid_C': {
+      slug: 'sulfuric_acid', name: 'Sulfuric Acid', isAlternate: false,
+      ingredients: [{ itemClass: 'Desc_Sulfur_C', perMinute: 50 }, { itemClass: 'Desc_Water_C', perMinute: 50 }],
+      products: [{ itemClass: 'Desc_Acid_C', perMinute: 50 }],
+      producedIn: 'Build_Refinery_C', isFicsmas: false,
+      craftTime: 6,
+    },
+  },
+  resources: {
+    'Desc_Sulfur_C': { itemClass: 'Desc_Sulfur_C', maxExtraction: 100000, relativeValue: 1 },
+    'Desc_Water_C': { itemClass: 'Desc_Water_C', maxExtraction: 100000, relativeValue: 1 },
+  },
+  items: {
+    'Desc_Sulfur_C': { slug: 'sulfur', name: 'Sulfur', sinkPoints: 0, isFluid: false, usedInRecipes: ['Recipe_Acid_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_Water_C': { slug: 'water', name: 'Water', sinkPoints: 0, isFluid: true, usedInRecipes: ['Recipe_Acid_C'], producedFromRecipes: [], isFicsmas: false },
+    'Desc_Acid_C': { slug: 'acid', name: 'Sulfuric Acid', sinkPoints: 0, isFluid: true, usedInRecipes: [], producedFromRecipes: ['Recipe_Acid_C'], isFicsmas: false },
+  },
+  handGatheredItems: {},
+};
+
+function realCraftTimeOptions(recipePartsCost: string): FactoryOptions {
+  return {
+    key: 'real-craft-time-cost',
+    productionItems: [{ key: 'p1', itemKey: 'Desc_Acid_C', mode: 'per-minute', value: '50' }],
+    inputItems: [],
+    inputResources: [
+      { key: 'r1', itemKey: 'Desc_Sulfur_C', value: '100000', weight: '1', unlimited: false },
+      { key: 'r2', itemKey: 'Desc_Water_C', value: '100000', weight: '1', unlimited: false },
+    ],
+    allowHandGatheredItems: false,
+    weightingOptions: { resources: '1', power: '1', complexity: '0', buildings: '0' },
+    gameModeOptions: { recipePartsCost, powerConsumption: '1' },
+    amplificationOptions: { availableSloops: '0', availableShards: '0' },
+    allowedRecipes: { 'Recipe_Acid_C': true },
+    allowedBuildings: { 'Build_Refinery_C': true },
+    nodesPositions: [],
+    maximizeBalanceMode: 'proportional',
+    transportOptions: { beltCapacity: null, pipeCapacity: null },
+  };
+}
+
+describe('ProductionSolver game mode multiplier: real craftTime overrides the GCD guess (issue #198)', () => {
+  it('0.25x: uses the recipe\'s real craft time instead of the ambiguous GCD-derived cycle', async () => {
+    // Real cycle (craftTime = 6s): 5 sulfur/cycle. round(5 * 0.25) = round(1.25) = 1 -> 10/min.
+    // GCD-only guess would have collapsed the cycle to 1 sulfur/cycle (GCD(50,50,50) = 50), giving
+    // round(1 * 0.25) clamped to 1 -> 50/min unchanged (no discount at all).
+    const { productionGraph, error } = await new ProductionSolver(realCraftTimeOptions('0.25'), realCraftTimeGameData).exec();
+
+    expect(error).toBeNull();
+    const sulfurNode = productionGraph!.nodes['Desc_Sulfur_C'];
+    expect(sulfurNode.multiplier).toBeCloseTo(10, 4);
+  });
+
+  it('1x: multiplier of 1 leaves ingredients unchanged regardless of craftTime', async () => {
+    const { productionGraph, error } = await new ProductionSolver(realCraftTimeOptions('1'), realCraftTimeGameData).exec();
+
+    expect(error).toBeNull();
+    const sulfurNode = productionGraph!.nodes['Desc_Sulfur_C'];
+    expect(sulfurNode.multiplier).toBeCloseTo(50, 4);
+  });
+});
+
 describe('ProductionSolver belt/pipe capacity (issue #130)', () => {
   // Iron Ingot recipe produces 30 ingots/min per building, so the recipe node's total
   // output for iron ingot is `multiplier * 30`. A rate target (rate pass) plus a maximize

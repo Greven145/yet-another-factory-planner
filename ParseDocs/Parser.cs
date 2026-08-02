@@ -54,7 +54,7 @@ public static class Parser {
                 .Select(p => new ItemPerMinute(p.ItemClass, 60 * p.Quantity / recipeData.CraftTime)).ToList();
             recipesOutput.Add(recipeKey,
                 new Recipe(recipeData.Slug.Replace('-', '_'), recipeData.Name, recipeData.IsAlternate, ingredients, products,
-                    recipeData.ProducedIn.First(), recipeData.Event == EventType.FICSMAS));
+                    recipeData.ProducedIn.First(), recipeData.Event == EventType.FICSMAS, recipeData.CraftTime));
         }
 
         recipesOutput.Add("Recipe_CUSTOM_NuclearPower_C",

@@ -25,6 +25,12 @@ export type RecipeInfo = {
   products: ItemRate[],
   producedIn: string,
   isFicsmas: boolean,
+  // Real craft time in seconds (mManufactoringDuration from the game's Docs.json), when known.
+  // Lets applyGameModeMultipliers derive true per-cycle quantities instead of guessing from the
+  // GCD of perMinute rates, which is ambiguous when a recipe's amounts share a common factor
+  // (see issue #198). Absent for recipes parsed before this field existed, and for the synthetic
+  // nuclear/plutonium power "recipes", which fall back to the GCD heuristic.
+  craftTime?: number | null,
 };
 
 export type ResourceInfo = {

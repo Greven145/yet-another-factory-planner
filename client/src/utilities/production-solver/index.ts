@@ -363,8 +363,13 @@ export class ProductionSolver {
   // (generators, power < 0, left alone). All downstream solver/report logic then reads scaled values.
   //
   // The game applies the cost multiplier to the integer *per-cycle quantities*, not to the stored
-  // perMinute rates directly. The cycle time is derived from the GCD of all perMinute values in the
-  // recipe (ingredients + products): craftTime = 60 / GCD, perCycleQty = perMinute / GCD.
+  // perMinute rates directly. When the recipe's real craft time is known (craftTime, parsed from
+  // the game's mManufactoringDuration), per-cycle quantity is derived directly: perCycleQty =
+  // perMinute * craftTime / 60. Otherwise we fall back to guessing the cycle from the GCD of all
+  // perMinute values in the recipe (ingredients + products): craftTime = 60 / GCD, perCycleQty =
+  // perMinute / GCD. The GCD guess is ambiguous whenever a recipe's true per-cycle amounts share a
+  // common factor beyond what the GCD captures (e.g. Sulfuric Acid: 5 sulfur + 5 water -> 5 acid
+  // per 6s reduces to a false 1-per-1.2s cycle) — see issue #198.
   // Scaled quantities are rounded to the nearest whole number (minimum 1 per the game's floor).
   // Fluid ingredients are exempt from this rounding (the game keeps fluids fractional) and are
   // scaled directly. Packager recipes are exempt from the multiplier entirely: they only convert
@@ -380,11 +385,13 @@ export class ProductionSolver {
       if (recipeCostMultiplier === 1 || recipe.producedIn === PACKAGER_BUILDING_KEY) {
         recipes[key] = recipe;
       } else {
-        const allRates = [
-          ...recipe.ingredients.map((i) => i.perMinute),
-          ...recipe.products.map((p) => p.perMinute),
-        ];
-        const gcd = allRates.reduce(gcdFloats);
+        const craftTime = recipe.craftTime;
+        const gcd = craftTime
+          ? 60 / craftTime
+          : [
+            ...recipe.ingredients.map((i) => i.perMinute),
+            ...recipe.products.map((p) => p.perMinute),
+          ].reduce(gcdFloats);
         recipes[key] = {
           ...recipe,
           ingredients: recipe.ingredients.map((i) => {
