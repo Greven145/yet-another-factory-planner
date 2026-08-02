@@ -13,7 +13,7 @@
 export const BELT_TIERS: ReadonlyArray<{ label: string, rate: number }> = [
   { label: 'Mk.1', rate: 60 },
   { label: 'Mk.2', rate: 120 },
-  { label: 'Mk.3', rate: 240 },
+  { label: 'Mk.3', rate: 270 },
   { label: 'Mk.4', rate: 480 },
   { label: 'Mk.5', rate: 780 },
   { label: 'Mk.6', rate: 1200 },
